@@ -1,6 +1,5 @@
 use crate::lockfile::RemotePackageSourceUrl;
 use crate::lua_rockspec::LuaVersionError;
-use crate::project::project_toml::LocalProjectTomlValidationError;
 use crate::rockspec::{LuaVersionCompatibility, Rockspec};
 use std::{io, path::Path, process::ExitStatus};
 
@@ -74,49 +73,13 @@ impl<R: Rockspec + HasIntegrity, State> BuildBuilder<'_, R, State>
 where
     State: build_builder::State + build_builder::IsComplete,
 {
-    pub async fn build(self) -> Result<LocalPackage, RemoteBuildError> {
-        let build = self._build();
-
-        do_build(build).await
+    pub async fn build(self) -> Result<LocalPackage, BuildError> {
+        do_build(self._build()).await
     }
 }
 
 #[derive(Error, Debug)]
-pub enum LocalBuildError {
-    #[error("IO operation failed: {0}")]
-    Io(#[from] io::Error),
-    #[error("failed to create spinner: {0}")]
-    SpinnerFailure(#[from] TemplateError),
-    #[error(transparent)]
-    ExternalDependencyError(#[from] ExternalDependencyError),
-    #[error(transparent)]
-    PatchError(#[from] PatchError),
-    #[error("failed to compile build modules: {0}")]
-    CompilationError(#[from] cc::Error),
-    #[error(transparent)]
-    CMakeError(#[from] CMakeError),
-    #[error(transparent)]
-    MakeError(#[from] MakeError),
-    #[error(transparent)]
-    CommandError(#[from] CommandError),
-    #[error(transparent)]
-    RustError(#[from] RustError),
-    #[error(transparent)]
-    LuaVersionError(#[from] LuaVersionError),
-    #[error("compilation failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
-    CommandFailure {
-        status: ExitStatus,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(transparent)]
-    LuarocksBuildError(#[from] LuarocksBuildError),
-    #[error(transparent)]
-    LocalProjectTomlValidationError(#[from] LocalProjectTomlValidationError),
-}
-
-#[derive(Error, Debug)]
-pub enum RemoteBuildError {
+pub enum BuildError {
     #[error("IO operation failed: {0}")]
     Io(#[from] io::Error),
     #[error("failed to create spinner: {0}")]
@@ -176,14 +139,14 @@ impl From<bool> for BuildBehaviour {
     }
 }
 
-async fn run_build<R: Rockspec>(
+async fn run_build<R: Rockspec + HasIntegrity>(
     rockspec: &R,
     output_paths: &RockLayout,
     lua: &LuaInstallation,
     config: &Config,
     build_dir: &Path,
     progress: &Progress<ProgressBar>,
-) -> Result<BuildInfo, RemoteBuildError> {
+) -> Result<BuildInfo, BuildError> {
     progress.map(|p| p.set_message("🛠️ Building..."));
 
     Ok(
@@ -221,14 +184,14 @@ async fn run_build<R: Rockspec>(
     )
 }
 
-async fn install<R: Rockspec>(
+async fn install<R: Rockspec + HasIntegrity>(
     rockspec: &R,
     tree: &Tree,
     output_paths: &RockLayout,
     lua: &LuaInstallation,
     build_dir: &Path,
     progress: &Progress<ProgressBar>,
-) -> Result<(), RemoteBuildError> {
+) -> Result<(), BuildError> {
     progress.map(|p| {
         p.set_message(format!(
             "💻 Installing {} {}",
@@ -276,7 +239,7 @@ async fn install<R: Rockspec>(
 
 async fn do_build<R: Rockspec + HasIntegrity>(
     build: Build<'_, R>,
-) -> Result<LocalPackage, RemoteBuildError> {
+) -> Result<LocalPackage, BuildError> {
     let rockspec = build.rockspec;
 
     build.progress.map(|p| {
@@ -309,7 +272,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
 
     if let Some(expected) = &rockspec.source().current_platform().integrity {
         if expected.matches(&hashes.source).is_none() {
-            return Err(RemoteBuildError::SourceIntegrityMismatch {
+            return Err(BuildError::SourceIntegrityMismatch {
                 expected: expected.clone(),
                 actual: hashes.source,
             });
@@ -420,10 +383,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
     }
 }
 
-fn recursive_copy_doc_dir(
-    output_paths: &RockLayout,
-    build_dir: &Path,
-) -> Result<(), RemoteBuildError> {
+fn recursive_copy_doc_dir(output_paths: &RockLayout, build_dir: &Path) -> Result<(), BuildError> {
     let mut doc_dir = build_dir.join("doc");
     if !doc_dir.exists() {
         doc_dir = build_dir.join("docs");
