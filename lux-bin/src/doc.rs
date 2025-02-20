@@ -7,7 +7,7 @@ use lux_lib::{
     lockfile::LocalPackage,
     lua_rockspec::RemoteLuaRockspec,
     package::PackageReq,
-    rockspec::LocalRockspec,
+    rockspec::Rockspec,
     tree::{RockMatches, Tree},
 };
 use url::Url;

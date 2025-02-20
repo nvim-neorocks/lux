@@ -21,7 +21,7 @@ use crate::{
     package::PackageSpec,
     progress::{Progress, ProgressBar},
     remote_package_source::RemotePackageSource,
-    rockspec::LocalRockspec,
+    rockspec::Rockspec,
 };
 use crate::{lockfile::RemotePackageSourceUrl, rockspec::LuaVersionCompatibility};
 

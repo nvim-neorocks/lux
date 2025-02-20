@@ -13,7 +13,7 @@ use lux_lib::{
     package::PackageName,
     progress::MultiProgress,
     project::Project,
-    rockspec::{LocalRockspec, LuaVersionCompatibility},
+    rockspec::{LuaVersionCompatibility, Rockspec},
 };
 
 #[derive(Args, Default)]

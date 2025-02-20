@@ -1,14 +1,14 @@
 use std::path::PathBuf;
 
 use clap::Args;
-use eyre::{eyre, Context, Result};
+use eyre::{eyre, Context, OptionExt, Result};
 use lux_lib::{
     config::{Config, LuaVersion},
     lockfile::ProjectLockfile,
     operations,
     package::PackageReq,
-    project::{project_toml::ProjectToml, PROJECT_TOML},
-    rockspec::LocalRockspec,
+    project::{Project, PROJECT_TOML},
+    rockspec::Rockspec,
 };
 
 #[derive(Args)]
@@ -61,10 +61,17 @@ pub async fn sync(args: Sync, config: Config) -> Result<()> {
 
     if let Some(dependencies) = manifest_path
         .map(|manifest_path| -> Result<Vec<PackageReq>> {
-            let content = std::fs::read_to_string(&manifest_path)?;
-            let toml = ProjectToml::new(&content)?;
-            Ok(toml
-                .into_validated()?
+            // TODO(vhyrro): this is hacky and the design of this entire CLI command should be
+            // rewritten.
+            let project = Project::from(
+                manifest_path
+                    .parent()
+                    .expect("invalid lux.toml path provided"),
+            )?
+            .ok_or_eyre("Not in a project!")?;
+            Ok(project
+                .toml()
+                .into_remote()?
                 .dependencies()
                 .current_platform()
                 .clone())

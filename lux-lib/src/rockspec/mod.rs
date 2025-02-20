@@ -4,7 +4,6 @@ use std::{
     path::PathBuf,
 };
 
-use ambassador::delegatable_trait;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
@@ -17,8 +16,7 @@ use crate::{
     package::{PackageName, PackageReq, PackageVersion},
 };
 
-#[delegatable_trait]
-pub trait LocalRockspec {
+pub trait Rockspec {
     fn package(&self) -> &PackageName;
     fn version(&self) -> &PackageVersion;
     fn description(&self) -> &RockDescription;
@@ -30,9 +28,11 @@ pub trait LocalRockspec {
 
     fn build(&self) -> &PerPlatform<BuildSpec>;
     fn test(&self) -> &PerPlatform<TestSpec>;
+    fn source(&self) -> &PerPlatform<RemoteRockSource>;
 
     fn build_mut(&mut self) -> &mut PerPlatform<BuildSpec>;
     fn test_mut(&mut self) -> &mut PerPlatform<TestSpec>;
+    fn source_mut(&mut self) -> &mut PerPlatform<RemoteRockSource>;
 
     fn format(&self) -> &Option<RockspecFormat>;
 
@@ -48,14 +48,9 @@ pub trait LocalRockspec {
                 .collect(),
         )
     }
-}
 
-/// A trait for querying information about a project from either a rockspec or `lux.toml` file.
-pub trait RemoteRockspec: LocalRockspec {
-    fn source(&self) -> &PerPlatform<RemoteRockSource>;
-    fn source_mut(&mut self) -> &mut PerPlatform<RemoteRockSource>;
-
-    fn to_rockspec_str(&self) -> String;
+    /// Converts the rockspec to a string that can be uploaded to a luarocks server.
+    fn to_lua_rockspec_string(&self) -> String;
 }
 
 pub trait LuaVersionCompatibility {
@@ -77,7 +72,7 @@ pub trait LuaVersionCompatibility {
     fn test_lua_version(&self) -> Option<LuaVersion>;
 }
 
-impl<T: RemoteRockspec> LuaVersionCompatibility for T {
+impl<T: Rockspec> LuaVersionCompatibility for T {
     fn validate_lua_version(&self, config: &Config) -> Result<(), LuaVersionError> {
         let _ = self.lua_version_matches(config)?;
         Ok(())

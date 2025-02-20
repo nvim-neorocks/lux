@@ -21,7 +21,7 @@ use crate::{
     path::Paths,
     progress::{MultiProgress, Progress, ProgressBar},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
-    rockspec::{LocalRockspec, RemoteRockspec},
+    rockspec::Rockspec,
     tree::Tree,
 };
 
@@ -125,7 +125,7 @@ impl LuaRocksInstallation {
         Ok(())
     }
 
-    pub async fn install_build_dependencies<R: RemoteRockspec>(
+    pub async fn install_build_dependencies<R: Rockspec>(
         &self,
         build_backend: &str,
         rocks: &R,

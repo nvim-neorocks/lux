@@ -6,11 +6,8 @@ mod rock_source;
 mod serde_util;
 mod test_spec;
 
-use crate::rockspec::ambassador_impl_LocalRockspec;
-use crate::rockspec::RockBinaries;
 use std::{collections::HashMap, fmt::Display, io, path::PathBuf, str::FromStr};
 
-use ambassador::Delegate;
 use mlua::{FromLua, Lua, LuaSerdeExt, Value};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -29,7 +26,8 @@ use crate::{
     config::{LuaVersion, LuaVersionUnset},
     hash::HasIntegrity,
     package::{PackageName, PackageReq, PackageVersion},
-    rockspec::{LocalRockspec, RemoteRockspec},
+    project::ProjectRoot,
+    rockspec::Rockspec,
 };
 
 #[derive(Error, Debug)]
@@ -58,6 +56,7 @@ pub struct LocalLuaRockspec {
     external_dependencies: PerPlatform<HashMap<String, ExternalDependencySpec>>,
     test_dependencies: PerPlatform<Vec<PackageReq>>,
     build: PerPlatform<BuildSpec>,
+    source: PerPlatform<RemoteRockSource>,
     test: PerPlatform<TestSpec>,
     /// The original content of this rockspec, needed by luarocks
     raw_content: String,
@@ -66,7 +65,10 @@ pub struct LocalLuaRockspec {
 }
 
 impl LocalLuaRockspec {
-    pub fn new(rockspec_content: &str) -> Result<Self, LuaRockspecError> {
+    pub fn new(
+        rockspec_content: &str,
+        project_root: ProjectRoot,
+    ) -> Result<Self, LuaRockspecError> {
         let lua = Lua::new();
         lua.load(rockspec_content).exec()?;
 
@@ -85,6 +87,15 @@ impl LocalLuaRockspec {
             test: globals.get("test")?,
             hash: Integrity::from(rockspec_content),
             raw_content: rockspec_content.into(),
+
+            source: globals
+                .get::<Option<PerPlatform<RemoteRockSource>>>("source")?
+                .unwrap_or_else(|| {
+                    PerPlatform::new(RemoteRockSource {
+                        local: LocalRockSource::default(),
+                        source_spec: RockSourceSpec::File(project_root.to_path_buf()),
+                    })
+                }),
         };
 
         let rockspec_file_name = format!("{}-{}.rockspec", rockspec.package(), rockspec.version());
@@ -111,7 +122,7 @@ impl LocalLuaRockspec {
     }
 }
 
-impl LocalRockspec for LocalLuaRockspec {
+impl Rockspec for LocalLuaRockspec {
     fn package(&self) -> &PackageName {
         &self.package
     }
@@ -122,6 +133,10 @@ impl LocalRockspec for LocalLuaRockspec {
 
     fn description(&self) -> &RockDescription {
         &self.description
+    }
+
+    fn supported_platforms(&self) -> &PlatformSupport {
+        &self.supported_platforms
     }
 
     fn dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
@@ -148,8 +163,8 @@ impl LocalRockspec for LocalLuaRockspec {
         &self.test
     }
 
-    fn supported_platforms(&self) -> &PlatformSupport {
-        &self.supported_platforms
+    fn source(&self) -> &PerPlatform<RemoteRockSource> {
+        &self.source
     }
 
     fn build_mut(&mut self) -> &mut PerPlatform<BuildSpec> {
@@ -160,13 +175,26 @@ impl LocalRockspec for LocalLuaRockspec {
         &mut self.test
     }
 
+    fn source_mut(&mut self) -> &mut PerPlatform<RemoteRockSource> {
+        &mut self.source
+    }
+
     fn format(&self) -> &Option<RockspecFormat> {
         &self.rockspec_format
     }
+
+    fn to_lua_rockspec_string(&self) -> String {
+        self.raw_content.clone()
+    }
 }
 
-#[derive(Clone, Debug, Delegate)]
-#[delegate(LocalRockspec, target = "local")]
+impl HasIntegrity for LocalLuaRockspec {
+    fn hash(&self) -> io::Result<Integrity> {
+        Ok(self.hash.to_owned())
+    }
+}
+
+#[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct RemoteLuaRockspec {
     local: LocalLuaRockspec,
@@ -175,30 +203,83 @@ pub struct RemoteLuaRockspec {
 
 impl RemoteLuaRockspec {
     pub fn new(rockspec_content: &str) -> Result<Self, LuaRockspecError> {
-        // NOTE(vhyrro): We waste CPU time here by parsing the rockspec twice, but it's not a big
-        // deal for now.
         let lua = Lua::new();
         lua.load(rockspec_content).exec()?;
 
         let globals = lua.globals();
+        let source = globals.get("source")?;
 
-        Ok(RemoteLuaRockspec {
-            local: LocalLuaRockspec::new(rockspec_content)?,
-            source: globals.get("source")?,
-        })
+        let rockspec = RemoteLuaRockspec {
+            local: LocalLuaRockspec::new(rockspec_content, ProjectRoot::new())?,
+            source,
+        };
+
+        Ok(rockspec)
     }
 }
 
-impl RemoteRockspec for RemoteLuaRockspec {
+impl Rockspec for RemoteLuaRockspec {
+    fn package(&self) -> &PackageName {
+        self.local.package()
+    }
+
+    fn version(&self) -> &PackageVersion {
+        self.local.version()
+    }
+
+    fn description(&self) -> &RockDescription {
+        self.local.description()
+    }
+
+    fn supported_platforms(&self) -> &PlatformSupport {
+        self.local.supported_platforms()
+    }
+
+    fn dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+        self.local.dependencies()
+    }
+
+    fn build_dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+        self.local.build_dependencies()
+    }
+
+    fn external_dependencies(&self) -> &PerPlatform<HashMap<String, ExternalDependencySpec>> {
+        self.local.external_dependencies()
+    }
+
+    fn test_dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+        self.local.test_dependencies()
+    }
+
+    fn build(&self) -> &PerPlatform<BuildSpec> {
+        self.local.build()
+    }
+
+    fn test(&self) -> &PerPlatform<TestSpec> {
+        self.local.test()
+    }
+
     fn source(&self) -> &PerPlatform<RemoteRockSource> {
         &self.source
+    }
+
+    fn build_mut(&mut self) -> &mut PerPlatform<BuildSpec> {
+        self.local.build_mut()
+    }
+
+    fn test_mut(&mut self) -> &mut PerPlatform<TestSpec> {
+        self.local.test_mut()
     }
 
     fn source_mut(&mut self) -> &mut PerPlatform<RemoteRockSource> {
         &mut self.source
     }
 
-    fn to_rockspec_str(&self) -> String {
+    fn format(&self) -> &Option<RockspecFormat> {
+        self.local.format()
+    }
+
+    fn to_lua_rockspec_string(&self) -> String {
         self.local.raw_content.clone()
     }
 }
@@ -213,6 +294,8 @@ pub enum LuaVersionError {
 
 impl HasIntegrity for RemoteLuaRockspec {
     fn hash(&self) -> io::Result<Integrity> {
+        // FIXME(vhyrro): I don't think we should use a precomputed hash here, but rather compute
+        // it at runtime. What if the rockspec changes? Can it change?
         Ok(self.local.hash.to_owned())
     }
 }
@@ -589,7 +672,7 @@ mod tests {
         .to_string();
         let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
         assert_eq!(
-            rockspec.source.default.source_spec,
+            rockspec.local.source.default.source_spec,
             RockSourceSpec::Git(GitSource {
                 url: "https://hub.com/example-project/".parse().unwrap(),
                 checkout_ref: Some("bar".into())
@@ -608,7 +691,7 @@ mod tests {
         .to_string();
         let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
         assert_eq!(
-            rockspec.source.default.source_spec,
+            rockspec.local.source.default.source_spec,
             RockSourceSpec::Git(GitSource {
                 url: "https://hub.com/example-project/".parse().unwrap(),
                 checkout_ref: Some("bar".into())
@@ -644,7 +727,7 @@ mod tests {
         .to_string();
         let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
         assert_eq!(
-            rockspec.source.default.archive_name,
+            rockspec.local.source.default.archive_name,
             Some("foo.tar.gz".into())
         );
         let foo_bar_path = rockspec
@@ -760,7 +843,7 @@ mod tests {
         "
         .to_string();
         let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
-        assert_eq!(rockspec.source.default.unpack_dir, Some("baz".into()));
+        assert_eq!(rockspec.local.source.default.unpack_dir, Some("baz".into()));
         assert_eq!(
             rockspec.local.build.default.build_backend,
             Some(BuildBackendSpec::Make(MakeBuildSpec::default()))
@@ -999,7 +1082,7 @@ mod tests {
         .to_string();
         let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
         assert_eq!(
-            rockspec.source.default.source_spec,
+            rockspec.local.source.default.source_spec,
             RockSourceSpec::Git(GitSource {
                 url: "https://hub.com/example-project/.git".parse().unwrap(),
                 checkout_ref: Some("bar".into())
