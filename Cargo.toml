@@ -3,9 +3,9 @@ members = [
    "lux-lib",
    "lux-cli",
    "xtask",
-   "lux-lua",
 ]
 default-members = [
    "lux-cli",
 ]
+exclude = ["lux-lua"]
 resolver = "2"

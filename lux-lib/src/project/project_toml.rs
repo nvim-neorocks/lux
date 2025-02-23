@@ -111,10 +111,10 @@ impl UserData for PartialProjectToml {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("package", |_, this, _: ()| Ok(this.package().clone()));
         methods.add_method("version", |_, this, _: ()| Ok(this.version().clone()));
-        methods.add_method("into_local", |_, this, _: ()| {
+        methods.add_method("to_local", |_, this, _: ()| {
             this.into_local().into_lua_err()
         });
-        methods.add_method("into_remote", |_, this, _: ()| {
+        methods.add_method("to_remote", |_, this, _: ()| {
             this.into_remote().into_lua_err()
         });
         //TODO:
