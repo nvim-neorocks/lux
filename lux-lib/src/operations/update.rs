@@ -5,7 +5,6 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use crate::{
-    build::BuildBehaviour,
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{
         LocalPackage, LocalPackageLockType, Lockfile, PinnedState, ProjectLockfile, ReadOnly,
@@ -20,7 +19,7 @@ use crate::{
     tree::Tree,
 };
 
-use super::{Install, InstallError, Remove, RemoveError, SyncError};
+use super::{Install, InstallError, PackageInstallSpec, Remove, RemoveError, SyncError};
 
 #[derive(Error, Debug)]
 pub enum UpdateError {
@@ -275,7 +274,7 @@ async fn update(
             .packages(
                 updatable
                     .iter()
-                    .map(|constraint| (BuildBehaviour::NoForce, constraint.clone())),
+                    .map(|constraint| PackageInstallSpec::default_for(constraint.clone())),
             )
             .package_db(package_db)
             .progress(progress.clone())

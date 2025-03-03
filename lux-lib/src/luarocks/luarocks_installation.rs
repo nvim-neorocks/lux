@@ -11,12 +11,12 @@ use tempdir::TempDir;
 use thiserror::Error;
 
 use crate::{
-    build::{Build, BuildBehaviour, BuildError},
+    build::{Build, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
-    lockfile::{LocalPackage, LocalPackageId, PinnedState},
+    lockfile::{LocalPackage, LocalPackageId},
     lua_installation::LuaInstallation,
     lua_rockspec::{RemoteLuaRockspec, RockspecFormat},
-    operations::{get_all_dependencies, SearchAndDownloadError},
+    operations::{get_all_dependencies, PackageInstallSpec, SearchAndDownloadError},
     package::PackageReq,
     path::Paths,
     progress::{MultiProgress, Progress, ProgressBar},
@@ -151,15 +151,13 @@ impl LuaRocksInstallation {
             _ => rocks.build_dependencies().current_platform().to_vec(),
         }
         .into_iter()
-        .map(|dep| (BuildBehaviour::NoForce, dep))
+        .map(|dep| PackageInstallSpec::default_for(dep))
         .collect_vec();
 
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-        let pin = PinnedState::Unpinned;
         get_all_dependencies(
             tx,
             build_dependencies,
-            pin,
             Arc::new(package_db),
             Arc::new(lockfile.clone()),
             &self.config,

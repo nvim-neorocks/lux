@@ -1,8 +1,4 @@
 [workspace]
-members = [
-   "lux-lib",
-   "lux-cli",
-   "xtask",
-]
+members = ["lux-lib", "lux-cli", "xtask"]
 exclude = ["lux-lua"]
 resolver = "2"
