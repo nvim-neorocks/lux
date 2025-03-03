@@ -3,6 +3,7 @@
 mod download;
 mod fetch;
 mod install;
+mod install_spec;
 mod pack;
 mod pin;
 mod remove;
@@ -16,6 +17,7 @@ mod update;
 pub use download::*;
 pub use fetch::*;
 pub use install::*;
+pub use install_spec::*;
 pub use pack::*;
 pub use pin::*;
 pub use remove::*;

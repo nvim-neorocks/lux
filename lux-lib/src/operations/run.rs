@@ -1,7 +1,6 @@
 use std::{io, process::Command};
 
 use crate::{
-    build::BuildBehaviour,
     config::{Config, LuaVersion, LuaVersionUnset},
     lua_rockspec::LuaVersionError,
     operations::Install,
@@ -14,7 +13,7 @@ use bon::Builder;
 use itertools::Itertools;
 use thiserror::Error;
 
-use super::InstallError;
+use super::{InstallError, PackageInstallSpec};
 
 /// Rocks package runner, providing fine-grained control
 /// over how a package should be run.
@@ -114,7 +113,7 @@ pub enum InstallCmdError {
 pub async fn install_command(command: &str, config: &Config) -> Result<(), InstallCmdError> {
     let package_req = PackageReq::new(command.into(), None)?;
     Install::new(&config.tree(LuaVersion::from(config)?)?, config)
-        .package(BuildBehaviour::NoForce, package_req)
+        .package(PackageInstallSpec::default_for(package_req))
         .install()
         .await?;
     Ok(())

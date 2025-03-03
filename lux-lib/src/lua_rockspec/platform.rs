@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use mlua::{FromLua, IntoLua, IntoLuaMulti, Lua, LuaSerdeExt, UserData, Value};
+use mlua::{FromLua, IntoLuaMulti, Lua, LuaSerdeExt, UserData, Value};
 use std::{cmp::Ordering, collections::HashMap, convert::Infallible, marker::PhantomData};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;

@@ -14,7 +14,7 @@ pub struct Install {
     /// Package or list of packages to install.
     package_req: Vec<PackageReq>,
 
-    /// Pin the package so that it doesn't get updated.
+    /// Pin the packages so that they don't get updated.
     #[arg(long)]
     pin: bool,
 
@@ -34,7 +34,6 @@ pub async fn install(data: Install, config: Config) -> Result<()> {
     // TODO(vhyrro): If the tree doesn't exist then error out.
     operations::Install::new(&tree, &config)
         .packages(packages)
-        .pin(pin)
         .progress(MultiProgress::new_arc())
         .install()
         .await?;

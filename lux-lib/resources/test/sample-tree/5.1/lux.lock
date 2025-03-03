@@ -1,8 +1,3 @@
----
-source: lux-lib/src/lockfile/mod.rs
-assertion_line: 1514
-expression: lockfile
----
 {
   "version": "1.0.0",
   "rocks": {
@@ -203,38 +198,6 @@ expression: lockfile
       "hashes": {
         "rockspec": "sha256-L/6Yon2ek6NnEeifAy3qsnT2cMCB8IdaCgVeu3+1lvs=",
         "source": "sha256-23r4ScVV0aR09yn+Sla1Uw6b57JHSet6fEdKfHIHuXI="
-      }
-    },
-    "70c39f3bec3b9799890eb8dd8501115136faa83d7c0eb9448b9a9d933e178335": {
-      "name": "test2",
-      "version": "0.1.0-1",
-      "pinned": true,
-      "opt": false,
-      "dependencies": [],
-      "constraint": ">=1.0.0",
-      "binaries": [],
-      "source": "test+foo_bar",
-      "source_url": null,
-      "hashes": {
-        "rockspec": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek=",
-        "source": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
-      }
-    },
-    "9aee9941c7f659d37f722216138a3913b8861f8d31d52da5601a39d9a30e9d4e": {
-      "name": "test1",
-      "version": "0.1.0-1",
-      "pinned": false,
-      "opt": false,
-      "dependencies": [
-        "70c39f3bec3b9799890eb8dd8501115136faa83d7c0eb9448b9a9d933e178335"
-      ],
-      "constraint": null,
-      "binaries": [],
-      "source": "test+foo_bar",
-      "source_url": null,
-      "hashes": {
-        "rockspec": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek=",
-        "source": "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
       }
     },
     "9e1642247f9208a7e65e1e76461b2adc6f35fe644ce4cdf9f7fa6f5a12c8845e": {
