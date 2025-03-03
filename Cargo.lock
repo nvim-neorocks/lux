@@ -2170,6 +2170,7 @@ dependencies = [
  "inquire",
  "itertools 0.14.0",
  "lux-lib",
+ "lux-workspace-hack",
  "nucleo",
  "octocrab",
  "open",
@@ -2222,6 +2223,7 @@ dependencies = [
  "lets_find_up",
  "lua-src",
  "luajit-src",
+ "lux-workspace-hack",
  "md5",
  "mlua",
  "nix-nar",
@@ -2259,6 +2261,59 @@ dependencies = [
  "walkdir",
  "which 7.0.0",
  "zip",
+]
+
+[[package]]
+name = "lux-lua"
+version = "0.1.0"
+dependencies = [
+ "lets_find_up",
+ "lux-lib",
+ "lux-workspace-hack",
+ "mlua",
+ "path-absolutize",
+ "pathdiff",
+]
+
+[[package]]
+name = "lux-workspace-hack"
+version = "0.1.0"
+dependencies = [
+ "aho-corasick",
+ "bitflags 2.6.0",
+ "bstr",
+ "clap 4.5.23",
+ "clap_builder",
+ "console",
+ "crossbeam-utils",
+ "form_urlencoded",
+ "futures-channel",
+ "futures-core",
+ "futures-sink",
+ "futures-util",
+ "hyper",
+ "hyper-util",
+ "indexmap 1.9.3",
+ "lock_api",
+ "log",
+ "num-traits",
+ "parking_lot",
+ "percent-encoding",
+ "predicates",
+ "proc-macro2",
+ "quote",
+ "regex-automata",
+ "serde",
+ "similar",
+ "smallvec",
+ "syn 2.0.87",
+ "time",
+ "tokio",
+ "tokio-util",
+ "toml",
+ "toml_edit",
+ "tracing",
+ "url",
 ]
 
 [[package]]
@@ -2379,6 +2434,7 @@ dependencies = [
  "bstr",
  "either",
  "erased-serde",
+ "futures-util",
  "mlua-sys",
  "mlua_derive",
  "num-traits",
@@ -5044,6 +5100,7 @@ dependencies = [
  "clap_complete",
  "clap_mangen",
  "lux-cli",
+ "lux-workspace-hack",
 ]
 
 [[package]]

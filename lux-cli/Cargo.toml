@@ -43,6 +43,7 @@ path-absolutize = "3.1.1"
 url = "2.5.4"
 open = "5.3.2"
 edit = "0.1.5"
+lux-workspace-hack = { version = "0.1", path = "../lux-workspace-hack" }
 
 [dev-dependencies]
 assert_fs = "1.1.2"

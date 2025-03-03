@@ -76,6 +76,7 @@ tree-sitter-loader = "0.25.2"
 tree-sitter-generate = "0.25.1"
 tree-sitter = "0.25.2"
 tree-sitter-config = "0.25.2"
+lux-workspace-hack = { version = "0.1", path = "../lux-workspace-hack" }
 
 [dev-dependencies]
 httptest = { version = "0.16.1" }
