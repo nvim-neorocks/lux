@@ -4,8 +4,8 @@ use crate::{
     build::BuildBehaviour,
     config::Config,
     lockfile::{
-        LocalPackage, LocalPackageLockType, LockfileIntegrityError, PackageSyncSpec, PinnedState,
-        ProjectLockfile, ReadWrite,
+        LocalPackage, LocalPackageLockType, LockfileIntegrityError, OptState, PackageSyncSpec,
+        PinnedState, ProjectLockfile, ReadWrite,
     },
     luarocks::luarocks_installation::LUAROCKS_VERSION,
     package::{PackageName, PackageReq},
@@ -16,7 +16,7 @@ use bon::{builder, Builder};
 use itertools::Itertools;
 use thiserror::Error;
 
-use super::{Install, InstallError, Remove, RemoveError};
+use super::{Install, InstallError, PackageInstallSpec, Remove, RemoveError};
 
 /// A rocks sync builder, for synchronising a tree with a lockfile.
 #[derive(Builder)]
@@ -154,7 +154,7 @@ async fn do_sync(
         .iter()
         .cloned()
         .map(|pkg| pkg.into_package_req())
-        .map(|pkg| (BuildBehaviour::Force, pkg))
+        .map(|pkg| PackageInstallSpec::new(pkg, BuildBehaviour::Force, pin, OptState::default()))
         .collect_vec();
 
     let package_db = args
@@ -165,7 +165,6 @@ async fn do_sync(
     Install::new(args.tree, args.config)
         .package_db(package_db)
         .packages(packages_to_install)
-        .pin(pin)
         .progress(progress.clone())
         .install()
         .await?;
@@ -201,14 +200,12 @@ async fn do_sync(
 
     if !package_sync_spec.to_add.is_empty() {
         // Install missing packages using the default package_db.
-        let missing_packages = package_sync_spec
-            .to_add
-            .into_iter()
-            .map(|pkg| (BuildBehaviour::Force, pkg));
+        let missing_packages = package_sync_spec.to_add.into_iter().map(|pkg| {
+            PackageInstallSpec::new(pkg, BuildBehaviour::Force, pin, OptState::default())
+        });
 
         let added = Install::new(args.tree, args.config)
             .packages(missing_packages)
-            .pin(pin)
             .progress(progress.clone())
             .install()
             .await?;
