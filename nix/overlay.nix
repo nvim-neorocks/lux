@@ -2,12 +2,13 @@
   self,
   crane,
 }: final: prev: let
-  craneLib = crane.mkLib prev;
-
   cleanCargoSrc = craneLib.cleanCargoSource self;
 
+  craneLib = crane.mkLib prev;
+
+  luxCliCargo = craneLib.crateNameFromCargoToml {src = "${self}/lux-cli";};
+
   commonArgs = with final; {
-    inherit (craneLib.crateNameFromCargoToml {cargoToml = "${self}/lux-cli/Cargo.toml";}) version pname;
     strictDeps = true;
 
     nativeBuildInputs = [
@@ -39,6 +40,8 @@
 
   lux-deps = craneLib.buildDepsOnly (commonArgs
     // {
+      pname = "lux";
+      version = "0.1.0";
       src = cleanCargoSrc;
     });
 
@@ -55,8 +58,9 @@
   mk-lux-cli = {buildType ? "release"}:
     craneLib.buildPackage (individualCrateArgs
       // {
-        pname = "lux-cli";
-        cargoExtrArgs = "-p lux-cli";
+        inherit (luxCliCargo) pname version;
+        cargoExtraArgs = "-p ${luxCliCargo.pname}";
+        cargoArtifacts = lux-deps;
 
         postBuild = ''
           cargo xtask dist-man
@@ -64,22 +68,62 @@
         '';
 
         postInstall = ''
-          installManPage target/dist/lux.1
-          installShellCompletion target/dist/lux.{bash,fish} --zsh target/dist/_lux
+          installManPage target/dist/lx.1
+          installShellCompletion target/dist/lx.{bash,fish} --zsh target/dist/_lx
         '';
 
         inherit buildType;
 
-        meta.mainProgram = "lux";
+        LUX_LIB_DIR = lux-lua;
+
+        meta.mainProgram = "lx";
       });
+
+  lux-lua =
+    let luxLuaCargo = craneLib.crateNameFromCargoToml {src = "${self}/lux-lua";};
+    in
+    craneLib.buildPackage (individualCrateArgs // {
+        inherit (luxLuaCargo) pname version;
+
+        # FIXME: mlua-sys still fails saying it couldn't link the functions properly :(
+        nativeBuildInputs = with final; individualCrateArgs.nativeBuildInputs ++ [
+          lua51Packages.lua
+          lua52Packages.lua
+          lua53Packages.lua
+          lua54Packages.lua
+        ];
+
+        buildCargoCommand = ''
+          cargo xtask dist-lua
+        '';
+      });
+
+  lux-workspace-hack = craneLib.mkCargoDerivation {
+    src = cleanCargoSrc;
+    pname = "lux-workspace-hack";
+    version = "0.1.0";
+    cargoArtifacts = null;
+    doInstallCargoArtifacts = false;
+
+    buildPhaseCargoCommand = ''
+      cargo hakari generate --diff
+      cargo hakari manage-deps --dry-run
+      cargo hakari verify
+    '';
+
+    nativeBuildInputs = with final; [
+      cargo-hakari
+    ];
+  };
 in {
-  inherit lux-deps;
+  inherit lux-deps lux-workspace-hack;
   lux-cli = mk-lux-cli {};
   lux-cli-debug = mk-lux-cli {buildType = "debug";};
 
   lux-nextest = craneLib.cargoNextest (commonArgs
     // {
-      src = self;
+      inherit (luxCliCargo) pname version;
+      src = cleanCargoSrc;
       nativeCheckInputs = with final; [
         cacert
         cargo-nextest
@@ -101,7 +145,8 @@ in {
 
   lux-clippy = craneLib.cargoClippy (commonArgs
     // {
-      src = self;
+      inherit (luxCliCargo) pname version;
+      src = cleanCargoSrc;
       cargoArtifacts = lux-deps;
     });
 }
