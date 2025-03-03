@@ -28,6 +28,7 @@ fn try_main() -> Result<(), DynError> {
         Some("dist") => dist(true)?,
         Some("dist-man") => dist_man()?,
         Some("dist-completions") => dist_completions()?,
+        Some("dist-lua") => build_lua_libs(true)?,
         Some("build") => build(false)?,
         Some("build-release") => build(true)?,
         _ => print_help(),
@@ -44,6 +45,7 @@ build               builds and links all libraries and the application
 dist-man            builds man pages
 dist-completions    builds shell completions
 dist                builds everything, equivalent to build + dist-man + dist-completions
+dist-lua            builds the lua libraries for all Lua versions
 
 Environment variables:
 LUA_LIB_DIR         when set, overrides the path to the directory containing the compiled lux-lua libraries
@@ -52,12 +54,13 @@ LUA_LIB_DIR         when set, overrides the path to the directory containing the
 }
 
 fn dist(release: bool) -> Result<(), DynError> {
+    build_lua_libs(release)?;
     build(release)?;
     dist_man()?;
     dist_completions()
 }
 
-fn build(release: bool) -> Result<(), DynError> {
+fn build_lua_libs(release: bool) -> Result<(), DynError> {
     let _ = fs::remove_dir_all(dist_dir());
     fs::create_dir_all(dist_dir())?;
 
@@ -98,10 +101,19 @@ fn build(release: bool) -> Result<(), DynError> {
         fs::create_dir_all(dir.join(canonical_version))?;
 
         fs::copy(
-            project_root().join(format!("lux-lua/target/{profile}/liblux_lua.so")),
+            project_root().join(format!("target/{profile}/liblux_lua.so")),
             dir.join(format!("{canonical_version}/lux.so")),
         )?;
     }
+
+    Ok(())
+}
+
+fn build(release: bool) -> Result<(), DynError> {
+    let profile = if release { "release" } else { "debug" };
+
+    let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
+    let dest_dir = project_root().join(format!("target/{profile}"));
 
     let mut args = vec!["build", "--features", "luajit"];
 
@@ -161,7 +173,7 @@ fn dist_man() -> Result<(), DynError> {
     let cmd = &mut Cli::command();
 
     Man::new(cmd.clone())
-        .render(&mut File::create(dist_dir().join("lux.1")).unwrap())
+        .render(&mut File::create(dist_dir().join("lx.1")).unwrap())
         .unwrap();
     Ok(())
 }
