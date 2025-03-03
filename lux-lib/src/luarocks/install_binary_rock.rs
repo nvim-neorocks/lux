@@ -15,7 +15,7 @@ use crate::{
     },
     config::Config,
     hash::HasIntegrity,
-    lockfile::{LocalPackage, LocalPackageHashes, LockConstraint, PinnedState},
+    lockfile::{LocalPackage, LocalPackageHashes, LockConstraint, OptState, PinnedState},
     lua_rockspec::{LuaVersionError, RemoteLuaRockspec},
     luarocks::rock_manifest::RockManifest,
     package::PackageSpec,
@@ -48,6 +48,7 @@ pub(crate) struct BinaryRockInstall<'a> {
     rock_bytes: Bytes,
     source: RemotePackageSource,
     pin: PinnedState,
+    opt: OptState,
     constraint: LockConstraint,
     behaviour: BuildBehaviour,
     config: &'a Config,
@@ -71,11 +72,16 @@ impl<'a> BinaryRockInstall<'a> {
             constraint: LockConstraint::default(),
             behaviour: BuildBehaviour::default(),
             pin: PinnedState::default(),
+            opt: OptState::default(),
         }
     }
 
     pub(crate) fn pin(self, pin: PinnedState) -> Self {
         Self { pin, ..self }
+    }
+
+    pub(crate) fn opt(self, opt: OptState) -> Self {
+        Self { opt, ..self }
     }
 
     pub(crate) fn constraint(self, constraint: LockConstraint) -> Self {
@@ -122,6 +128,7 @@ impl<'a> BinaryRockInstall<'a> {
             hashes,
         );
         package.spec.pinned = self.pin;
+        package.spec.opt = self.opt;
         match tree.lockfile()?.get(&package.id()) {
             Some(package) if self.behaviour == BuildBehaviour::NoForce => Ok(package.clone()),
             _ => {

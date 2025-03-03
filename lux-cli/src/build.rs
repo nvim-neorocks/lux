@@ -7,9 +7,9 @@ use eyre::Result;
 use lux_lib::{
     build::{self, BuildBehaviour},
     config::Config,
-    lockfile::PinnedState,
+    lockfile::{OptState, PinnedState},
     luarocks::luarocks_installation::LuaRocksInstallation,
-    operations::{Install, Sync},
+    operations::{Install, PackageInstallSpec, Sync},
     package::PackageName,
     progress::MultiProgress,
     project::Project,
@@ -61,12 +61,13 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                 tree.match_rocks(req)
                     .is_ok_and(|rock_match| !rock_match.is_found())
             })
-            .map(|dep| (BuildBehaviour::NoForce, dep));
+            .map(|dep| {
+                PackageInstallSpec::new(dep, BuildBehaviour::default(), pin, OptState::default())
+            });
 
         Install::new(&tree, &config)
             .packages(dependencies_to_install)
             .project(&project)
-            .pin(pin)
             .progress(progress.clone())
             .install()
             .await?;
@@ -77,7 +78,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                 tree.match_rocks(req)
                     .is_ok_and(|rock_match| !rock_match.is_found())
             })
-            .map(|dep| (BuildBehaviour::NoForce, dep))
+            .map(|dep| PackageInstallSpec::default_for(dep))
             .collect_vec();
 
         if !build_dependencies_to_install.is_empty() {
@@ -86,7 +87,6 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
             Install::new(luarocks.tree(), luarocks.config())
                 .packages(build_dependencies_to_install)
                 .project(&project)
-                .pin(pin)
                 .progress(progress.clone())
                 .install()
                 .await?;

@@ -1,4 +1,4 @@
-use crate::lockfile::RemotePackageSourceUrl;
+use crate::lockfile::{OptState, RemotePackageSourceUrl};
 use crate::lua_rockspec::LuaVersionError;
 use crate::rockspec::{LuaVersionCompatibility, Rockspec};
 use std::{io, path::Path, process::ExitStatus};
@@ -65,6 +65,8 @@ pub struct Build<'a, R: Rockspec + HasIntegrity> {
 
     #[builder(default)]
     pin: PinnedState,
+    #[builder(default)]
+    opt: OptState,
     #[builder(default)]
     constraint: LockConstraint,
     #[builder(default)]
@@ -137,7 +139,9 @@ pub enum BuildError {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum BuildBehaviour {
+    /// Don't force a rebuild if the package is already installed
     NoForce,
+    /// Force a rebuild if the package is already installed
     Force,
 }
 
@@ -320,6 +324,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
         hashes,
     );
     package.spec.pinned = build.pin;
+    package.spec.opt = build.opt;
 
     match tree.lockfile()?.get(&package.id()) {
         Some(package) if build.behaviour == BuildBehaviour::NoForce => Ok(package.clone()),

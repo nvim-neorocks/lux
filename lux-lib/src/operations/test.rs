@@ -3,6 +3,7 @@ use std::{io, ops::Deref, process::Command, sync::Arc};
 use crate::{
     build::BuildBehaviour,
     config::Config,
+    lockfile::{OptState, PinnedState},
     package::{PackageName, PackageReq, PackageVersionReqError},
     path::Paths,
     progress::{MultiProgress, Progress},
@@ -14,7 +15,7 @@ use bon::Builder;
 use itertools::Itertools;
 use thiserror::Error;
 
-use super::{Install, InstallError, Sync, SyncError};
+use super::{Install, InstallError, PackageInstallSpec, Sync, SyncError};
 
 #[derive(Builder)]
 #[builder(start_fn = new, finish_fn(name = _run, vis = ""))]
@@ -185,7 +186,7 @@ pub async fn ensure_busted(
 
     if !tree.match_rocks(&busted_req)?.is_found() {
         Install::new(tree, config)
-            .package(BuildBehaviour::NoForce, busted_req)
+            .package(PackageInstallSpec::default_for(busted_req))
             .progress(progress)
             .install()
             .await?;
@@ -218,7 +219,14 @@ async fn ensure_dependencies(
             } else {
                 None
             };
-            build_behaviour.map(|it| (it, req.to_owned()))
+            build_behaviour.map(|build_behaviour| {
+                PackageInstallSpec::new(
+                    req.clone(),
+                    build_behaviour,
+                    PinnedState::default(),
+                    OptState::default(),
+                )
+            })
         });
 
     Install::new(test_tree, config)
@@ -241,7 +249,14 @@ async fn ensure_dependencies(
             } else {
                 None
             };
-            build_behaviour.map(|it| (it, req.to_owned()))
+            build_behaviour.map(|build_behaviour| {
+                PackageInstallSpec::new(
+                    req.clone(),
+                    build_behaviour,
+                    PinnedState::default(),
+                    OptState::default(),
+                )
+            })
         });
 
     Install::new(project_tree, config)

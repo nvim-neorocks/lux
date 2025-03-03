@@ -23,7 +23,9 @@ use crate::rockspec::RockBinaries;
 
 #[derive(Copy, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub enum PinnedState {
+    /// Unpinned packages can be updated
     Unpinned,
+    /// Pinned packages cannot be updated
     Pinned,
 }
 
@@ -94,11 +96,86 @@ impl<'de> Deserialize<'de> for PinnedState {
     }
 }
 
+/// For now, this doesn't have much meaning.
+/// It may be used later.
+#[derive(Copy, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+pub enum OptState {
+    /// A required package
+    Required,
+    /// An optional package
+    Optional,
+}
+
+impl OptState {
+    fn as_bool(&self) -> bool {
+        match self {
+            Self::Required => false,
+            Self::Optional => true,
+        }
+    }
+    fn from_bool(bool_value: bool) -> Self {
+        if bool_value {
+            Self::Optional
+        } else {
+            Self::Required
+        }
+    }
+}
+
+impl FromLua for OptState {
+    fn from_lua(value: mlua::Value, lua: &mlua::Lua) -> mlua::Result<Self> {
+        Ok(Self::from_bool(bool::from_lua(value, lua)?))
+    }
+}
+
+impl IntoLua for OptState {
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        self.as_bool().into_lua(lua)
+    }
+}
+
+impl Default for OptState {
+    fn default() -> Self {
+        Self::Required
+    }
+}
+
+impl Display for OptState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            OptState::Required => "required".fmt(f),
+            OptState::Optional => "optional".fmt(f),
+        }
+    }
+}
+
+impl Serialize for OptState {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bool(self.as_bool())
+    }
+}
+
+impl<'de> Deserialize<'de> for OptState {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(match bool::deserialize(deserializer)? {
+            false => Self::Required,
+            true => Self::Optional,
+        })
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) struct LocalPackageSpec {
     pub name: PackageName,
     pub version: PackageVersion,
     pub pinned: PinnedState,
+    pub opt: OptState,
     pub dependencies: Vec<LocalPackageId>,
     // TODO: Deserialize this directly into a `LuaPackageReq`
     pub constraint: Option<String>,
@@ -119,15 +196,17 @@ impl LocalPackageId {
         name: &PackageName,
         version: &PackageVersion,
         pinned: PinnedState,
+        opt: OptState,
         constraint: LockConstraint,
     ) -> Self {
         let mut hasher = Sha256::new();
 
         hasher.update(format!(
-            "{}{}{}{}",
+            "{}{}{}{}{}",
             name,
             version,
             pinned.as_bool(),
+            opt.as_bool(),
             match constraint {
                 LockConstraint::Unconstrained => String::default(),
                 LockConstraint::Constrained(version_req) => version_req.to_string(),
@@ -168,12 +247,14 @@ impl LocalPackageSpec {
         constraint: LockConstraint,
         dependencies: Vec<LocalPackageId>,
         pinned: &PinnedState,
+        opt: &OptState,
         binaries: RockBinaries,
     ) -> Self {
         Self {
             name: name.clone(),
             version: version.clone(),
             pinned: *pinned,
+            opt: *opt,
             dependencies,
             constraint: match constraint {
                 LockConstraint::Unconstrained => None,
@@ -188,6 +269,7 @@ impl LocalPackageSpec {
             self.name(),
             self.version(),
             self.pinned,
+            self.opt,
             match &self.constraint {
                 None => LockConstraint::Unconstrained,
                 Some(constraint) => LockConstraint::Constrained(constraint.parse().unwrap()),
@@ -210,6 +292,10 @@ impl LocalPackageSpec {
 
     pub fn pinned(&self) -> PinnedState {
         self.pinned
+    }
+
+    pub fn opt(&self) -> OptState {
+        self.opt
     }
 
     pub fn dependencies(&self) -> Vec<&LocalPackageId> {
@@ -290,6 +376,7 @@ struct LocalPackageIntermediate {
     name: PackageName,
     version: PackageVersion,
     pinned: PinnedState,
+    opt: OptState,
     dependencies: Vec<LocalPackageId>,
     constraint: Option<String>,
     binaries: RockBinaries,
@@ -310,6 +397,7 @@ impl TryFrom<LocalPackageIntermediate> for LocalPackage {
                 constraint,
                 value.dependencies,
                 &value.pinned,
+                &value.opt,
                 value.binaries,
             ),
             source: value.source,
@@ -325,6 +413,7 @@ impl From<&LocalPackage> for LocalPackageIntermediate {
             name: value.spec.name.clone(),
             version: value.spec.version.clone(),
             pinned: value.spec.pinned,
+            opt: value.spec.opt,
             dependencies: value.spec.dependencies.clone(),
             constraint: value.spec.constraint.clone(),
             binaries: value.spec.binaries.clone(),
@@ -370,6 +459,7 @@ impl LocalPackage {
                 constraint,
                 Vec::default(),
                 &PinnedState::Unpinned,
+                &OptState::Required,
                 binaries,
             ),
             source,
@@ -392,6 +482,10 @@ impl LocalPackage {
 
     pub fn pinned(&self) -> PinnedState {
         self.spec.pinned()
+    }
+
+    pub fn opt(&self) -> OptState {
+        self.spec.opt()
     }
 
     pub fn dependencies(&self) -> Vec<&LocalPackageId> {
@@ -1395,7 +1489,7 @@ mod tests {
         let lockfile = get_test_lockfile();
         let packages = vec![
             PackageReq::parse("neorg@8.8.1-1").unwrap(),
-            PackageReq::parse("lua-cjson").unwrap(),
+            PackageReq::parse("lua-cjson@2.1.0").unwrap(),
             PackageReq::parse("nonexistent").unwrap(),
         ];
 

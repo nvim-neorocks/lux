@@ -7,9 +7,9 @@ use eyre::Result;
 use lux_lib::{
     build::{self, BuildBehaviour},
     config::Config,
-    lockfile::PinnedState,
+    lockfile::{OptState, PinnedState},
     lua_rockspec::RemoteLuaRockspec,
-    operations::Install,
+    operations::{Install, PackageInstallSpec},
     package::PackageName,
     progress::MultiProgress,
     project::Project,
@@ -60,11 +60,17 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
             tree.match_rocks(req)
                 .is_ok_and(|rock_match| rock_match.is_found())
         })
-        .map(|dep| (BuildBehaviour::NoForce, dep.to_owned()));
+        .map(|dep| {
+            PackageInstallSpec::new(
+                dep.clone(),
+                BuildBehaviour::NoForce,
+                pin,
+                OptState::Required,
+            )
+        });
 
     Install::new(&tree, &config)
         .packages(dependencies_to_install)
-        .pin(pin)
         .progress(progress_arc)
         .install()
         .await?;
