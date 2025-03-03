@@ -43,8 +43,8 @@
         };
       in {
         packages = with pkgs; {
-          default = lux;
-          inherit lux;
+          default = lux-cli;
+          inherit lux-cli;
         };
 
         devShells = let
@@ -57,6 +57,7 @@
                   rust-analyzer
                   ra-multiplex
                   cargo-nextest
+                  cargo-hakari
                   clippy
                   lua_pkg
                   # Needed for integration test builds
@@ -85,6 +86,7 @@
             ;
           tests = pkgs.lux-nextest;
           clippy = pkgs.lux-clippy;
+          workspace-hack = pkgs.lux-workspace-hack;
         };
       };
       flake = {

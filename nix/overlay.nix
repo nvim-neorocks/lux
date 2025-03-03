@@ -6,8 +6,9 @@
 
   cleanCargoSrc = craneLib.cleanCargoSource self;
 
+  luxCliCargo = craneLib.crateNameFromCargoToml {src = "${self}/lux-cli";};
+
   commonArgs = with final; {
-    inherit (craneLib.crateNameFromCargoToml {cargoToml = "${self}/lux-cli/Cargo.toml";}) version pname;
     strictDeps = true;
 
     nativeBuildInputs = [
@@ -39,6 +40,8 @@
 
   lux-deps = craneLib.buildDepsOnly (commonArgs
     // {
+      pname = "lux";
+      version = "0.1.0";
       src = cleanCargoSrc;
     });
 
@@ -51,12 +54,54 @@
       doCheck = false;
     };
 
-  # can't seem to override the buildType with override or overrideAttrs :(
-  mk-lux-cli = {buildType ? "release"}:
+  mk-lux-lua = {
+    buildType ? "release",
+    luaVersion,
+  }: let
+    luxLuaCargo = craneLib.crateNameFromCargoToml {src = "${self}/lux-lua";};
+    canonicalLuaVersion =
+      {
+        lua51 = "5.1";
+        lua52 = "5.2";
+        lua53 = "5.3";
+        lua54 = "5.4";
+      }
+      ."${luaVersion}";
+  in
     craneLib.buildPackage (individualCrateArgs
       // {
-        pname = "lux-cli";
-        cargoExtrArgs = "-p lux-cli";
+        pname = "lux-lua-${canonicalLuaVersion}";
+        inherit (luxLuaCargo) version;
+        cargoExtraArgs = "-p ${luxLuaCargo.pname} --features ${luaVersion}";
+
+        installPhase = ''
+          mkdir -p $out/${canonicalLuaVersion}
+          cp target/${buildType}/liblux_lua.so $out/${canonicalLuaVersion}/lux.so
+        '';
+      });
+
+  lux-lua-all = {buildType ? "release"}:
+    with final;
+      symlinkJoin {
+        name = "lux-lua";
+        paths = lib.map (luaVersion: mk-lux-lua {inherit luaVersion buildType;}) [
+          "lua51"
+          "lua52"
+          "lua53"
+          "lua54"
+        ];
+      };
+
+  # can't seem to override the buildType with override or overrideAttrs :(
+  mk-lux-cli = {buildType ? "release"}: let
+    lux-lua = lux-lua-all {inherit buildType;};
+  in
+    craneLib.buildPackage (individualCrateArgs
+      // {
+        inherit (luxCliCargo) pname version;
+        inherit buildType;
+
+        cargoExtraArgs = "-p ${luxCliCargo.pname}";
 
         postBuild = ''
           cargo xtask dist-man
@@ -64,22 +109,41 @@
         '';
 
         postInstall = ''
-          installManPage target/dist/lux.1
-          installShellCompletion target/dist/lux.{bash,fish} --zsh target/dist/_lux
+          installManPage target/dist/lx.1
+          installShellCompletion target/dist/lx.{bash,fish} --zsh target/dist/_lx
         '';
 
-        inherit buildType;
+        meta.mainProgram = "lx";
 
-        meta.mainProgram = "lux";
+        # Instruct Lux to search for the lux-specific shared libraries in the lux-lua derivation
+        env.LUX_LIB_DIR = lux-lua;
       });
 in {
-  inherit lux-deps;
   lux-cli = mk-lux-cli {};
   lux-cli-debug = mk-lux-cli {buildType = "debug";};
 
+  lux-workspace-hack = craneLib.mkCargoDerivation {
+    src = cleanCargoSrc;
+    pname = "lux-workspace-hack";
+    version = "0.1.0";
+    cargoArtifacts = null;
+    doInstallCargoArtifacts = false;
+
+    buildPhaseCargoCommand = ''
+      cargo hakari generate --diff
+      cargo hakari manage-deps --dry-run
+      cargo hakari verify
+    '';
+
+    nativeBuildInputs = with final; [
+      cargo-hakari
+    ];
+  };
+
   lux-nextest = craneLib.cargoNextest (commonArgs
     // {
-      src = self;
+      inherit (luxCliCargo) pname version;
+      src = cleanCargoSrc;
       nativeCheckInputs = with final; [
         cacert
         cargo-nextest
@@ -101,7 +165,8 @@ in {
 
   lux-clippy = craneLib.cargoClippy (commonArgs
     // {
-      src = self;
+      inherit (luxCliCargo) pname version;
+      src = cleanCargoSrc;
       cargoArtifacts = lux-deps;
     });
 }
