@@ -1,0 +1,12 @@
+{
+    "rust-analyzer.cargo.features": [
+      "luajit",
+      "clap",
+      "lua"
+    ],
+    "rust-analyzer.check.features": [
+      "luajit",
+      "clap",
+      "lua"
+    ]
+}

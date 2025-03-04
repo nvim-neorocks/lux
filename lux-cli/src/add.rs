@@ -8,6 +8,7 @@ use lux_lib::{
     progress::{MultiProgress, Progress, ProgressBar},
     project::Project,
     remote_package_db::RemotePackageDB,
+    rockspec::lua_dependency,
 };
 
 #[derive(clap::Args)]
@@ -58,7 +59,7 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
 
         project
             .add(
-                lux_lib::project::DependencyType::Regular(data.package_req),
+                lua_dependency::DependencyType::Regular(data.package_req),
                 &db,
             )
             .await?;
@@ -79,7 +80,7 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
         }
 
         project
-            .add(lux_lib::project::DependencyType::Build(build_packages), &db)
+            .add(lua_dependency::DependencyType::Build(build_packages), &db)
             .await?;
     }
 
@@ -96,7 +97,7 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
                 .wrap_err("syncing test dependencies with the project lockfile failed.")?;
 
             project
-                .add(lux_lib::project::DependencyType::Test(test_packages), &db)
+                .add(lua_dependency::DependencyType::Test(test_packages), &db)
                 .await?;
         }
     }
