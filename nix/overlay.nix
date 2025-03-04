@@ -103,5 +103,6 @@ in {
     // {
       src = self;
       cargoArtifacts = lux-deps;
+      cargoClippyExtraArgs = "--all-targets -- --deny warnings";
     });
 }
