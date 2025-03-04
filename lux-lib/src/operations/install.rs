@@ -293,6 +293,7 @@ async fn install_impl(
     Ok(installed_packages.into_values().collect_vec())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn install_rockspec(
     rockspec_download: DownloadedRockspec,
     constraint: LockConstraint,
@@ -335,6 +336,7 @@ async fn install_rockspec(
     Ok(pkg)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn install_binary_rock(
     rockspec_download: DownloadedRockspec,
     packed_rock: Bytes,

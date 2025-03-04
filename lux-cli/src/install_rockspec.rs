@@ -56,13 +56,13 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
 
     let dependencies_to_install = dependencies
         .into_iter()
-        .filter(|req| {
-            tree.match_rocks(req)
+        .filter(|dep| {
+            tree.match_rocks(dep.package_req())
                 .is_ok_and(|rock_match| rock_match.is_found())
         })
         .map(|dep| {
             PackageInstallSpec::new(
-                dep.clone(),
+                dep.package_req().clone(),
                 BuildBehaviour::NoForce,
                 pin,
                 OptState::Required,

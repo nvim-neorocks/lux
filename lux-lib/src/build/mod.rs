@@ -143,7 +143,7 @@ pub enum BuildBehaviour {
 
 impl FromLua for BuildBehaviour {
     fn from_lua(value: mlua::Value, lua: &mlua::Lua) -> mlua::Result<Self> {
-        Ok(bool::from_lua(value, &lua)?.into())
+        Ok(bool::from_lua(value, lua)?.into())
     }
 }
 

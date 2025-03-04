@@ -14,7 +14,9 @@ path-absolutize = "3.1.1"
 pathdiff = "0.2.3"
 
 [features]
+default = ["luajit"]
 lua51 = ["mlua/lua51", "lux-lib/lua51"]
 lua52 = ["mlua/lua52", "lux-lib/lua52"]
 lua53 = ["mlua/lua53", "lux-lib/lua53"]
 lua54 = ["mlua/lua54", "lux-lib/lua54"]
+luajit = ["mlua/luajit", "lux-lib/luajit"]
