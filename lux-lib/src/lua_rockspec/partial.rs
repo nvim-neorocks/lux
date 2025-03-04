@@ -4,7 +4,8 @@ use mlua::{Lua, LuaSerdeExt, Value};
 
 use crate::{
     lua_rockspec::RockspecFormat,
-    package::{PackageName, PackageReq, PackageVersion},
+    package::{PackageName, PackageVersion},
+    rockspec::lua_dependency::LuaDependencySpec,
 };
 
 use super::{
@@ -19,10 +20,10 @@ pub struct PartialLuaRockspec {
     pub(crate) build: Option<BuildSpecInternal>,
     pub(crate) description: Option<RockDescription>,
     pub(crate) supported_platforms: Option<PlatformSupport>,
-    pub(crate) dependencies: Option<Vec<PackageReq>>,
-    pub(crate) build_dependencies: Option<Vec<PackageReq>>,
+    pub(crate) dependencies: Option<Vec<LuaDependencySpec>>,
+    pub(crate) build_dependencies: Option<Vec<LuaDependencySpec>>,
     pub(crate) external_dependencies: Option<HashMap<String, ExternalDependencySpec>>,
-    pub(crate) test_dependencies: Option<Vec<PackageReq>>,
+    pub(crate) test_dependencies: Option<Vec<LuaDependencySpec>>,
     pub(crate) source: Option<RockSourceInternal>,
     pub(crate) test: Option<TestSpecInternal>,
 }

@@ -15,7 +15,7 @@ use crate::{
     progress::{MultiProgress, Progress},
     project::{Project, ProjectError, ProjectTreeError},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
-    rockspec::Rockspec,
+    rockspec::{lua_dependency::LuaDependencySpec, Rockspec},
     tree::Tree,
 };
 
@@ -128,6 +128,7 @@ async fn update_project(
         .dependencies()
         .current_platform()
         .iter()
+        .map(LuaDependencySpec::package_req)
         .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
         .cloned()
         .collect_vec();
@@ -152,7 +153,13 @@ async fn update_project(
     .chain(dep_report.removed);
 
     let test_tree = project.test_tree(args.config)?;
-    let test_dependencies = toml.test_dependencies().current_platform().clone();
+    let test_dependencies = toml
+        .test_dependencies()
+        .current_platform()
+        .iter()
+        .map(LuaDependencySpec::package_req)
+        .cloned()
+        .collect_vec();
     let dep_report = super::Sync::new(&test_tree, &mut project_lockfile, args.config)
         .validate_integrity(false)
         .packages(test_dependencies)
@@ -173,7 +180,14 @@ async fn update_project(
     .chain(dep_report.removed);
 
     let luarocks = LuaRocksInstallation::new(args.config)?;
-    let build_dependencies = toml.build_dependencies().current_platform().clone();
+    let build_dependencies = toml
+        .build_dependencies()
+        .current_platform()
+        .iter()
+        .map(LuaDependencySpec::package_req)
+        .cloned()
+        .collect_vec();
+
     let dep_report = super::Sync::new(luarocks.tree(), &mut project_lockfile, luarocks.config())
         .validate_integrity(false)
         .packages(build_dependencies)

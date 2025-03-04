@@ -5,6 +5,7 @@ use lux_lib::package::{PackageName, PackageReq};
 use lux_lib::progress::{MultiProgress, Progress, ProgressBar};
 use lux_lib::project::Project;
 use lux_lib::remote_package_db::RemotePackageDB;
+use lux_lib::rockspec::lua_dependency;
 use lux_lib::{config::Config, operations};
 
 #[derive(Args)]
@@ -47,21 +48,21 @@ pub async fn update(args: Update, config: Config) -> Result<()> {
         if let Some(packages) = package_names {
             upgrade_all = false;
             project
-                .upgrade(lux_lib::project::LuaDependencyType::Regular(packages), &db)
+                .upgrade(lua_dependency::LuaDependencyType::Regular(packages), &db)
                 .await?;
         }
         let build_package_names = to_package_names(args.build.as_ref())?;
         if let Some(packages) = build_package_names {
             upgrade_all = false;
             project
-                .upgrade(lux_lib::project::LuaDependencyType::Build(packages), &db)
+                .upgrade(lua_dependency::LuaDependencyType::Build(packages), &db)
                 .await?;
         }
         let test_package_names = to_package_names(args.test.as_ref())?;
         if let Some(packages) = test_package_names {
             upgrade_all = false;
             project
-                .upgrade(lux_lib::project::LuaDependencyType::Test(packages), &db)
+                .upgrade(lua_dependency::LuaDependencyType::Test(packages), &db)
                 .await?;
         }
         if upgrade_all {

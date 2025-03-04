@@ -5,8 +5,10 @@ use std::{
 };
 
 use itertools::Itertools;
+use lua_dependency::LuaDependencySpec;
 use mlua::IntoLua;
 use serde::{Deserialize, Serialize};
+pub mod lua_dependency;
 
 use crate::{
     config::{Config, LuaVersion},
@@ -14,7 +16,7 @@ use crate::{
         BuildSpec, ExternalDependencySpec, LuaVersionError, PerPlatform, PlatformSupport,
         RemoteRockSource, RockDescription, RockspecFormat, TestSpec,
     },
-    package::{PackageName, PackageReq, PackageVersion},
+    package::{PackageName, PackageVersion},
 };
 
 pub trait Rockspec {
@@ -22,10 +24,10 @@ pub trait Rockspec {
     fn version(&self) -> &PackageVersion;
     fn description(&self) -> &RockDescription;
     fn supported_platforms(&self) -> &PlatformSupport;
-    fn dependencies(&self) -> &PerPlatform<Vec<PackageReq>>;
-    fn build_dependencies(&self) -> &PerPlatform<Vec<PackageReq>>;
+    fn dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>>;
+    fn build_dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>>;
     fn external_dependencies(&self) -> &PerPlatform<HashMap<String, ExternalDependencySpec>>;
-    fn test_dependencies(&self) -> &PerPlatform<Vec<PackageReq>>;
+    fn test_dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>>;
 
     fn build(&self) -> &PerPlatform<BuildSpec>;
     fn test(&self) -> &PerPlatform<TestSpec>;
@@ -116,7 +118,7 @@ impl<T: Rockspec> LuaVersionCompatibility for T {
 }
 
 pub(crate) fn latest_lua_version(
-    dependencies: &PerPlatform<Vec<PackageReq>>,
+    dependencies: &PerPlatform<Vec<LuaDependencySpec>>,
 ) -> Option<LuaVersion> {
     dependencies
         .current_platform()

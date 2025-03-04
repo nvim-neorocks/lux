@@ -1,8 +1,14 @@
 use clap::Args;
 use eyre::{Context, OptionExt, Result};
+use itertools::Itertools;
 use lux_lib::{
-    config::Config, luarocks::luarocks_installation::LuaRocksInstallation, operations::Sync,
-    package::PackageName, progress::MultiProgress, project::Project, rockspec::Rockspec,
+    config::Config,
+    luarocks::luarocks_installation::LuaRocksInstallation,
+    operations::Sync,
+    package::PackageName,
+    progress::MultiProgress,
+    project::Project,
+    rockspec::{lua_dependency, Rockspec},
 };
 
 #[derive(Args)]
@@ -27,7 +33,7 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
 
     if !data.package.is_empty() {
         project
-            .remove(lux_lib::project::DependencyType::Regular(data.package))
+            .remove(lua_dependency::DependencyType::Regular(data.package))
             .await?;
         // NOTE: We only update the lockfile if one exists.
         // Otherwise, the next `lx build` will remove the packages.
@@ -38,7 +44,10 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
                 .into_local()?
                 .dependencies()
                 .current_platform()
-                .clone();
+                .iter()
+                .cloned()
+                .map(|dep| dep.into_package_req())
+                .collect_vec();
             Sync::new(&tree, &mut lockfile, &config)
                 .packages(packages)
                 .progress(progress.clone())
@@ -51,7 +60,7 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
     let build_packages = data.build.unwrap_or_default();
     if !build_packages.is_empty() {
         project
-            .remove(lux_lib::project::DependencyType::Build(build_packages))
+            .remove(lua_dependency::DependencyType::Build(build_packages))
             .await?;
         if let Some(lockfile) = project.try_lockfile()? {
             let luarocks = LuaRocksInstallation::new(&config)?;
@@ -61,7 +70,10 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
                 .into_local()?
                 .build_dependencies()
                 .current_platform()
-                .clone();
+                .iter()
+                .cloned()
+                .map(|dep| dep.into_package_req())
+                .collect_vec();
             Sync::new(luarocks.tree(), &mut lockfile, luarocks.config())
                 .packages(packages)
                 .progress(progress.clone())
@@ -74,7 +86,7 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
     let test_packages = data.test.unwrap_or_default();
     if !test_packages.is_empty() {
         project
-            .remove(lux_lib::project::DependencyType::Test(test_packages))
+            .remove(lua_dependency::DependencyType::Test(test_packages))
             .await?;
         if let Some(lockfile) = project.try_lockfile()? {
             let mut lockfile = lockfile.write_guard();
@@ -83,7 +95,10 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
                 .into_local()?
                 .test_dependencies()
                 .current_platform()
-                .clone();
+                .iter()
+                .cloned()
+                .map(|dep| dep.into_package_req())
+                .collect_vec();
             Sync::new(&tree, &mut lockfile, &config)
                 .packages(packages)
                 .progress(progress.clone())

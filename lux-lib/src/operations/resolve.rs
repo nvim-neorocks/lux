@@ -84,7 +84,7 @@ where
                             .iter()
                             .filter(|dep| !dep.name().eq(&"lua".into()))
                             .map(|dep| PackageInstallSpec {
-                                package: dep.clone(),
+                                package: dep.package_req().clone(),
                                 build_behaviour,
                                 pin,
                                 opt,

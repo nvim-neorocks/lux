@@ -57,12 +57,17 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     if data.no_lock {
         let dependencies_to_install = dependencies
             .into_iter()
-            .filter(|req| {
-                tree.match_rocks(req)
+            .filter(|dep| {
+                tree.match_rocks(dep.package_req())
                     .is_ok_and(|rock_match| !rock_match.is_found())
             })
             .map(|dep| {
-                PackageInstallSpec::new(dep, BuildBehaviour::default(), pin, OptState::default())
+                PackageInstallSpec::new(
+                    dep.into_package_req(),
+                    BuildBehaviour::default(),
+                    pin,
+                    OptState::default(),
+                )
             });
 
         Install::new(&tree, &config)
@@ -74,11 +79,11 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
 
         let build_dependencies_to_install = build_dependencies
             .into_iter()
-            .filter(|req| {
-                tree.match_rocks(req)
+            .filter(|dep| {
+                tree.match_rocks(dep.package_req())
                     .is_ok_and(|rock_match| !rock_match.is_found())
             })
-            .map(|dep| PackageInstallSpec::default_for(dep))
+            .map(|dep| PackageInstallSpec::default_for(dep.into_package_req()))
             .collect_vec();
 
         if !build_dependencies_to_install.is_empty() {
@@ -96,7 +101,12 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
 
         Sync::new(&tree, &mut project_lockfile, &config)
             .progress(progress.clone())
-            .packages(dependencies)
+            .packages(
+                dependencies
+                    .into_iter()
+                    .map(|dep| dep.into_package_req())
+                    .collect_vec(),
+            )
             .sync_dependencies()
             .await
             .wrap_err(
@@ -108,7 +118,12 @@ Use --ignore-lockfile to force a new build.
 
         Sync::new(luarocks.tree(), &mut project_lockfile, luarocks.config())
             .progress(progress.clone())
-            .packages(build_dependencies)
+            .packages(
+                build_dependencies
+                    .into_iter()
+                    .map(|dep| dep.into_package_req())
+                    .collect_vec(),
+            )
             .sync_build_dependencies()
             .await
             .wrap_err(

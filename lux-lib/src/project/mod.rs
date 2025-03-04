@@ -5,7 +5,6 @@ use project_toml::{
     LocalProjectTomlValidationError, PartialProjectToml, RemoteProjectTomlValidationError,
 };
 use std::{
-    collections::HashMap,
     io,
     ops::Deref,
     path::{Path, PathBuf},
@@ -14,6 +13,7 @@ use std::{
 use thiserror::Error;
 use toml_edit::{DocumentMut, Item};
 
+use crate::package::{PackageName, PackageReq};
 use crate::{
     config::{Config, LuaVersion},
     lockfile::{ProjectLockfile, ReadOnly},
@@ -21,9 +21,11 @@ use crate::{
         ExternalDependencySpec, LocalLuaRockspec, LuaRockspecError, LuaVersionError,
         PartialLuaRockspec, PartialRockspecError, RemoteLuaRockspec,
     },
-    package::{PackageName, PackageReq},
     remote_package_db::RemotePackageDB,
-    rockspec::LuaVersionCompatibility,
+    rockspec::{
+        lua_dependency::{DependencyType, LuaDependencyType},
+        LuaVersionCompatibility,
+    },
     tree::Tree,
 };
 
@@ -61,19 +63,6 @@ pub enum IntoRemoteRockspecError {
 pub enum ProjectEditError {
     Io(#[from] tokio::io::Error),
     Toml(#[from] toml_edit::TomlError),
-}
-
-pub enum DependencyType<T> {
-    Regular(Vec<T>),
-    Build(Vec<T>),
-    Test(Vec<T>),
-    External(HashMap<String, ExternalDependencySpec>),
-}
-
-pub enum LuaDependencyType<T> {
-    Regular(Vec<T>),
-    Build(Vec<T>),
-    Test(Vec<T>),
 }
 
 #[derive(Error, Debug)]
@@ -317,7 +306,7 @@ impl Project {
                         .take()
                         .unwrap_or_default()
                         .into_iter()
-                        .chain(deps)
+                        .chain(deps.iter().cloned().map(|dep| dep.into()))
                         .collect(),
                 )
             }
@@ -328,7 +317,7 @@ impl Project {
                         .take()
                         .unwrap_or_default()
                         .into_iter()
-                        .chain(deps)
+                        .chain(deps.iter().cloned().map(|dep| dep.into()))
                         .collect(),
                 )
             }
@@ -339,7 +328,7 @@ impl Project {
                         .take()
                         .unwrap_or_default()
                         .into_iter()
-                        .chain(deps)
+                        .chain(deps.iter().cloned().map(|dep| dep.into()))
                         .collect(),
                 )
             }
@@ -545,6 +534,8 @@ fn prepare_dependency_tables(project_toml: &mut DocumentMut) {
 // TODO: More project-based test
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use assert_fs::prelude::PathCopy;
     use url::Url;
 
@@ -553,7 +544,7 @@ mod tests {
         lua_rockspec::RockSourceSpec,
         manifest::{Manifest, ManifestMetadata},
         package::PackageReq,
-        rockspec::Rockspec,
+        rockspec::{lua_dependency::LuaDependencySpec, Rockspec},
     };
 
     #[tokio::test]
@@ -563,8 +554,11 @@ mod tests {
         project_root.copy_from(&sample_project, &["**"]).unwrap();
         let project_root: PathBuf = project_root.path().into();
         let mut project = Project::from(&project_root).unwrap().unwrap();
-        let expected_dependencies =
+        let add_dependencies =
             vec![PackageReq::new("busted".into(), Some(">= 1.0.0".into())).unwrap()];
+        let expected_dependencies = vec![LuaDependencySpec {
+            package_req: PackageReq::new("busted".into(), Some(">= 1.0.0".into())).unwrap(),
+        }];
 
         let test_manifest_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/manifest-5.1");
@@ -574,24 +568,18 @@ mod tests {
 
         project
             .add(
-                DependencyType::Regular(expected_dependencies.clone()),
+                DependencyType::Regular(add_dependencies.clone()),
                 &package_db,
             )
             .await
             .unwrap();
 
         project
-            .add(
-                DependencyType::Build(expected_dependencies.clone()),
-                &package_db,
-            )
+            .add(DependencyType::Build(add_dependencies.clone()), &package_db)
             .await
             .unwrap();
         project
-            .add(
-                DependencyType::Test(expected_dependencies.clone()),
-                &package_db,
-            )
+            .add(DependencyType::Test(add_dependencies.clone()), &package_db)
             .await
             .unwrap();
 
@@ -606,7 +594,7 @@ mod tests {
             .await
             .unwrap();
 
-        let strip_lua = |deps: &Vec<PackageReq>| -> Vec<PackageReq> {
+        let strip_lua = |deps: &Vec<LuaDependencySpec>| -> Vec<LuaDependencySpec> {
             deps.iter()
                 .filter(|dep| dep.name() != &"lua".into())
                 .cloned()
