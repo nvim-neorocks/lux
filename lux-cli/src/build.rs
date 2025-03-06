@@ -7,7 +7,6 @@ use eyre::Result;
 use lux_lib::{
     build::{self, BuildBehaviour},
     config::Config,
-    lockfile::{OptState, PinnedState},
     luarocks::luarocks_installation::LuaRocksInstallation,
     operations::{Install, PackageInstallSpec, Sync},
     package::PackageName,
@@ -18,10 +17,6 @@ use lux_lib::{
 
 #[derive(Args, Default)]
 pub struct Build {
-    /// Whether to pin the dependencies.
-    #[arg(long)]
-    pin: bool,
-
     /// Ignore the project's lockfile and don't create one.
     #[arg(long)]
     no_lock: bool,
@@ -29,7 +24,6 @@ pub struct Build {
 
 pub async fn build(data: Build, config: Config) -> Result<()> {
     let project = Project::current()?.ok_or_eyre("Not in a project!")?;
-    let pin = PinnedState::from(data.pin);
     let progress_arc = MultiProgress::new_arc();
     let progress = Arc::clone(&progress_arc);
 
@@ -63,10 +57,10 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
             })
             .map(|dep| {
                 PackageInstallSpec::new(
-                    dep.into_package_req(),
+                    dep.clone().into_package_req(),
                     BuildBehaviour::default(),
-                    pin,
-                    OptState::default(),
+                    *dep.pin(),
+                    *dep.opt(),
                 )
             });
 
@@ -83,7 +77,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                 tree.match_rocks(dep.package_req())
                     .is_ok_and(|rock_match| !rock_match.is_found())
             })
-            .map(|dep| PackageInstallSpec::default_for(dep.into_package_req()))
+            .map(PackageInstallSpec::from)
             .collect_vec();
 
         if !build_dependencies_to_install.is_empty() {
@@ -101,12 +95,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
 
         Sync::new(&tree, &mut project_lockfile, &config)
             .progress(progress.clone())
-            .packages(
-                dependencies
-                    .into_iter()
-                    .map(|dep| dep.into_package_req())
-                    .collect_vec(),
-            )
+            .packages(dependencies)
             .sync_dependencies()
             .await
             .wrap_err(
@@ -118,12 +107,7 @@ Use --ignore-lockfile to force a new build.
 
         Sync::new(luarocks.tree(), &mut project_lockfile, luarocks.config())
             .progress(progress.clone())
-            .packages(
-                build_dependencies
-                    .into_iter()
-                    .map(|dep| dep.into_package_req())
-                    .collect_vec(),
-            )
+            .packages(build_dependencies)
             .sync_build_dependencies()
             .await
             .wrap_err(
@@ -135,7 +119,6 @@ Use --ignore-lockfile to force a new build.
     }
 
     build::Build::new(&rocks, &tree, &config, &progress.map(|p| p.new_bar()))
-        .pin(pin)
         .behaviour(BuildBehaviour::Force)
         .build()
         .await?;

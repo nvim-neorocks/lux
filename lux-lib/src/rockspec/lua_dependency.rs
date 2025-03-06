@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer};
 use thiserror::Error;
 
 use crate::{
+    lockfile::{OptState, PinnedState},
     lua_rockspec::{ExternalDependencySpec, PartialOverride, PerPlatform, PlatformOverridable},
     package::{PackageName, PackageReq, PackageReqParseError, PackageSpec, PackageVersionReq},
 };
@@ -18,11 +19,26 @@ pub enum LuaDependencySpecParseError {
 #[derive(Debug, Clone, PartialEq)]
 pub struct LuaDependencySpec {
     pub(crate) package_req: PackageReq,
+    pub(crate) pin: PinnedState,
+    pub(crate) opt: OptState,
 }
 
 impl LuaDependencySpec {
+    pub fn new(package_req: PackageReq, pin: PinnedState, opt: OptState) -> Self {
+        Self {
+            package_req,
+            pin,
+            opt,
+        }
+    }
     pub fn package_req(&self) -> &PackageReq {
         &self.package_req
+    }
+    pub fn pin(&self) -> &PinnedState {
+        &self.pin
+    }
+    pub fn opt(&self) -> &OptState {
+        &self.opt
     }
     pub fn into_package_req(self) -> PackageReq {
         self.package_req
@@ -42,13 +58,19 @@ impl From<PackageName> for LuaDependencySpec {
     fn from(name: PackageName) -> Self {
         Self {
             package_req: PackageReq::from(name),
+            pin: PinnedState::default(),
+            opt: OptState::default(),
         }
     }
 }
 
 impl From<PackageReq> for LuaDependencySpec {
     fn from(package_req: PackageReq) -> Self {
-        Self { package_req }
+        Self {
+            package_req,
+            pin: PinnedState::default(),
+            opt: OptState::default(),
+        }
     }
 }
 
@@ -57,7 +79,11 @@ impl FromStr for LuaDependencySpec {
 
     fn from_str(str: &str) -> Result<Self, LuaDependencySpecParseError> {
         let package_req = PackageReq::from_str(str)?;
-        Ok(Self { package_req })
+        Ok(Self {
+            package_req,
+            pin: PinnedState::default(),
+            opt: OptState::default(),
+        })
     }
 }
 
@@ -107,7 +133,11 @@ impl PlatformOverridable for Vec<LuaDependencySpec> {
 impl FromLua for LuaDependencySpec {
     fn from_lua(value: mlua::Value, lua: &mlua::Lua) -> mlua::Result<Self> {
         let package_req = lua.from_value(value)?;
-        Ok(Self { package_req })
+        Ok(Self {
+            package_req,
+            pin: PinnedState::default(),
+            opt: OptState::default(),
+        })
     }
 }
 
@@ -117,7 +147,11 @@ impl<'de> Deserialize<'de> for LuaDependencySpec {
         D: Deserializer<'de>,
     {
         let package_req = PackageReq::deserialize(deserializer)?;
-        Ok(Self { package_req })
+        Ok(Self {
+            package_req,
+            pin: PinnedState::default(),
+            opt: OptState::default(),
+        })
     }
 }
 
