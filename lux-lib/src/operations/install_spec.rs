@@ -2,6 +2,7 @@ use crate::{
     build::BuildBehaviour,
     lockfile::{OptState, PinnedState},
     package::PackageReq,
+    rockspec::lua_dependency::LuaDependencySpec,
 };
 
 /// Specifies how to install a package
@@ -26,12 +27,26 @@ impl PackageInstallSpec {
             opt,
         }
     }
-    pub fn default_for(package: PackageReq) -> Self {
+}
+
+impl From<PackageReq> for PackageInstallSpec {
+    fn from(package: PackageReq) -> Self {
         Self {
             package,
             build_behaviour: BuildBehaviour::default(),
             pin: PinnedState::default(),
             opt: OptState::default(),
+        }
+    }
+}
+
+impl From<LuaDependencySpec> for PackageInstallSpec {
+    fn from(value: LuaDependencySpec) -> Self {
+        Self {
+            package: value.package_req,
+            build_behaviour: BuildBehaviour::default(),
+            pin: value.pin,
+            opt: value.opt,
         }
     }
 }

@@ -1,6 +1,8 @@
 //! Structs and utilities for `lux.toml`
 
 use crate::hash::HasIntegrity;
+use crate::lockfile::OptState;
+use crate::lockfile::PinnedState;
 use crate::lua_rockspec::LocalLuaRockspec;
 use crate::lua_rockspec::LocalRockSource;
 use crate::lua_rockspec::LuaRockspecError;
@@ -35,18 +37,44 @@ use crate::{
 
 use super::ProjectRoot;
 
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum DependencyEntry {
+    Simple(PackageVersionReq),
+    Detailed(DependencyTableEntry),
+}
+
+#[derive(Debug, Deserialize)]
+struct DependencyTableEntry {
+    version: PackageVersionReq,
+    #[serde(default)]
+    opt: Option<bool>,
+    #[serde(default)]
+    pin: Option<bool>,
+}
+
 fn parse_map_to_package_vec_opt<'de, D>(
     deserializer: D,
 ) -> Result<Option<Vec<LuaDependencySpec>>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let packages: Option<HashMap<PackageName, PackageVersionReq>> =
+    let packages: Option<HashMap<PackageName, DependencyEntry>> =
         Option::deserialize(deserializer)?;
 
     Ok(packages.map(|pkgs| {
         pkgs.into_iter()
-            .map(|(name, version_req)| PackageReq { name, version_req }.into())
+            .map(|(name, spec)| match spec {
+                DependencyEntry::Simple(version_req) => PackageReq { name, version_req }.into(),
+                DependencyEntry::Detailed(entry) => LuaDependencySpec {
+                    package_req: PackageReq {
+                        name,
+                        version_req: entry.version,
+                    },
+                    opt: OptState::from(entry.opt.unwrap_or(false)),
+                    pin: PinnedState::from(entry.pin.unwrap_or(false)),
+                },
+            })
             .collect()
     }))
 }
@@ -500,12 +528,11 @@ version = "{}""#,
             let mut dependencies = self.internal.dependencies.clone().unwrap_or_default();
             dependencies.insert(
                 0,
-                LuaDependencySpec {
-                    package_req: PackageReq {
-                        name: "lua".into(),
-                        version_req: self.lua.clone(),
-                    },
-                },
+                PackageReq {
+                    name: "lua".into(),
+                    version_req: self.lua.clone(),
+                }
+                .into(),
             );
             template.push(Dependencies(&dependencies).display_lua());
         }
@@ -660,12 +687,11 @@ version = "{}""#,
             let mut dependencies = self.local.internal.dependencies.clone().unwrap_or_default();
             dependencies.insert(
                 0,
-                LuaDependencySpec {
-                    package_req: PackageReq {
-                        name: "lua".into(),
-                        version_req: self.local.lua.clone(),
-                    },
-                },
+                PackageReq {
+                    name: "lua".into(),
+                    version_req: self.local.lua.clone(),
+                }
+                .into(),
             );
             template.push(Dependencies(&dependencies).display_lua());
         }
