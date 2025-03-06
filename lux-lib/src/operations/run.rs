@@ -13,7 +13,7 @@ use bon::Builder;
 use itertools::Itertools;
 use thiserror::Error;
 
-use super::{InstallError, PackageInstallSpec};
+use super::InstallError;
 
 /// Rocks package runner, providing fine-grained control
 /// over how a package should be run.
@@ -113,7 +113,7 @@ pub enum InstallCmdError {
 pub async fn install_command(command: &str, config: &Config) -> Result<(), InstallCmdError> {
     let package_req = PackageReq::new(command.into(), None)?;
     Install::new(&config.tree(LuaVersion::from(config)?)?, config)
-        .package(PackageInstallSpec::default_for(package_req))
+        .package(package_req.into())
         .install()
         .await?;
     Ok(())

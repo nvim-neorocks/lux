@@ -1,6 +1,5 @@
 use clap::Args;
 use eyre::{Context, OptionExt, Result};
-use itertools::Itertools;
 use lux_lib::{
     config::Config,
     luarocks::luarocks_installation::LuaRocksInstallation,
@@ -44,10 +43,7 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
                 .into_local()?
                 .dependencies()
                 .current_platform()
-                .iter()
-                .cloned()
-                .map(|dep| dep.into_package_req())
-                .collect_vec();
+                .clone();
             Sync::new(&tree, &mut lockfile, &config)
                 .packages(packages)
                 .progress(progress.clone())
@@ -70,10 +66,7 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
                 .into_local()?
                 .build_dependencies()
                 .current_platform()
-                .iter()
-                .cloned()
-                .map(|dep| dep.into_package_req())
-                .collect_vec();
+                .clone();
             Sync::new(luarocks.tree(), &mut lockfile, luarocks.config())
                 .packages(packages)
                 .progress(progress.clone())
@@ -95,10 +88,7 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
                 .into_local()?
                 .test_dependencies()
                 .current_platform()
-                .iter()
-                .cloned()
-                .map(|dep| dep.into_package_req())
-                .collect_vec();
+                .clone();
             Sync::new(&tree, &mut lockfile, &config)
                 .packages(packages)
                 .progress(progress.clone())
