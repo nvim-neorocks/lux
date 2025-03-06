@@ -19,6 +19,7 @@ use crate::package::{
     PackageVersionReqError, RemotePackageTypeFilterSpec,
 };
 use crate::remote_package_source::RemotePackageSource;
+use crate::rockspec::lua_dependency::LuaDependencySpec;
 use crate::rockspec::RockBinaries;
 
 #[derive(Copy, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
@@ -107,14 +108,17 @@ pub enum OptState {
 }
 
 impl OptState {
-    fn as_bool(&self) -> bool {
+    pub(crate) fn as_bool(&self) -> bool {
         match self {
             Self::Required => false,
             Self::Optional => true,
         }
     }
-    fn from_bool(bool_value: bool) -> Self {
-        if bool_value {
+}
+
+impl From<bool> for OptState {
+    fn from(value: bool) -> Self {
+        if value {
             Self::Optional
         } else {
             Self::Required
@@ -124,7 +128,7 @@ impl OptState {
 
 impl FromLua for OptState {
     fn from_lua(value: mlua::Value, lua: &mlua::Lua) -> mlua::Result<Self> {
-        Ok(Self::from_bool(bool::from_lua(value, lua)?))
+        Ok(Self::from(bool::from_lua(value, lua)?))
     }
 }
 
@@ -688,7 +692,7 @@ impl LocalPackageLock {
             .cloned()
     }
 
-    fn has_rock_with_equal_constraint(&self, req: &PackageReq) -> Option<LocalPackage> {
+    fn has_rock_with_equal_constraint(&self, req: &LuaDependencySpec) -> Option<LocalPackage> {
         self.list()
             .get(req.name())
             .map(|packages| {
@@ -706,7 +710,7 @@ impl LocalPackageLock {
     ///
     /// NOTE: The reason we produce a report and don't add/remove packages
     /// here is because packages need to be installed in order to be added.
-    pub(crate) fn package_sync_spec(&self, packages: &[PackageReq]) -> PackageSyncSpec {
+    pub(crate) fn package_sync_spec(&self, packages: &[LuaDependencySpec]) -> PackageSyncSpec {
         let entrypoints_to_keep: HashSet<LocalPackage> = self
             .entrypoints
             .iter()
@@ -809,7 +813,7 @@ pub enum LockfileIntegrityError {
 /// A specification for syncing a list of packages with a lockfile
 #[derive(Debug, Default)]
 pub(crate) struct PackageSyncSpec {
-    pub to_add: Vec<PackageReq>,
+    pub to_add: Vec<LuaDependencySpec>,
     pub to_remove: Vec<LocalPackage>,
 }
 
@@ -963,7 +967,7 @@ impl<P: LockfilePermissions> ProjectLockfile<P> {
 
     pub(crate) fn package_sync_spec(
         &self,
-        packages: &[PackageReq],
+        packages: &[LuaDependencySpec],
         deps: &LocalPackageLockType,
     ) -> PackageSyncSpec {
         match deps {
@@ -1488,9 +1492,9 @@ mod tests {
     fn test_sync_spec() {
         let lockfile = get_test_lockfile();
         let packages = vec![
-            PackageReq::parse("neorg@8.8.1-1").unwrap(),
-            PackageReq::parse("lua-cjson@2.1.0").unwrap(),
-            PackageReq::parse("nonexistent").unwrap(),
+            PackageReq::parse("neorg@8.8.1-1").unwrap().into(),
+            PackageReq::parse("lua-cjson@2.1.0").unwrap().into(),
+            PackageReq::parse("nonexistent").unwrap().into(),
         ];
 
         let sync_spec = lockfile.lock.package_sync_spec(&packages);
@@ -1560,7 +1564,7 @@ mod tests {
     #[test]
     fn test_sync_spec_different_constraints() {
         let lockfile = get_test_lockfile();
-        let packages = vec![PackageReq::parse("nvim-nio>=2.0.0").unwrap()];
+        let packages = vec![PackageReq::parse("nvim-nio>=2.0.0").unwrap().into()];
         let sync_spec = lockfile.lock.package_sync_spec(&packages);
 
         let expected: PackageVersionReq = ">=2.0.0".parse().unwrap();

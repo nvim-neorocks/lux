@@ -15,11 +15,11 @@ use crate::{
     progress::{MultiProgress, Progress},
     project::{Project, ProjectError, ProjectTreeError},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
-    rockspec::{lua_dependency::LuaDependencySpec, Rockspec},
+    rockspec::Rockspec,
     tree::Tree,
 };
 
-use super::{Install, InstallError, PackageInstallSpec, Remove, RemoveError, SyncError};
+use super::{Install, InstallError, Remove, RemoveError, SyncError};
 
 #[derive(Error, Debug)]
 pub enum UpdateError {
@@ -128,7 +128,6 @@ async fn update_project(
         .dependencies()
         .current_platform()
         .iter()
-        .map(LuaDependencySpec::package_req)
         .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
         .cloned()
         .collect_vec();
@@ -153,13 +152,7 @@ async fn update_project(
     .chain(dep_report.removed);
 
     let test_tree = project.test_tree(args.config)?;
-    let test_dependencies = toml
-        .test_dependencies()
-        .current_platform()
-        .iter()
-        .map(LuaDependencySpec::package_req)
-        .cloned()
-        .collect_vec();
+    let test_dependencies = toml.test_dependencies().current_platform().clone();
     let dep_report = super::Sync::new(&test_tree, &mut project_lockfile, args.config)
         .validate_integrity(false)
         .packages(test_dependencies)
@@ -180,13 +173,7 @@ async fn update_project(
     .chain(dep_report.removed);
 
     let luarocks = LuaRocksInstallation::new(args.config)?;
-    let build_dependencies = toml
-        .build_dependencies()
-        .current_platform()
-        .iter()
-        .map(LuaDependencySpec::package_req)
-        .cloned()
-        .collect_vec();
+    let build_dependencies = toml.build_dependencies().current_platform().clone();
 
     let dep_report = super::Sync::new(luarocks.tree(), &mut project_lockfile, luarocks.config())
         .validate_integrity(false)
@@ -285,11 +272,7 @@ async fn update(
         Ok(Vec::new())
     } else {
         let updated_packages = Install::new(tree, config)
-            .packages(
-                updatable
-                    .iter()
-                    .map(|constraint| PackageInstallSpec::default_for(constraint.clone())),
-            )
+            .packages(updatable.iter().map(|constraint| constraint.clone().into()))
             .package_db(package_db)
             .progress(progress.clone())
             .install()

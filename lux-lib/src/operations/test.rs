@@ -3,12 +3,11 @@ use std::{io, ops::Deref, process::Command, sync::Arc};
 use crate::{
     build::BuildBehaviour,
     config::Config,
-    lockfile::{OptState, PinnedState},
     package::{PackageName, PackageReq, PackageVersionReqError},
     path::Paths,
     progress::{MultiProgress, Progress},
     project::{project_toml::LocalProjectTomlValidationError, Project, ProjectTreeError},
-    rockspec::{lua_dependency::LuaDependencySpec, Rockspec},
+    rockspec::Rockspec,
     tree::Tree,
 };
 use bon::Builder;
@@ -109,7 +108,6 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
             .test_dependencies()
             .current_platform()
             .iter()
-            .map(LuaDependencySpec::package_req)
             .cloned()
             .collect_vec();
 
@@ -123,7 +121,6 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
             .dependencies()
             .current_platform()
             .iter()
-            .map(LuaDependencySpec::package_req)
             .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
             .cloned()
             .collect_vec();
@@ -193,7 +190,7 @@ pub async fn ensure_busted(
 
     if !tree.match_rocks(&busted_req)?.is_found() {
         Install::new(tree, config)
-            .package(PackageInstallSpec::default_for(busted_req))
+            .package(busted_req.into())
             .progress(progress)
             .install()
             .await?;
@@ -230,8 +227,8 @@ async fn ensure_dependencies(
                 PackageInstallSpec::new(
                     dep.package_req().clone(),
                     build_behaviour,
-                    PinnedState::default(),
-                    OptState::default(),
+                    *dep.pin(),
+                    *dep.opt(),
                 )
             })
         });
@@ -260,8 +257,8 @@ async fn ensure_dependencies(
                 PackageInstallSpec::new(
                     dep.package_req().clone(),
                     build_behaviour,
-                    PinnedState::default(),
-                    OptState::default(),
+                    *dep.pin(),
+                    *dep.opt(),
                 )
             })
         });

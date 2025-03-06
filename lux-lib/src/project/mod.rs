@@ -556,9 +556,9 @@ mod tests {
         let mut project = Project::from(&project_root).unwrap().unwrap();
         let add_dependencies =
             vec![PackageReq::new("busted".into(), Some(">= 1.0.0".into())).unwrap()];
-        let expected_dependencies = vec![LuaDependencySpec {
-            package_req: PackageReq::new("busted".into(), Some(">= 1.0.0".into())).unwrap(),
-        }];
+        let expected_dependencies = vec![PackageReq::new("busted".into(), Some(">= 1.0.0".into()))
+            .unwrap()
+            .into()];
 
         let test_manifest_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/manifest-5.1");

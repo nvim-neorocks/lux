@@ -151,7 +151,7 @@ impl LuaRocksInstallation {
             _ => rocks.build_dependencies().current_platform().to_vec(),
         }
         .into_iter()
-        .map(|dep| PackageInstallSpec::default_for(dep.package_req))
+        .map(PackageInstallSpec::from)
         .collect_vec();
 
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
