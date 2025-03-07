@@ -263,11 +263,7 @@ mod test {
         .install()
         .await
         .unwrap();
-        let tree = Tree::new(
-            install_root.to_path_buf(),
-            LuaVersion::from(&config).unwrap(),
-        )
-        .unwrap();
+        let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
         let installed_rock_layout = tree.rock_layout(&local_package);
         let orig_install_tree_integrity = installed_rock_layout.rock_path.hash().unwrap();
 
