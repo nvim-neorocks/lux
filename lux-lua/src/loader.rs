@@ -92,7 +92,7 @@ pub fn loader(lua: &Lua, module: String) -> mlua::Result<Option<mlua::Function>>
         .find(|path| path.file_name().is_some_and(|filename| filename == ".lux"))
     {
         // Get the name of the current module, so we can look up its dependencies in the lockfile.
-        let lockfile = Lockfile::new(lock_path.join("lux.lock")).into_lua_err()?;
+        let lockfile = Lockfile::load(lock_path.join("lux.lock")).into_lua_err()?;
 
         // If we're in a lux tree, the path looks like `.lux/5.4/12345678-package_name-1.0.0/src/code.lua`
         // we need to extract the hash from the path.

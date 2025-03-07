@@ -14,6 +14,7 @@ use ssri::Integrity;
 use thiserror::Error;
 use url::Url;
 
+use crate::config::tree::RockLayoutConfig;
 use crate::package::{
     PackageName, PackageReq, PackageSpec, PackageVersion, PackageVersionReq,
     PackageVersionReqError, RemotePackageTypeFilterSpec,
@@ -21,6 +22,8 @@ use crate::package::{
 use crate::remote_package_source::RemotePackageSource;
 use crate::rockspec::lua_dependency::LuaDependencySpec;
 use crate::rockspec::RockBinaries;
+
+const LOCKFILE_VERSION_STR: &str = "1.0.0";
 
 #[derive(Copy, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub enum PinnedState {
@@ -641,11 +644,15 @@ impl LocalPackageLock {
     }
 
     fn is_empty(&self) -> bool {
-        self.entrypoints.is_empty()
+        self.rocks.is_empty()
     }
 
     pub(crate) fn rocks(&self) -> &BTreeMap<LocalPackageId, LocalPackage> {
         &self.rocks
+    }
+
+    fn is_entrypoint(&self, package: &LocalPackageId) -> bool {
+        self.entrypoints.contains(&package)
     }
 
     fn list(&self) -> HashMap<PackageName, Vec<LocalPackage>> {
@@ -776,6 +783,8 @@ pub struct Lockfile<P: LockfilePermissions> {
     version: String,
     #[serde(flatten)]
     lock: LocalPackageLock,
+    #[serde(default, skip_serializing_if = "RockLayoutConfig::is_default")]
+    pub(crate) rock_layout: RockLayoutConfig,
 }
 
 pub(crate) enum LocalPackageLockType {
@@ -839,6 +848,10 @@ impl<P: LockfilePermissions> Lockfile<P> {
 
     pub fn rocks(&self) -> &BTreeMap<LocalPackageId, LocalPackage> {
         self.lock.rocks()
+    }
+
+    pub fn is_entrypoint(&self, package: &LocalPackageId) -> bool {
+        self.lock.is_entrypoint(package)
     }
 
     pub(crate) fn local_pkg_lock(&self) -> &LocalPackageLock {
@@ -917,22 +930,7 @@ impl<P: LockfilePermissions> Lockfile<P> {
         }
     }
 
-    fn flush(&mut self) -> io::Result<()> {
-        let dependencies = self
-            .lock
-            .rocks
-            .iter()
-            .flat_map(|(_, rock)| rock.dependencies())
-            .collect_vec();
-
-        self.lock.entrypoints = self
-            .lock
-            .rocks
-            .keys()
-            .filter(|id| !dependencies.iter().contains(&id))
-            .cloned()
-            .collect();
-
+    fn flush(&self) -> io::Result<()> {
         let content = serde_json::to_string_pretty(&self)?;
 
         std::fs::write(&self.filepath, content)?;
@@ -985,52 +983,7 @@ impl<P: LockfilePermissions> ProjectLockfile<P> {
         }
     }
 
-    fn flush(&mut self) -> io::Result<()> {
-        let dependencies = self
-            .dependencies
-            .rocks
-            .iter()
-            .flat_map(|(_, rock)| rock.dependencies())
-            .collect_vec();
-
-        self.dependencies.entrypoints = self
-            .dependencies
-            .rocks
-            .keys()
-            .filter(|id| !dependencies.iter().contains(&id))
-            .cloned()
-            .collect();
-
-        let test_dependencies = self
-            .test_dependencies
-            .rocks
-            .iter()
-            .flat_map(|(_, rock)| rock.dependencies())
-            .collect_vec();
-
-        self.test_dependencies.entrypoints = self
-            .test_dependencies
-            .rocks
-            .keys()
-            .filter(|id| !test_dependencies.iter().contains(&id))
-            .cloned()
-            .collect();
-
-        let build_dependencies = self
-            .build_dependencies
-            .rocks
-            .iter()
-            .flat_map(|(_, rock)| rock.dependencies())
-            .collect_vec();
-
-        self.build_dependencies.entrypoints = self
-            .build_dependencies
-            .rocks
-            .keys()
-            .filter(|id| !build_dependencies.iter().contains(&id))
-            .cloned()
-            .collect();
-
+    fn flush(&self) -> io::Result<()> {
         let content = serde_json::to_string_pretty(&self)?;
 
         std::fs::write(&self.filepath, content)?;
@@ -1040,31 +993,48 @@ impl<P: LockfilePermissions> ProjectLockfile<P> {
 }
 
 impl Lockfile<ReadOnly> {
-    pub fn new(filepath: PathBuf) -> io::Result<Lockfile<ReadOnly>> {
+    /// Create a new `Lockfile`, writing an empty file if none exists.
+    pub(crate) fn new(
+        filepath: PathBuf,
+        rock_layout: RockLayoutConfig,
+    ) -> io::Result<Lockfile<ReadOnly>> {
         // Ensure that the lockfile exists
         match File::options().create_new(true).write(true).open(&filepath) {
             Ok(mut file) => {
-                write!(
-                    file,
-                    r#"
-                        {{
-                            "entrypoints": [],
-                            "rocks": {{}},
-                            "version": "1.0.0"
-                        }}
-                    "#
-                )?;
+                let empty_lockfile: Lockfile<ReadOnly> = Lockfile {
+                    filepath: filepath.clone(),
+                    _marker: PhantomData,
+                    version: LOCKFILE_VERSION_STR.into(),
+                    lock: LocalPackageLock::default(),
+                    rock_layout: rock_layout.clone(),
+                };
+                let json_str = serde_json::to_string(&empty_lockfile)?;
+                write!(file, "{}", json_str)?;
             }
             Err(err) if err.kind() == ErrorKind::AlreadyExists => {}
             Err(err) => return Err(err),
         }
 
-        let mut new: Lockfile<ReadOnly> =
+        Self::load(filepath, Some(&rock_layout))
+    }
+
+    /// Load a `Lockfile`, failing if none exists.
+    /// If `expected_rock_layout` is `Some`, this fails if the rock layouts don't match
+    pub fn load(
+        filepath: PathBuf,
+        expected_rock_layout: Option<&RockLayoutConfig>,
+    ) -> io::Result<Lockfile<ReadOnly>> {
+        let mut lockfile: Lockfile<ReadOnly> =
             serde_json::from_str(&std::fs::read_to_string(&filepath)?)?;
-
-        new.filepath = filepath;
-
-        Ok(new)
+        lockfile.filepath = filepath;
+        if let Some(expected_rock_layout) = expected_rock_layout {
+            if &lockfile.rock_layout != expected_rock_layout {
+                return Err(io::Error::other(
+                    "attempt to a lockfile that does not match the expected rock layout.",
+                ));
+            }
+        }
+        Ok(lockfile)
     }
 
     /// Creates a temporary, writeable lockfile which can never flush.
@@ -1074,6 +1044,7 @@ impl Lockfile<ReadOnly> {
             filepath: self.filepath,
             version: self.version,
             lock: self.lock,
+            rock_layout: self.rock_layout,
         }
     }
 
@@ -1120,33 +1091,37 @@ impl Lockfile<ReadOnly> {
 }
 
 impl ProjectLockfile<ReadOnly> {
+    /// Create a new `ProjectLockfile`, writing an empty file if none exists.
     pub fn new(filepath: PathBuf) -> io::Result<ProjectLockfile<ReadOnly>> {
         // Ensure that the lockfile exists
         match File::options().create_new(true).write(true).open(&filepath) {
             Ok(mut file) => {
-                write!(
-                    file,
-                    r#"
-                        {{
-                            "dependencies": {{
-                                "entrypoints": [],
-                                "rocks": {{}}
-                            }},
-                            "version": "1.0.0"
-                        }}
-                    "#
-                )?;
+                let empty_lockfile: ProjectLockfile<ReadOnly> = ProjectLockfile {
+                    filepath: filepath.clone(),
+                    _marker: PhantomData,
+                    version: LOCKFILE_VERSION_STR.into(),
+                    dependencies: LocalPackageLock::default(),
+                    test_dependencies: LocalPackageLock::default(),
+                    build_dependencies: LocalPackageLock::default(),
+                };
+                let json_str = serde_json::to_string(&empty_lockfile)?;
+                write!(file, "{}", json_str)?;
             }
             Err(err) if err.kind() == ErrorKind::AlreadyExists => {}
             Err(err) => return Err(err),
         }
 
-        let mut new: ProjectLockfile<ReadOnly> =
+        Self::load(filepath)
+    }
+
+    /// Load a `ProjectLockfile`, failing if none exists.
+    pub fn load(filepath: PathBuf) -> io::Result<ProjectLockfile<ReadOnly>> {
+        let mut lockfile: ProjectLockfile<ReadOnly> =
             serde_json::from_str(&std::fs::read_to_string(&filepath)?)?;
 
-        new.filepath = filepath;
+        lockfile.filepath = filepath;
 
-        Ok(new)
+        Ok(lockfile)
     }
 
     /// Creates a temporary, writeable project lockfile which can never flush.
@@ -1169,7 +1144,12 @@ impl ProjectLockfile<ReadOnly> {
 }
 
 impl Lockfile<ReadWrite> {
-    pub fn add(&mut self, rock: &LocalPackage) {
+    pub fn add_entrypoint(&mut self, rock: &LocalPackage) {
+        self.add(rock);
+        self.lock.entrypoints.push(rock.id().clone())
+    }
+
+    fn add(&mut self, rock: &LocalPackage) {
         self.lock.rocks.insert(rock.id(), rock.clone());
     }
 
@@ -1400,7 +1380,10 @@ mod tests {
     use assert_fs::fixture::PathCopy;
     use insta::{assert_json_snapshot, sorted_redaction};
 
-    use crate::{config::LuaVersion::Lua51, package::PackageSpec, tree::Tree};
+    use crate::{
+        config::{ConfigBuilder, LuaVersion::Lua51},
+        package::PackageSpec,
+    };
 
     #[test]
     fn parse_lockfile() {
@@ -1411,7 +1394,12 @@ mod tests {
         )
         .unwrap();
 
-        let tree = Tree::new(temp.to_path_buf(), Lua51).unwrap();
+        let config = ConfigBuilder::new()
+            .unwrap()
+            .tree(Some(temp.to_path_buf()))
+            .build()
+            .unwrap();
+        let tree = config.tree(Lua51).unwrap();
         let lockfile = tree.lockfile().unwrap();
 
         assert_json_snapshot!(lockfile, { ".**" => sorted_redaction() });
@@ -1435,7 +1423,12 @@ mod tests {
                 .unwrap(),
         };
 
-        let tree = Tree::new(temp.to_path_buf(), Lua51).unwrap();
+        let config = ConfigBuilder::new()
+            .unwrap()
+            .tree(Some(temp.to_path_buf()))
+            .build()
+            .unwrap();
+        let tree = config.tree(Lua51).unwrap();
         let mut lockfile = tree.lockfile().unwrap().write_guard();
 
         let test_package = PackageSpec::parse("test1".to_string(), "0.1.0".to_string()).unwrap();
@@ -1447,7 +1440,7 @@ mod tests {
             None,
             mock_hashes.clone(),
         );
-        lockfile.add(&test_local_package);
+        lockfile.add_entrypoint(&test_local_package);
 
         let test_dep_package =
             PackageSpec::parse("test2".to_string(), "0.1.0".to_string()).unwrap();
@@ -1460,8 +1453,6 @@ mod tests {
             mock_hashes.clone(),
         );
         test_local_dep_package.spec.pinned = PinnedState::Pinned;
-        lockfile.add(&test_local_dep_package);
-
         lockfile.add_dependency(&test_local_package, &test_local_dep_package);
 
         assert_json_snapshot!(lockfile, { ".**" => sorted_redaction() });
@@ -1477,7 +1468,12 @@ mod tests {
 
         remove_file(temp.join("5.1/lux.lock")).unwrap();
 
-        let tree = Tree::new(temp.to_path_buf(), Lua51).unwrap();
+        let config = ConfigBuilder::new()
+            .unwrap()
+            .tree(Some(temp.to_path_buf()))
+            .build()
+            .unwrap();
+        let tree = config.tree(Lua51).unwrap();
 
         let _ = tree.lockfile().unwrap().write_guard(); // Try to create the lockfile but don't actually do anything with it.
     }
@@ -1485,7 +1481,7 @@ mod tests {
     fn get_test_lockfile() -> Lockfile<ReadOnly> {
         let sample_tree = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("resources/test/sample-tree/5.1/lux.lock");
-        Lockfile::new(sample_tree).unwrap()
+        Lockfile::new(sample_tree, RockLayoutConfig::default()).unwrap()
     }
 
     #[test]

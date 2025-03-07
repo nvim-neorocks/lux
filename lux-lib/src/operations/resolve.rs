@@ -25,6 +25,7 @@ pub(crate) struct PackageInstallData {
     pub opt: OptState,
     pub downloaded_rock: RemoteRockDownload,
     pub spec: LocalPackageSpec,
+    pub is_entrypoint: bool,
 }
 
 #[async_recursion]
@@ -60,6 +61,7 @@ where
                      build_behaviour,
                      pin,
                      opt,
+                     is_entrypoint,
                  }| {
                     let config = config.clone();
                     let tx = tx.clone();
@@ -83,11 +85,14 @@ where
                             .current_platform()
                             .iter()
                             .filter(|dep| !dep.name().eq(&"lua".into()))
-                            .map(|dep| PackageInstallSpec {
-                                package: dep.package_req().clone(),
-                                build_behaviour,
-                                pin,
-                                opt,
+                            .map(|dep| {
+                                PackageInstallSpec::new(
+                                    dep.package_req().clone(),
+                                    build_behaviour,
+                                    pin,
+                                    opt,
+                                    false,
+                                )
                             })
                             .collect_vec();
 
@@ -118,6 +123,7 @@ where
                             opt,
                             spec: local_spec.clone(),
                             downloaded_rock,
+                            is_entrypoint,
                         };
 
                         tx.send(install_spec).unwrap();

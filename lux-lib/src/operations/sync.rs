@@ -158,6 +158,7 @@ async fn do_sync(
                 BuildBehaviour::Force,
                 pkg.pinned(),
                 pkg.opt(),
+                true,
             )
         })
         .collect_vec();
@@ -211,6 +212,7 @@ async fn do_sync(
                 BuildBehaviour::Force,
                 *pkg.pin(),
                 *pkg.opt(),
+                true,
             )
         });
 

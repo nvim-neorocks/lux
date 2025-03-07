@@ -53,6 +53,7 @@ pub(crate) struct BinaryRockInstall<'a> {
     behaviour: BuildBehaviour,
     config: &'a Config,
     progress: &'a Progress<ProgressBar>,
+    install_etc: bool,
 }
 
 impl<'a> BinaryRockInstall<'a> {
@@ -73,6 +74,7 @@ impl<'a> BinaryRockInstall<'a> {
             behaviour: BuildBehaviour::default(),
             pin: PinnedState::default(),
             opt: OptState::default(),
+            install_etc: true,
         }
     }
 
@@ -90,6 +92,13 @@ impl<'a> BinaryRockInstall<'a> {
 
     pub(crate) fn behaviour(self, behaviour: BuildBehaviour) -> Self {
         Self { behaviour, ..self }
+    }
+
+    pub(crate) fn install_etc(self, install_etc: bool) -> Self {
+        Self {
+            install_etc,
+            ..self
+        }
     }
 
     pub(crate) async fn install(self) -> Result<LocalPackage, InstallBinaryRockError> {
@@ -158,16 +167,18 @@ impl<'a> BinaryRockInstall<'a> {
                     &unpack_dir.join("bin"),
                     &output_paths.bin,
                 )?;
-                install_manifest_entries(
-                    &rock_manifest.doc.entries,
-                    &unpack_dir.join("doc"),
-                    &output_paths.doc,
-                )?;
-                install_manifest_entries(
-                    &rock_manifest.root.entries,
-                    &unpack_dir,
-                    &output_paths.etc,
-                )?;
+                if self.install_etc {
+                    install_manifest_entries(
+                        &rock_manifest.doc.entries,
+                        &unpack_dir.join("doc"),
+                        &output_paths.doc,
+                    )?;
+                    install_manifest_entries(
+                        &rock_manifest.root.entries,
+                        &unpack_dir,
+                        &output_paths.etc,
+                    )?;
+                }
                 // rename <name>-<version>.rockspec
                 let rockspec_path = output_paths.etc.join(format!(
                     "{}-{}.rockspec",
@@ -206,7 +217,6 @@ mod test {
         config::{ConfigBuilder, LuaVersion},
         operations::{unpack_rockspec, DownloadedPackedRockBytes, Pack, Remove},
         progress::MultiProgress,
-        tree::Tree,
     };
 
     use super::*;
@@ -263,11 +273,7 @@ mod test {
         .install()
         .await
         .unwrap();
-        let tree = Tree::new(
-            install_root.to_path_buf(),
-            LuaVersion::from(&config).unwrap(),
-        )
-        .unwrap();
+        let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
         let installed_rock_layout = tree.rock_layout(&local_package);
         let orig_install_tree_integrity = installed_rock_layout.rock_path.hash().unwrap();
 

@@ -1,6 +1,6 @@
 ---
 source: lux-lib/src/lockfile/mod.rs
-assertion_line: 1514
+assertion_line: 1484
 expression: lockfile
 ---
 {
@@ -317,6 +317,7 @@ expression: lockfile
     "09b728b8ffb1b864e2002cec989c47a30ccb3d92dfea356667e576e0329b8d84",
     "0e7601c45f13611fa5b85cb3ba46a554ad6fb6c4546776b310c9ebfc5581e663",
     "6ce52e817fcd2ffa42a18cff12c0fe8c94bc9fdddc62ff0592d1ce7934876e4d",
-    "6e71c27e2818df16fdbf782b88dca9199cd20b29a88a7af29cb5c1c87cb03f95"
+    "6e71c27e2818df16fdbf782b88dca9199cd20b29a88a7af29cb5c1c87cb03f95",
+    "9aee9941c7f659d37f722216138a3913b8861f8d31d52da5601a39d9a30e9d4e"
   ]
 }

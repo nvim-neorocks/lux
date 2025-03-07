@@ -11,7 +11,6 @@ use lux_lib::{
     package::PackageReq,
     progress::MultiProgress,
     project::Project,
-    tree::Tree,
 };
 use tempdir::TempDir;
 
@@ -71,13 +70,15 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
             match default_tree.match_rocks(&package_req)? {
                 lux_lib::tree::RockMatches::NotFound(_) => {
                     let temp_dir = TempDir::new("lux-pack")?.into_path();
-                    let tree = Tree::new(temp_dir.clone(), lua_version.clone())?;
-                    let packages = Install::new(&tree, &config)
+                    let temp_config = config.with_tree(temp_dir);
+                    let tree = temp_config.tree(lua_version.clone())?;
+                    let packages = Install::new(&tree, &temp_config)
                         .package(PackageInstallSpec::new(
                             package_req,
                             BuildBehaviour::Force,
                             PinnedState::default(),
                             OptState::default(),
+                            true,
                         ))
                         .progress(progress)
                         .install()
@@ -119,8 +120,8 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
             }?;
             let temp_dir = TempDir::new("lux-pack")?.into_path();
             let bar = progress.map(|p| p.new_bar());
-            let tree = Tree::new(temp_dir.clone(), lua_version.clone())?;
             let config = config.with_tree(temp_dir);
+            let tree = config.tree(lua_version)?;
             let package = Build::new(&rockspec, &tree, &config, &bar).build().await?;
             let rock_path = operations::Pack::new(dest_dir, tree, package).pack()?;
             Ok(rock_path)

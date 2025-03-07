@@ -111,6 +111,10 @@ pub struct Cli {
     #[arg(long)]
     pub verbose: bool,
 
+    /// Configure lux for installing Neovim packages.
+    #[arg(long)]
+    pub nvim: bool,
+
     /// Timeout on network operations, in seconds.
     /// 0 means no timeout (wait forever). Default is 30.
     #[arg(long, value_name = "seconds")]

@@ -30,6 +30,8 @@ pub enum PinError {
     Io(#[from] io::Error),
     #[error("failed to move old package: {0}")]
     MoveItemsFailure(#[from] fs_extra::error::Error),
+    #[error("cannot change pin state of {rock}, because it is not an entrypoint")]
+    NotAnEntrypoint { rock: PackageSpec },
 }
 
 pub fn set_pinned_state(
@@ -42,6 +44,12 @@ pub fn set_pinned_state(
         .get(package_id)
         .ok_or_else(|| PinError::PackageNotFound(package_id.clone()))?
         .clone();
+
+    if !lockfile.is_entrypoint(&package.id()) {
+        return Err(PinError::NotAnEntrypoint {
+            rock: package.to_package(),
+        });
+    }
 
     if pin == package.pinned() {
         return Err(PinError::PinStateUnchanged {
@@ -73,7 +81,7 @@ pub fn set_pinned_state(
 
     lockfile.map_then_flush(|lockfile| {
         lockfile.remove(&old_package);
-        lockfile.add(&package);
+        lockfile.add_entrypoint(&package);
 
         Ok::<_, io::Error>(())
     })?;
