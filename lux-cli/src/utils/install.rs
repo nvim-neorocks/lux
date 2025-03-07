@@ -35,7 +35,8 @@ pub fn apply_build_behaviour(
                 }
                 _ => Some(BuildBehaviour::from(force)),
             };
-            build_behaviour.map(|it| PackageInstallSpec::new(req, it, pin, OptState::Required))
+            build_behaviour
+                .map(|it| PackageInstallSpec::new(req, it, pin, OptState::Required, true))
         })
         .collect()
 }

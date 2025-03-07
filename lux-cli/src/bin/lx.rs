@@ -10,7 +10,7 @@ use lux_cli::{
     which, Cli, Commands,
 };
 use lux_lib::{
-    config::ConfigBuilder,
+    config::{tree::RockLayoutConfig, ConfigBuilder},
     lockfile::PinnedState::{Pinned, Unpinned},
 };
 
@@ -18,7 +18,7 @@ use lux_lib::{
 async fn main() {
     let cli = Cli::parse();
 
-    let config = ConfigBuilder::new()
+    let mut config_builder = ConfigBuilder::new()
         .unwrap()
         .dev(Some(cli.dev))
         .lua_dir(cli.lua_dir)
@@ -33,9 +33,13 @@ async fn main() {
                 .map(|duration| Duration::from_secs(duration as u64)),
         )
         .no_project(Some(cli.no_project))
-        .verbose(Some(cli.verbose))
-        .build()
-        .unwrap();
+        .verbose(Some(cli.verbose));
+
+    if cli.nvim {
+        config_builder = config_builder.rock_layout(RockLayoutConfig::new_nvim_layout());
+    }
+
+    let config = config_builder.build().unwrap();
 
     match cli.command {
         Commands::Search(search_data) => search::search(search_data, config).await.unwrap(),

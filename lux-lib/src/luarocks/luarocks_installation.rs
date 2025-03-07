@@ -11,9 +11,9 @@ use tempdir::TempDir;
 use thiserror::Error;
 
 use crate::{
-    build::{Build, BuildError},
+    build::{Build, BuildBehaviour, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
-    lockfile::{LocalPackage, LocalPackageId},
+    lockfile::{LocalPackage, LocalPackageId, OptState, PinnedState},
     lua_installation::LuaInstallation,
     lua_rockspec::{RemoteLuaRockspec, RockspecFormat},
     operations::{get_all_dependencies, PackageInstallSpec, SearchAndDownloadError},
@@ -90,7 +90,7 @@ impl LuaRocksInstallation {
     pub fn new(config: &Config) -> Result<Self, LuaRocksError> {
         let config = config.clone().with_tree(config.luarocks_tree().clone());
         let luarocks_installation = Self {
-            tree: Tree::new(config.luarocks_tree().clone(), LuaVersion::from(&config)?)?,
+            tree: config.tree(LuaVersion::from(&config)?)?,
             config,
         };
         Ok(luarocks_installation)
@@ -119,7 +119,7 @@ impl LuaRocksInstallation {
                 .constraint(luarocks_req.version_req().clone().into())
                 .build()
                 .await?;
-            lockfile.add(&pkg);
+            lockfile.add_entrypoint(&pkg);
         }
 
         Ok(())
@@ -151,7 +151,15 @@ impl LuaRocksInstallation {
             _ => rocks.build_dependencies().current_platform().to_vec(),
         }
         .into_iter()
-        .map(PackageInstallSpec::from)
+        .map(|dep| {
+            PackageInstallSpec::new(
+                dep.package_req,
+                BuildBehaviour::default(),
+                PinnedState::default(),
+                OptState::default(),
+                true,
+            )
+        })
         .collect_vec();
 
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -184,36 +192,45 @@ impl LuaRocksInstallation {
                 let pkg = Build::new(rockspec, &tree, &config, &bar)
                     .constraint(install_spec.spec.constraint())
                     .behaviour(install_spec.build_behaviour)
+                    .install_etc(install_spec.is_entrypoint)
                     .build()
                     .await?;
 
                 bar.map(|b| b.finish_and_clear());
 
-                Ok::<_, InstallBuildDependenciesError>((pkg.id(), pkg))
+                Ok::<_, InstallBuildDependenciesError>((
+                    pkg.id(),
+                    (pkg, install_spec.is_entrypoint),
+                ))
             })
         }))
         .await
         .into_iter()
         .flatten()
-        .try_collect::<_, HashMap<LocalPackageId, LocalPackage>, _>()?;
+        .try_collect::<_, HashMap<LocalPackageId, (LocalPackage, bool)>, _>()?;
 
-        installed_packages.iter().for_each(|(id, pkg)| {
-            lockfile.add(pkg);
+        installed_packages
+            .iter()
+            .for_each(|(id, (pkg, is_entrypoint))| {
+                if *is_entrypoint {
+                    lockfile.add_entrypoint(pkg);
+                }
 
-            all_packages
-                .get(id)
-                .map(|pkg| pkg.spec.dependencies())
-                .unwrap_or_default()
-                .into_iter()
-                .for_each(|dependency_id| {
-                    lockfile.add_dependency(
-                        pkg,
-                        installed_packages
-                            .get(dependency_id)
-                            .expect("required dependency not found"),
-                    );
-                });
-        });
+                all_packages
+                    .get(id)
+                    .map(|pkg| pkg.spec.dependencies())
+                    .unwrap_or_default()
+                    .into_iter()
+                    .for_each(|dependency_id| {
+                        lockfile.add_dependency(
+                            pkg,
+                            &installed_packages
+                                .get(dependency_id)
+                                .expect("required dependency not found")
+                                .0,
+                        );
+                    });
+            });
 
         Ok(())
     }

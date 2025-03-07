@@ -117,7 +117,9 @@ async fn remove_package(
         ))
     });
 
-    tokio::fs::remove_dir_all(tree.root_for(&package)).await?;
+    let rock_layout = tree.rock_layout(&package);
+    tokio::fs::remove_dir_all(&rock_layout.etc).await?;
+    tokio::fs::remove_dir_all(&rock_layout.rock_path).await?;
 
     // Delete the corresponding binaries attached to the current package (located under `{LUX_TREE}/bin/`)
     for relative_binary_path in package.spec.binaries() {

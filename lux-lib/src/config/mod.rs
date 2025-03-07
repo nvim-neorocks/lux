@@ -7,6 +7,7 @@ use std::{
     collections::HashMap, env, fmt::Display, io, path::PathBuf, str::FromStr, time::Duration,
 };
 use thiserror::Error;
+use tree::RockLayoutConfig;
 use url::Url;
 
 use crate::rockspec::LuaVersionCompatibility;
@@ -21,6 +22,7 @@ use crate::{
 };
 
 pub mod external_deps;
+pub mod tree;
 
 const DEV_PATH: &str = "dev/";
 
@@ -178,6 +180,9 @@ pub struct Config {
     timeout: Duration,
     variables: HashMap<String, String>,
     external_deps: ExternalDependencySearchConfig,
+    /// The rock layout for new install trees.
+    /// Does not affect existing install trees.
+    rock_layout: RockLayoutConfig,
 
     cache_dir: PathBuf,
     data_dir: PathBuf,
@@ -247,7 +252,13 @@ impl Config {
     }
 
     pub fn tree(&self, version: LuaVersion) -> io::Result<Tree> {
-        Tree::new(self.tree.clone(), version)
+        Tree::new(self.tree.clone(), version, self)
+    }
+
+    pub fn test_tree(&self, version: LuaVersion) -> io::Result<Tree> {
+        let tree = self.tree(version.clone())?;
+        let test_tree_root = tree.root().join("test_dependencies");
+        Ok(Tree::new(test_tree_root, version, self)?)
     }
 
     /// The tree in which to install luarocks for use as a compatibility layer
@@ -287,6 +298,10 @@ impl Config {
 
     pub fn external_deps(&self) -> &ExternalDependencySearchConfig {
         &self.external_deps
+    }
+
+    pub fn rock_layout(&self) -> &RockLayoutConfig {
+        &self.rock_layout
     }
 
     pub fn cache_dir(&self) -> &PathBuf {
@@ -347,6 +362,10 @@ pub struct ConfigBuilder {
     variables: Option<HashMap<String, String>>,
     #[serde(default)]
     external_deps: ExternalDependencySearchConfig,
+    /// The rock layout for new install trees.
+    /// Does not affect existing install trees.
+    #[serde(default)]
+    rock_layout: RockLayoutConfig,
 }
 
 impl ConfigBuilder {
@@ -439,6 +458,13 @@ impl ConfigBuilder {
         Self { data_dir, ..self }
     }
 
+    pub fn rock_layout(self, rock_layout: RockLayoutConfig) -> Self {
+        Self {
+            rock_layout,
+            ..self
+        }
+    }
+
     pub fn build(self) -> Result<Config, ConfigError> {
         let data_dir = self.data_dir.unwrap_or(Config::get_default_data_path()?);
         let cache_dir = self.cache_dir.unwrap_or(Config::get_default_cache_path()?);
@@ -482,6 +508,7 @@ impl ConfigBuilder {
                 .chain(self.variables.unwrap_or_default())
                 .collect(),
             external_deps: self.external_deps,
+            rock_layout: self.rock_layout,
             cache_dir,
             data_dir,
         })
@@ -508,6 +535,7 @@ impl From<Config> for ConfigBuilder {
             cache_dir: Some(value.cache_dir),
             data_dir: Some(value.data_dir),
             external_deps: value.external_deps,
+            rock_layout: value.rock_layout,
         }
     }
 }

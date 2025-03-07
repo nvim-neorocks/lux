@@ -5,6 +5,7 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use crate::{
+    build::BuildBehaviour,
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{
         LocalPackage, LocalPackageLockType, Lockfile, PinnedState, ProjectLockfile, ReadOnly,
@@ -19,7 +20,7 @@ use crate::{
     tree::Tree,
 };
 
-use super::{Install, InstallError, Remove, RemoveError, SyncError};
+use super::{Install, InstallError, PackageInstallSpec, Remove, RemoveError, SyncError};
 
 #[derive(Error, Debug)]
 pub enum UpdateError {
@@ -215,7 +216,8 @@ async fn update_dependency_tree(
         .into_iter()
         .filter(|pkg| is_included(pkg, packages))
         .collect_vec();
-    let updated_dependencies = update(dependencies, package_db, tree, config, progress).await?;
+    let updated_dependencies =
+        update(dependencies, package_db, tree, &lockfile, config, progress).await?;
     if !updated_dependencies.is_empty() {
         let updated_lockfile = tree.lockfile()?;
         project_lockfile.sync(updated_lockfile.local_pkg_lock(), &lock_type);
@@ -245,13 +247,22 @@ async fn update_install_tree(
         .into_iter()
         .filter(|pkg| is_included(pkg, &args.packages))
         .collect_vec();
-    update(packages, package_db, &tree, args.config, args.progress).await
+    update(
+        packages,
+        package_db,
+        &tree,
+        &lockfile,
+        args.config,
+        args.progress,
+    )
+    .await
 }
 
 async fn update(
     packages: Vec<(LocalPackage, PackageReq)>,
     package_db: RemotePackageDB,
     tree: &Tree,
+    lockfile: &Lockfile<ReadOnly>,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, UpdateError> {
@@ -263,7 +274,9 @@ async fn update(
                 .to_package()
                 .has_update_with(&constraint, &package_db)
             {
-                Ok(Some(_)) if package.pinned() == PinnedState::Unpinned => Some(constraint),
+                Ok(Some(_)) if package.pinned() == PinnedState::Unpinned => {
+                    Some((package, constraint))
+                }
                 _ => None,
             }
         })
@@ -271,16 +284,20 @@ async fn update(
     if updatable.is_empty() {
         Ok(Vec::new())
     } else {
-        let updated_packages = Install::new(tree, config)
-            .packages(updatable.iter().map(|constraint| constraint.clone().into()))
-            .package_db(package_db)
-            .progress(progress.clone())
-            .install()
-            .await?;
         Remove::new(config)
-            .packages(packages.into_iter().map(|package| package.0.id()))
-            .progress(progress)
+            .packages(updatable.iter().map(|(package, _)| package.id()))
+            .progress(progress.clone())
             .remove()
+            .await?;
+        let updated_packages = Install::new(tree, config)
+            .packages(
+                updatable
+                    .iter()
+                    .map(|updatable| mk_install_spec(updatable, lockfile)),
+            )
+            .package_db(package_db)
+            .progress(progress)
+            .install()
             .await?;
         Ok(updated_packages)
     }
@@ -293,4 +310,18 @@ fn unpinned_packages(lockfile: &Lockfile<ReadOnly>) -> Vec<(LocalPackage, Packag
         .filter(|package| package.pinned() == PinnedState::Unpinned)
         .map(|package| (package.clone(), package.to_package().into_package_req()))
         .collect_vec()
+}
+
+fn mk_install_spec(
+    (package, req): &(LocalPackage, PackageReq),
+    lockfile: &Lockfile<ReadOnly>,
+) -> PackageInstallSpec {
+    let is_entrypoint = lockfile.is_entrypoint(&package.id());
+    PackageInstallSpec::new(
+        req.clone(),
+        BuildBehaviour::default(),
+        PinnedState::Unpinned,
+        package.opt().clone(),
+        is_entrypoint,
+    )
 }

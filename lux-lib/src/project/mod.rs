@@ -193,7 +193,7 @@ impl Project {
     pub fn try_lockfile(&self) -> Result<Option<ProjectLockfile<ReadOnly>>, io::Error> {
         let path = self.lockfile_path();
         if path.is_file() {
-            Ok(Some(ProjectLockfile::new(path)?))
+            Ok(Some(ProjectLockfile::load(path)?))
         } else {
             Ok(None)
         }
@@ -234,9 +234,7 @@ impl Project {
     }
 
     pub fn test_tree(&self, config: &Config) -> Result<Tree, ProjectTreeError> {
-        let tree = self.tree(config)?;
-        let test_tree_root = tree.root().join("test_dependencies");
-        Ok(Tree::new(test_tree_root, self.lua_version(config)?)?)
+        Ok(config.test_tree(self.lua_version(config)?)?)
     }
 
     pub fn lua_version(&self, config: &Config) -> Result<LuaVersion, LuaVersionError> {

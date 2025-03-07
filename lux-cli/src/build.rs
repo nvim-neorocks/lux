@@ -61,6 +61,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                     BuildBehaviour::default(),
                     *dep.pin(),
                     *dep.opt(),
+                    true,
                 )
             });
 
@@ -77,7 +78,15 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                 tree.match_rocks(dep.package_req())
                     .is_ok_and(|rock_match| !rock_match.is_found())
             })
-            .map(PackageInstallSpec::from)
+            .map(|dep| {
+                PackageInstallSpec::new(
+                    dep.clone().into_package_req(),
+                    BuildBehaviour::default(),
+                    *dep.pin(),
+                    *dep.opt(),
+                    true,
+                )
+            })
             .collect_vec();
 
         if !build_dependencies_to_install.is_empty() {
