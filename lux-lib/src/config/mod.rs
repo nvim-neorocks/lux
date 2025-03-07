@@ -2,6 +2,7 @@ use directories::ProjectDirs;
 use external_deps::ExternalDependencySearchConfig;
 use itertools::Itertools;
 use mlua::{ExternalError, FromLua, IntoLua, UserData};
+use rock_layout::RockLayoutConfig;
 use serde::{Deserialize, Serialize, Serializer};
 use std::{
     collections::HashMap, env, fmt::Display, io, path::PathBuf, str::FromStr, time::Duration,
@@ -21,6 +22,7 @@ use crate::{
 };
 
 pub mod external_deps;
+pub mod rock_layout;
 
 const DEV_PATH: &str = "dev/";
 
@@ -178,6 +180,7 @@ pub struct Config {
     timeout: Duration,
     variables: HashMap<String, String>,
     external_deps: ExternalDependencySearchConfig,
+    rock_layout: RockLayoutConfig,
 
     cache_dir: PathBuf,
     data_dir: PathBuf,
