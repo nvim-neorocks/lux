@@ -100,6 +100,8 @@ pub enum LocalProjectTomlValidationError {
     DuplicateTestDependencies(PackageNameList),
     #[error("duplicate build dependencies: {0}")]
     DuplicateBuildDependencies(PackageNameList),
+    #[error("dependencies field cannot contain lua - please provide the version in the top-level lua field")]
+    DependenciesContainLua,
 }
 
 #[derive(Debug, Error)]
@@ -172,6 +174,15 @@ impl PartialProjectToml {
     /// it ready to be used for building a project.
     pub fn into_local(&self) -> Result<LocalProjectToml, LocalProjectTomlValidationError> {
         let project_toml = self.clone();
+
+        // Disallow `lua` to be part of the `dependencies` field
+        if project_toml
+            .dependencies
+            .as_ref()
+            .is_some_and(|deps| deps.iter().any(|dep| dep.name() == &"lua".into()))
+        {
+            return Err(LocalProjectTomlValidationError::DependenciesContainLua);
+        }
 
         let lua: LuaDependencySpec = PackageReq {
             name: "lua".into(),
@@ -1236,5 +1247,25 @@ mod tests {
         assert_eq!(merged.test(), expected_rockspec.test());
         assert_eq!(merged.build(), expected_rockspec.build());
         assert_eq!(merged.format(), expected_rockspec.format());
+    }
+
+    #[test]
+    fn project_toml_with_lua_in_dependencies() {
+        let project_toml = r#"
+        package = "my-package"
+        version = "1.0.0"
+        # lua = ">5.1"
+
+        [dependencies]
+        lua = "5.1" # disallowed
+
+        [build]
+        type = "builtin"
+        "#;
+
+        PartialProjectToml::new(project_toml, ProjectRoot::default())
+            .unwrap()
+            .into_local()
+            .unwrap_err();
     }
 }

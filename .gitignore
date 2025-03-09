@@ -21,6 +21,5 @@
 /.lux/*
 /lux.lock
 /lux.toml
-/lux-lua/target
 
 .pre-commit-config.yaml
