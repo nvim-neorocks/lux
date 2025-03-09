@@ -7,8 +7,8 @@ pub fn debug_project() -> Result<()> {
     if let Some(project) = project {
         let rocks = project.toml();
 
-        println!("Project Name: {}", rocks.package());
-        println!("Project Version: {}", rocks.version());
+        println!("Project name: {}", rocks.package());
+        println!("Project version: {}", rocks.version());
 
         println!("Project location: {}", project.root().display());
     } else {
