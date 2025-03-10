@@ -379,7 +379,10 @@ async fn do_build<R: Rockspec + HasIntegrity>(
                         .is_some_and(|name| name != "doc" && name != "docs")
                 })
             {
-                recursive_copy_dir(&build_dir.join(directory), &output_paths.etc)?;
+                recursive_copy_dir(
+                    &build_dir.join(directory),
+                    &output_paths.etc.join(directory),
+                )?;
             }
 
             recursive_copy_doc_dir(&output_paths, &build_dir)?;
