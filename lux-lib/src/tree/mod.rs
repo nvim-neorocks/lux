@@ -3,7 +3,7 @@ use crate::{
         utils::escape_path,
         variables::{self, HasVariables},
     },
-    config::LuaVersion,
+    config::{tree::RockLayoutConfig, Config, LuaVersion},
     lockfile::{LocalPackage, LocalPackageId, Lockfile, ReadOnly},
     package::PackageReq,
 };
@@ -31,6 +31,8 @@ pub struct Tree {
     version: LuaVersion,
     /// The root of the tree.
     root: PathBuf,
+    /// The rock layout config for this tree
+    rock_layout_config: RockLayoutConfig,
 }
 
 /// Change-agnostic way of referencing various paths for a rock.
@@ -106,7 +108,11 @@ impl mlua::UserData for RockLayout {
 }
 
 impl Tree {
-    pub fn new(root: PathBuf, version: LuaVersion) -> io::Result<Self> {
+    pub(in crate::config) fn new(
+        root: PathBuf,
+        version: LuaVersion,
+        config: &Config,
+    ) -> io::Result<Self> {
         let path_with_version = root.join(version.to_string());
 
         // Ensure that the root and the version directory exist.
@@ -115,7 +121,11 @@ impl Tree {
         // Ensure that the bin directory exists.
         std::fs::create_dir_all(root.join("bin"))?;
 
-        Ok(Self { root, version })
+        Ok(Self {
+            root,
+            version,
+            rock_layout_config: config.rock_layout().clone(),
+        })
     }
 
     pub fn root(&self) -> PathBuf {

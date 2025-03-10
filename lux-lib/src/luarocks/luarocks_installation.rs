@@ -90,7 +90,7 @@ impl LuaRocksInstallation {
     pub fn new(config: &Config) -> Result<Self, LuaRocksError> {
         let config = config.clone().with_tree(config.luarocks_tree().clone());
         let luarocks_installation = Self {
-            tree: Tree::new(config.luarocks_tree().clone(), LuaVersion::from(&config)?)?,
+            tree: config.tree(LuaVersion::from(&config)?)?,
             config,
         };
         Ok(luarocks_installation)
