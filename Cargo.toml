@@ -2,7 +2,8 @@
 members = [
    "lux-lib",
    "lux-cli",
+   "lux-workspace-hack",
    "xtask",
+   "lux-lua",
 ]
-exclude = ["lux-lua"]
 resolver = "2"
