@@ -2286,7 +2286,6 @@ dependencies = [
  "clap_builder",
  "console",
  "crossbeam-utils",
- "form_urlencoded",
  "futures-channel",
  "futures-core",
  "futures-sink",
@@ -2296,6 +2295,7 @@ dependencies = [
  "indexmap 1.9.3",
  "lock_api",
  "log",
+ "memchr",
  "num-traits",
  "parking_lot",
  "percent-encoding",
@@ -2313,7 +2313,6 @@ dependencies = [
  "toml",
  "toml_edit",
  "tracing",
- "url",
 ]
 
 [[package]]

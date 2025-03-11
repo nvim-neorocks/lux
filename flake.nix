@@ -38,7 +38,6 @@
             # to update CONTRIBUTING.md for non-nix users.
             alejandra.enable = true;
             rustfmt.enable = true;
-            taplo.enable = true;
           };
         };
       in {
@@ -59,6 +58,7 @@
                   cargo-nextest
                   cargo-hakari
                   clippy
+                  taplo
                   lua_pkg
                   # Needed for integration test builds
                   pkg-config
@@ -87,6 +87,7 @@
           tests = pkgs.lux-nextest;
           clippy = pkgs.lux-clippy;
           workspace-hack = pkgs.lux-workspace-hack;
+          taplo = pkgs.lux-taplo;
         };
       };
       flake = {
