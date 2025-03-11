@@ -163,6 +163,15 @@ in {
       cargoNextestPartitionsExtraArgs = "--no-tests=pass";
     });
 
+  lux-taplo = with final;
+    craneLib.craneLib.taploFmt {
+      inherit (luxCliCargo) pname version;
+      src = lib.fileset.toSource {
+        root = ../.;
+        fileset = lib.fileset.difference ../. ../lux-workspace-hack;
+      };
+    };
+
   lux-clippy = craneLib.cargoClippy (commonArgs
     // {
       inherit (luxCliCargo) pname version;

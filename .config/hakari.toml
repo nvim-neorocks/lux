@@ -27,6 +27,4 @@ platforms = [
 # exact-versions = true
 
 [traversal-excludes]
-third-party = [
-    { name = "mlua" },
-]
+third-party = [{ name = "mlua" }]

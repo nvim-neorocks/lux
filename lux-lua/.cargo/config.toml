@@ -3,13 +3,13 @@ rustflags = ["-C", "link-args=-rdynamic"]
 
 [target.x86_64-apple-darwin]
 rustflags = [
-  "-C", "link-arg=-undefined",
-  "-C", "link-arg=dynamic_lookup",
-  "-C", "link-args=-rdynamic"
+  "-C",
+  "link-arg=-undefined",
+  "-C",
+  "link-arg=dynamic_lookup",
+  "-C",
+  "link-args=-rdynamic",
 ]
 
 [target.aarch64-apple-darwin]
-rustflags = [
-  "-C", "link-arg=-undefined",
-  "-C", "link-arg=dynamic_lookup",
-]
+rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
