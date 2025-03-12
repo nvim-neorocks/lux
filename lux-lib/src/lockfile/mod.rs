@@ -796,7 +796,7 @@ pub struct Lockfile<P: LockfilePermissions> {
     #[serde(flatten)]
     lock: LocalPackageLock,
     #[serde(default, skip_serializing_if = "RockLayoutConfig::is_default")]
-    pub(crate) rock_layout: RockLayoutConfig,
+    pub(crate) entrypoint_layout: RockLayoutConfig,
 }
 
 pub enum LocalPackageLockType {
@@ -1018,7 +1018,7 @@ impl Lockfile<ReadOnly> {
                     _marker: PhantomData,
                     version: LOCKFILE_VERSION_STR.into(),
                     lock: LocalPackageLock::default(),
-                    rock_layout: rock_layout.clone(),
+                    entrypoint_layout: rock_layout.clone(),
                 };
                 let json_str = serde_json::to_string(&empty_lockfile)?;
                 write!(file, "{}", json_str)?;
@@ -1040,7 +1040,7 @@ impl Lockfile<ReadOnly> {
             serde_json::from_str(&std::fs::read_to_string(&filepath)?)?;
         lockfile.filepath = filepath;
         if let Some(expected_rock_layout) = expected_rock_layout {
-            if &lockfile.rock_layout != expected_rock_layout {
+            if &lockfile.entrypoint_layout != expected_rock_layout {
                 return Err(io::Error::other(
                     "attempt to a lockfile that does not match the expected rock layout.",
                 ));
@@ -1056,7 +1056,7 @@ impl Lockfile<ReadOnly> {
             filepath: self.filepath,
             version: self.version,
             lock: self.lock,
-            rock_layout: self.rock_layout,
+            entrypoint_layout: self.entrypoint_layout,
         }
     }
 

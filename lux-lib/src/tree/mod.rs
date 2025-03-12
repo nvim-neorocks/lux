@@ -34,7 +34,7 @@ pub struct Tree {
     /// The root of the tree.
     root: PathBuf,
     /// The rock layout config for this tree
-    rock_layout_config: RockLayoutConfig,
+    entrypoint_layout: RockLayoutConfig,
 }
 
 /// Change-agnostic way of referencing various paths for a rock.
@@ -123,14 +123,14 @@ impl Tree {
         let lockfile_path = root.join(LOCKFILE_NAME);
         let rock_layout_config = if lockfile_path.is_file() {
             let lockfile = Lockfile::load(lockfile_path, None)?;
-            lockfile.rock_layout
+            lockfile.entrypoint_layout
         } else {
-            config.rock_layout().clone()
+            config.entrypoint_layout().clone()
         };
         Ok(Self {
             root,
             version,
-            rock_layout_config,
+            entrypoint_layout: rock_layout_config,
         })
     }
 
@@ -190,26 +190,32 @@ impl Tree {
     }
 
     /// Create a `RockLayout` for a package, without creating the directories.
-    pub fn rock_layout(&self, package: &LocalPackage) -> RockLayout {
+    pub fn rock_layout(&self, package: &LocalPackage) -> io::Result<RockLayout> {
+        let lockfile = self.lockfile()?;
+        let layout_config = if lockfile.is_entrypoint(&package.id()) {
+            self.entrypoint_layout.clone()
+        } else {
+            RockLayoutConfig::default()
+        };
         let rock_path = self.root_for(package);
         let bin = self.bin();
-        let etc_root = match &self.rock_layout_config.etc_root {
-            Some(etc_root) => self.root().join(etc_root),
+        let etc_root = match layout_config.etc_root {
+            Some(ref etc_root) => self.root().join(etc_root),
             None => rock_path.clone(),
         };
         let mut etc = match package.spec.opt {
-            OptState::Required => etc_root.join(&self.rock_layout_config.etc),
-            OptState::Optional => etc_root.join(&self.rock_layout_config.opt_etc),
+            OptState::Required => etc_root.join(&layout_config.etc),
+            OptState::Optional => etc_root.join(&layout_config.opt_etc),
         };
-        if let Some(_) = self.rock_layout_config.etc_root {
+        if let Some(_) = layout_config.etc_root {
             etc = etc.join(format!("{}", package.name()));
         }
         let lib = rock_path.join("lib");
         let src = rock_path.join("src");
-        let conf = etc.join(&self.rock_layout_config.conf);
-        let doc = etc.join(&self.rock_layout_config.doc);
+        let conf = etc.join(&layout_config.conf);
+        let doc = etc.join(&layout_config.doc);
 
-        RockLayout {
+        Ok(RockLayout {
             rock_path,
             etc,
             lib,
@@ -217,19 +223,19 @@ impl Tree {
             bin,
             conf,
             doc,
-        }
+        })
     }
 
     /// Create a `RockLayout` for a package, creating the `lib` and `src` directories.
     pub fn rock(&self, package: &LocalPackage) -> io::Result<RockLayout> {
-        let rock_layout = self.rock_layout(package);
+        let rock_layout = self.rock_layout(package)?;
         std::fs::create_dir_all(&rock_layout.lib)?;
         std::fs::create_dir_all(&rock_layout.src)?;
         Ok(rock_layout)
     }
 
     pub fn lockfile(&self) -> io::Result<Lockfile<ReadOnly>> {
-        Lockfile::new(self.lockfile_path(), self.rock_layout_config.clone())
+        Lockfile::new(self.lockfile_path(), self.entrypoint_layout.clone())
     }
 
     /// Get this tree's lockfile path.
@@ -258,7 +264,7 @@ impl mlua::UserData for Tree {
             },
         );
         methods.add_method("rock_layout", |_, this, package: LocalPackage| {
-            Ok(this.rock_layout(&package))
+            Ok(this.rock_layout(&package)?)
         });
         methods.add_method("rock", |_, this, package: LocalPackage| {
             this.rock(&package).into_lua_err()

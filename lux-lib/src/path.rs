@@ -43,7 +43,8 @@ impl Paths {
                     .map(|package| tree.rock_layout(&package))
                     .collect_vec()
             })
-            .fold(Self::default(&tree), |mut paths, package| {
+            .try_fold(Self::default(&tree), |mut paths, package| {
+                let package = package?;
                 paths.src.0.push(package.src.join("?.lua"));
                 paths.src.0.push(package.src.join("?").join("init.lua"));
                 paths
@@ -51,8 +52,8 @@ impl Paths {
                     .0
                     .push(package.lib.join(format!("?.{}", lua_lib_extension())));
                 paths.bin.0.push(package.bin);
-                paths
-            });
+                Ok::<Paths, io::Error>(paths)
+            })?;
 
         let lib_path = option_env!("LUX_LIB_DIR")
             .map(PathBuf::from)

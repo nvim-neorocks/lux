@@ -36,7 +36,7 @@ async fn main() {
         .verbose(Some(cli.verbose));
 
     if cli.nvim {
-        config_builder = config_builder.rock_layout(RockLayoutConfig::new_nvim_layout());
+        config_builder = config_builder.entrypoint_layout(RockLayoutConfig::new_nvim_layout());
     }
 
     let config = config_builder.build().unwrap();

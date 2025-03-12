@@ -62,14 +62,14 @@ async fn open_homepage(pkg: LocalPackage, tree: &Tree) -> Result<()> {
 }
 
 fn get_homepage(pkg: &LocalPackage, tree: &Tree) -> Result<Option<Url>> {
-    let layout = tree.rock_layout(pkg);
+    let layout = tree.rock_layout(pkg)?;
     let rockspec_content = std::fs::read_to_string(layout.rockspec_path())?;
     let rockspec = RemoteLuaRockspec::new(&rockspec_content)?;
     Ok(rockspec.description().homepage.clone())
 }
 
 async fn open_local_docs(pkg: LocalPackage, tree: &Tree) -> Result<()> {
-    let layout = tree.rock_layout(&pkg);
+    let layout = tree.rock_layout(&pkg)?;
     let files: Vec<String> = WalkDir::new(&layout.doc)
         .into_iter()
         .filter_map_ok(|file| {

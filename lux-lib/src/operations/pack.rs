@@ -61,7 +61,7 @@ pub enum PackError {
 fn do_pack(args: Pack) -> Result<PathBuf, PackError> {
     let package = args.package;
     let tree = args.tree;
-    let layout = tree.rock_layout(&package);
+    let layout = tree.rock_layout(&package)?;
     let suffix = if is_binary_rock(&layout) {
         format!("{}.rock", luarocks::current_platform_luarocks_identifier())
     } else {
