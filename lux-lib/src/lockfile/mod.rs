@@ -7,7 +7,7 @@ use std::ops::{Deref, DerefMut};
 use std::{collections::HashMap, fs::File, io::ErrorKind, path::PathBuf};
 
 use itertools::Itertools;
-use mlua::{ExternalResult, FromLua, Function, IntoLua, UserData};
+use mlua::{ExternalResult, FromLua, IntoLua, UserData};
 use serde::{de, Deserialize, Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use ssri::Integrity;
@@ -412,32 +412,6 @@ impl LocalPackage {
 
     pub fn into_package_req(self) -> PackageReq {
         self.spec.into_package_req()
-    }
-}
-
-#[cfg(feature = "lua")]
-impl mlua::UserData for LocalPackage {
-    fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("name", |_, this| Ok(this.name().to_string()));
-        fields.add_field_method_get("version", |_, this| Ok(this.version().to_string()));
-        fields.add_field_method_get("pinned", |_, this| Ok(this.pinned().as_bool()));
-        fields.add_field_method_get("dependencies", |_, this| {
-            Ok(this
-                .spec
-                .dependencies
-                .iter()
-                .map(|id| id.clone().0)
-                .collect_vec())
-        });
-        fields.add_field_method_get("constraint", |_, this| Ok(this.spec.constraint.clone()));
-        fields.add_field_method_get("id", |_, this| Ok(this.id()));
-    }
-
-    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("to_package", |_, this, ()| Ok(this.to_package()));
-        methods.add_method("to_package_req", |_, this, ()| {
-            Ok(this.clone().into_package_req())
-        });
     }
 }
 
@@ -1008,19 +982,7 @@ impl Lockfile<ReadOnly> {
     }
 
     /// Creates a temporary, writeable lockfile which can never flush.
-    #[cfg(feature = "lua")]
     pub(crate) fn into_temporary(self) -> Lockfile<ReadWrite> {
-        Lockfile::<ReadWrite> {
-            _marker: PhantomData,
-            filepath: self.filepath,
-            version: self.version,
-            lock: self.lock,
-        }
-    }
-
-    /// Creates a temporary, writeable lockfile which can never flush.
-    #[cfg(not(feature = "lua"))]
-    fn into_temporary(self) -> Lockfile<ReadWrite> {
         Lockfile::<ReadWrite> {
             _marker: PhantomData,
             filepath: self.filepath,
@@ -1282,8 +1244,7 @@ impl Drop for ProjectLockfileGuard {
     }
 }
 
-#[cfg(feature = "lua")]
-impl mlua::UserData for Lockfile<ReadWrite> {
+impl UserData for Lockfile<ReadWrite> {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method_mut("add", |_, this, package: LocalPackage| {
             this.add(&package);

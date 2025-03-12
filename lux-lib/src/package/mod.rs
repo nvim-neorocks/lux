@@ -20,7 +20,6 @@ use crate::{
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]
-#[cfg_attr(feature = "lua", derive(mlua::FromLua))]
 pub struct PackageSpec {
     name: PackageName,
     version: PackageVersion,

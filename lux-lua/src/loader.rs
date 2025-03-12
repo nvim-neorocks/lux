@@ -88,9 +88,9 @@ pub fn loader(lua: &Lua, module: String) -> mlua::Result<Option<mlua::Function>>
         Some(module) => module,
         None => return Ok(None),
     };
-    let mut current_file = match current_file(lua).as_str() {
-        current_file => PathBuf::from(current_file),
+    let current_file = match current_file(lua).as_str() {
         "stdin" => return Ok(None),
+        current_file => PathBuf::from(current_file),
     };
     let current_file = current_file.absolutize().into_lua_err()?;
 
@@ -136,7 +136,7 @@ pub fn loader(lua: &Lua, module: String) -> mlua::Result<Option<mlua::Function>>
                     // If we're in a lux tree, the path looks like `.lux/5.4/12345678-package_name-1.0.0/src/code.lua`
                     // we need to extract the hash from the path.
 
-                    let module_hash = current_file.into_iter().rev().find_map(|path| {
+                    let module_hash = current_file.iter().rev().find_map(|path| {
                         if let [hash, _name, _version, _rest @ ""] =
                             path.to_str().unwrap().splitn(3, '-').collect::<Vec<&str>>()[..4]
                         {
@@ -166,7 +166,7 @@ pub fn loader(lua: &Lua, module: String) -> mlua::Result<Option<mlua::Function>>
                                         None
                                     }
                                 })
-                                .and_then(|dep| {
+                                .map(|dep| {
                                     let path = lock_path.parent().unwrap().join(format!(
                                         ".lux/{version}/{id}-{package_name}-{package_version}/",
                                         version = lua_version(),
@@ -175,7 +175,7 @@ pub fn loader(lua: &Lua, module: String) -> mlua::Result<Option<mlua::Function>>
                                         package_version = dep.version()
                                     ));
 
-                                    Some(load_file(lua, module, path))
+                                    load_file(lua, module, path)
                                 })
                                 .transpose();
                         }

@@ -10,9 +10,7 @@ use crate::{
 use std::{io, path::PathBuf};
 
 use itertools::Itertools;
-#[cfg(feature = "lua")]
-use mlua::ExternalResult;
-use mlua::{ExternalResult, IntoLua, UserData};
+use mlua::{ExternalResult, IntoLua};
 
 mod list;
 
