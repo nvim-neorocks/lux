@@ -338,7 +338,6 @@ async fn install_rockspec(
         .opt(opt)
         .constraint(constraint)
         .behaviour(behaviour)
-        .install_etc(is_entrypoint)
         .source(source)
         .source_url(rockspec_download.source_url)
         .build()
@@ -382,7 +381,6 @@ async fn install_binary_rock(
     .opt(opt)
     .constraint(constraint)
     .behaviour(behaviour)
-    .install_etc(is_entrypoint)
     .install()
     .await
     .map_err(|err| InstallError::InstallBinaryRockError(package, err))?;

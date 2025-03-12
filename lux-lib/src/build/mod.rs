@@ -72,10 +72,6 @@ pub struct Build<'a, R: Rockspec + HasIntegrity> {
     #[builder(default)]
     behaviour: BuildBehaviour,
 
-    /// Whether to install `etc` and `doc` directories.
-    #[builder(default = true)]
-    install_etc: bool,
-
     // TODO(vhyrro): Remove this and enforce that this is provided at a type level.
     source: Option<RemotePackageSource>,
 }
@@ -385,25 +381,20 @@ async fn do_build<R: Rockspec + HasIntegrity>(
             )
             .await?;
 
-            if build.install_etc {
-                for directory in rockspec
-                    .build()
-                    .current_platform()
-                    .copy_directories
-                    .iter()
-                    .filter(|dir| {
-                        dir.file_name()
-                            .is_some_and(|name| name != "doc" && name != "docs")
-                    })
-                {
-                    recursive_copy_dir(
-                        &build_dir.join(directory),
-                        &output_paths.etc.join(directory),
-                    )?;
-                }
-
-                recursive_copy_doc_dir(&output_paths, &build_dir)?;
+            for directory in rockspec
+                .build()
+                .current_platform()
+                .copy_directories
+                .iter()
+                .filter(|dir| {
+                    dir.file_name()
+                        .is_some_and(|name| name != "doc" && name != "docs")
+                })
+            {
+                recursive_copy_dir(&build_dir.join(directory), &output_paths.etc)?;
             }
+
+            recursive_copy_doc_dir(&output_paths, &build_dir)?;
 
             std::fs::write(
                 output_paths.rockspec_path(),

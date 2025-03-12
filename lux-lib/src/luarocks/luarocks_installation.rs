@@ -192,7 +192,6 @@ impl LuaRocksInstallation {
                 let pkg = Build::new(rockspec, &tree, &config, &bar)
                     .constraint(install_spec.spec.constraint())
                     .behaviour(install_spec.build_behaviour)
-                    .install_etc(install_spec.is_entrypoint)
                     .build()
                     .await?;
 

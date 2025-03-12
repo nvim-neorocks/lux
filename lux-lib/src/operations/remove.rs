@@ -117,7 +117,7 @@ async fn remove_package(
         ))
     });
 
-    let rock_layout = tree.rock_layout(&package);
+    let rock_layout = tree.rock_layout(&package)?;
     tokio::fs::remove_dir_all(&rock_layout.etc).await?;
     tokio::fs::remove_dir_all(&rock_layout.rock_path).await?;
 

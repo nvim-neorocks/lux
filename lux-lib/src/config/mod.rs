@@ -180,9 +180,9 @@ pub struct Config {
     timeout: Duration,
     variables: HashMap<String, String>,
     external_deps: ExternalDependencySearchConfig,
-    /// The rock layout for new install trees.
-    /// Does not affect existing install trees.
-    rock_layout: RockLayoutConfig,
+    /// The rock layout for entrypoints of new install trees.
+    /// Does not affect existing install trees or dependency rock layouts.
+    entrypoint_layout: RockLayoutConfig,
 
     cache_dir: PathBuf,
     data_dir: PathBuf,
@@ -300,8 +300,8 @@ impl Config {
         &self.external_deps
     }
 
-    pub fn rock_layout(&self) -> &RockLayoutConfig {
-        &self.rock_layout
+    pub fn entrypoint_layout(&self) -> &RockLayoutConfig {
+        &self.entrypoint_layout
     }
 
     pub fn cache_dir(&self) -> &PathBuf {
@@ -365,7 +365,7 @@ pub struct ConfigBuilder {
     /// The rock layout for new install trees.
     /// Does not affect existing install trees.
     #[serde(default)]
-    rock_layout: RockLayoutConfig,
+    entrypoint_layout: RockLayoutConfig,
 }
 
 impl ConfigBuilder {
@@ -458,9 +458,9 @@ impl ConfigBuilder {
         Self { data_dir, ..self }
     }
 
-    pub fn rock_layout(self, rock_layout: RockLayoutConfig) -> Self {
+    pub fn entrypoint_layout(self, rock_layout: RockLayoutConfig) -> Self {
         Self {
-            rock_layout,
+            entrypoint_layout: rock_layout,
             ..self
         }
     }
@@ -508,7 +508,7 @@ impl ConfigBuilder {
                 .chain(self.variables.unwrap_or_default())
                 .collect(),
             external_deps: self.external_deps,
-            rock_layout: self.rock_layout,
+            entrypoint_layout: self.entrypoint_layout,
             cache_dir,
             data_dir,
         })
@@ -535,7 +535,7 @@ impl From<Config> for ConfigBuilder {
             cache_dir: Some(value.cache_dir),
             data_dir: Some(value.data_dir),
             external_deps: value.external_deps,
-            rock_layout: value.rock_layout,
+            entrypoint_layout: value.entrypoint_layout,
         }
     }
 }
