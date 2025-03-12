@@ -16,7 +16,6 @@ use crate::{
     tree::{RockLayout, Tree},
 };
 use bon::{builder, Builder};
-use build_builder::State;
 use cmake::CMakeError;
 use command::CommandError;
 use external_dependency::{ExternalDependencyError, ExternalDependencyInfo};
@@ -25,7 +24,7 @@ use indicatif::style::TemplateError;
 use itertools::Itertools;
 use luarocks::LuarocksBuildError;
 use make::MakeError;
-use mlua::{FromLua, UserData};
+use mlua::FromLua;
 use patch::{Patch, PatchError};
 use rust_mlua::RustError;
 use ssri::Integrity;
@@ -144,7 +143,7 @@ pub enum BuildBehaviour {
 
 impl FromLua for BuildBehaviour {
     fn from_lua(value: mlua::Value, lua: &mlua::Lua) -> mlua::Result<Self> {
-        Ok(bool::from_lua(value, &lua)?.into())
+        Ok(bool::from_lua(value, lua)?.into())
     }
 }
 

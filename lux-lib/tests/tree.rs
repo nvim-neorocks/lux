@@ -1,5 +1,3 @@
-#![cfg(feature = "lua")]
-
 use lux_lib::tree::Tree;
 use mlua::{IntoLua, Lua};
 use tempdir::TempDir;

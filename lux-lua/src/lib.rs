@@ -1,9 +1,6 @@
 use std::path::PathBuf;
 
-use lux_lib::{
-    config::{Config, ConfigBuilder},
-    project::Project,
-};
+use lux_lib::{config::ConfigBuilder, project::Project};
 use mlua::prelude::*;
 
 mod loader;

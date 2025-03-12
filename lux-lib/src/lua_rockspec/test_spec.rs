@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use mlua::{FromLua, IntoLua, UserData, UserDataFields};
+use mlua::{FromLua, IntoLua, UserData};
 use serde_enum_str::Serialize_enum_str;
 use std::{convert::Infallible, path::PathBuf};
 use thiserror::Error;
