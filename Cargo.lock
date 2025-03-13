@@ -2267,12 +2267,10 @@ dependencies = [
 name = "lux-lua"
 version = "0.1.0"
 dependencies = [
- "lets_find_up",
  "lux-lib",
  "lux-workspace-hack",
  "mlua",
  "path-absolutize",
- "pathdiff",
 ]
 
 [[package]]
