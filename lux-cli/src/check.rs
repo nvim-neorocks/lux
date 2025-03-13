@@ -1,7 +1,8 @@
 use eyre::{OptionExt, Result};
 use lux_lib::{
     config::Config,
-    operations::{Install, PackageInstallSpec, Run},
+    operations::{Install, Run},
+    package::PackageReq,
     progress::MultiProgress,
     project::Project,
 };
@@ -9,8 +10,9 @@ use lux_lib::{
 pub async fn check(config: Config) -> Result<()> {
     let project = Project::current()?.ok_or_eyre("Not in a project!")?;
 
+    let luacheck: PackageReq = "luacheck".parse()?;
     Install::new(&project.tree(&config)?, &config)
-        .package(PackageInstallSpec::default_for("luacheck".parse()?))
+        .package(luacheck.into())
         .progress(MultiProgress::new_arc())
         .install()
         .await?;

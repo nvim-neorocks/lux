@@ -1,14 +1,15 @@
 use eyre::{Context, OptionExt, Result};
+use itertools::Itertools;
 use lux_lib::{
     config::Config,
-    lockfile::PinnedState,
+    lockfile::{OptState, PinnedState},
     luarocks::luarocks_installation::LuaRocksInstallation,
     operations::Sync,
     package::PackageReq,
     progress::{MultiProgress, Progress, ProgressBar},
     project::Project,
     remote_package_db::RemotePackageDB,
-    rockspec::lua_dependency,
+    rockspec::lua_dependency::{self, LuaDependencySpec},
 };
 
 #[derive(clap::Args)]
@@ -16,9 +17,13 @@ pub struct Add {
     /// Package or list of packages to install.
     package_req: Vec<PackageReq>,
 
-    /// Pin the package so that it doesn't get updated.
+    /// Pin the packages so that they doesn't get updated.
     #[arg(long)]
     pin: bool,
+
+    /// Mark the packages as optional.
+    #[arg(long)]
+    opt: bool,
 
     /// Reinstall without prompt if a package is already installed.
     #[arg(long)]
@@ -38,6 +43,7 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
     let mut project = Project::current()?.ok_or_eyre("No project found")?;
 
     let pin = PinnedState::from(data.pin);
+    let opt = OptState::from(data.opt);
     let tree = project.tree(&config)?;
     let db = RemotePackageDB::from_config(&config, &Progress::Progress(ProgressBar::new())).await?;
 
@@ -50,8 +56,13 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
             let mut lockfile = lockfile.write_guard();
             Sync::new(&tree, &mut lockfile, &config)
                 .progress(progress.clone())
-                .packages(data.package_req.clone())
-                .pin(pin)
+                .packages(
+                    data.package_req
+                        .iter()
+                        .cloned()
+                        .map(|pkg| LuaDependencySpec::new(pkg, pin, opt))
+                        .collect_vec(),
+                )
                 .sync_dependencies()
                 .await
                 .wrap_err("syncing dependencies with the project lockfile failed.")?;
@@ -72,8 +83,13 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
             let mut lockfile = lockfile.write_guard();
             Sync::new(luarocks.tree(), &mut lockfile, luarocks.config())
                 .progress(progress.clone())
-                .packages(build_packages.clone())
-                .pin(pin)
+                .packages(
+                    build_packages
+                        .iter()
+                        .cloned()
+                        .map(|pkg| LuaDependencySpec::new(pkg, pin, opt))
+                        .collect_vec(),
+                )
                 .sync_build_dependencies()
                 .await
                 .wrap_err("syncing build dependencies with the project lockfile failed.")?;
@@ -90,8 +106,13 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
             let mut lockfile = lockfile.write_guard();
             Sync::new(&tree, &mut lockfile, &config)
                 .progress(progress.clone())
-                .packages(test_packages.clone())
-                .pin(pin)
+                .packages(
+                    test_packages
+                        .iter()
+                        .cloned()
+                        .map(|pkg| LuaDependencySpec::new(pkg, pin, opt))
+                        .collect_vec(),
+                )
                 .sync_test_dependencies()
                 .await
                 .wrap_err("syncing test dependencies with the project lockfile failed.")?;

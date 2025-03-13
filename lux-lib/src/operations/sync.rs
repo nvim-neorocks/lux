@@ -4,12 +4,13 @@ use crate::{
     build::BuildBehaviour,
     config::Config,
     lockfile::{
-        LocalPackage, LocalPackageLockType, LockfileIntegrityError, OptState, PackageSyncSpec,
-        PinnedState, ProjectLockfile, ReadWrite,
+        LocalPackage, LocalPackageLockType, LockfileIntegrityError, PackageSyncSpec,
+        ProjectLockfile, ReadWrite,
     },
     luarocks::luarocks_installation::LUAROCKS_VERSION,
     package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress},
+    rockspec::lua_dependency::LuaDependencySpec,
     tree::Tree,
 };
 use bon::{builder, Builder};
@@ -34,11 +35,9 @@ pub struct Sync<'a> {
     progress: Option<Arc<Progress<MultiProgress>>>,
     /// Sync the source lockfile with these package requirements.
     #[builder(field)]
-    packages: Option<Vec<PackageReq>>,
+    packages: Option<Vec<LuaDependencySpec>>,
     /// Whether to validate the integrity of installed packages.
     validate_integrity: Option<bool>,
-    /// Whether to pin newly added packages
-    pin: Option<PinnedState>,
 }
 
 impl<State> SyncBuilder<'_, State>
@@ -50,17 +49,17 @@ where
         self
     }
 
-    pub fn packages(mut self, packages: Vec<PackageReq>) -> Self {
+    pub fn packages(mut self, packages: Vec<LuaDependencySpec>) -> Self {
         self.packages = Some(packages);
         self
     }
 
-    pub fn add_packages(&mut self, packages: Vec<PackageReq>) -> &Self {
+    pub fn add_packages(&mut self, packages: Vec<LuaDependencySpec>) -> &Self {
         self.packages = Some(packages);
         self
     }
 
-    fn add_package(&mut self, package: PackageReq) -> &Self {
+    fn add_package(&mut self, package: LuaDependencySpec) -> &Self {
         match &mut self.packages {
             Some(packages) => packages.push(package),
             None => self.packages = Some(vec![package]),
@@ -78,7 +77,7 @@ where
     }
 
     pub async fn sync_test_dependencies(mut self) -> Result<SyncReport, SyncError> {
-        let busted = PackageReq::new("busted".into(), None).unwrap();
+        let busted = PackageReq::new("busted".into(), None).unwrap().into();
         self.add_package(busted);
         do_sync(self._build(), &LocalPackageLockType::Test).await
     }
@@ -89,8 +88,9 @@ where
             .as_ref()
             .is_some_and(|packages| !packages.is_empty())
         {
-            let luarocks =
-                PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into())).unwrap();
+            let luarocks = PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into()))
+                .unwrap()
+                .into();
             self.add_package(luarocks);
         }
         do_sync(self._build(), &LocalPackageLockType::Build).await
@@ -122,7 +122,6 @@ async fn do_sync(
     let progress = args.progress.unwrap_or(MultiProgress::new_arc());
     std::fs::create_dir_all(args.tree.root())?;
     let dest_lockfile = args.tree.lockfile()?;
-    let pin = args.pin.unwrap_or_default();
 
     let package_sync_spec = match &args.packages {
         Some(packages) => args.project_lockfile.package_sync_spec(packages, lock_type),
@@ -153,8 +152,14 @@ async fn do_sync(
         .added
         .iter()
         .cloned()
-        .map(|pkg| pkg.into_package_req())
-        .map(|pkg| PackageInstallSpec::new(pkg, BuildBehaviour::Force, pin, OptState::default()))
+        .map(|pkg| {
+            PackageInstallSpec::new(
+                pkg.clone().into_package_req(),
+                BuildBehaviour::Force,
+                pkg.pinned(),
+                pkg.opt(),
+            )
+        })
         .collect_vec();
 
     let package_db = args
@@ -201,7 +206,12 @@ async fn do_sync(
     if !package_sync_spec.to_add.is_empty() {
         // Install missing packages using the default package_db.
         let missing_packages = package_sync_spec.to_add.into_iter().map(|pkg| {
-            PackageInstallSpec::new(pkg, BuildBehaviour::Force, pin, OptState::default())
+            PackageInstallSpec::new(
+                pkg.package_req().clone(),
+                BuildBehaviour::Force,
+                *pkg.pin(),
+                *pkg.opt(),
+            )
         });
 
         let added = Install::new(args.tree, args.config)
@@ -282,7 +292,9 @@ mod tests {
                 .unwrap();
             let dest_tree = config.tree(LuaVersion::Lua51).unwrap();
             let report = Sync::new(&dest_tree, &mut empty_lockfile, &config)
-                .packages(vec![PackageReq::new("toml-edit".into(), None).unwrap()])
+                .packages(vec![PackageReq::new("toml-edit".into(), None)
+                    .unwrap()
+                    .into()])
                 .sync_dependencies()
                 .await
                 .unwrap();
