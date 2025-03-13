@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io, sync::Arc};
+use std::{collections::HashMap, fmt::Display, io, sync::Arc};
 
 use crate::{
     build::{Build, BuildBehaviour, BuildError},
@@ -113,6 +113,21 @@ impl<'a> Install<'a> {
                 RemotePackageDB::from_config(self.config, &bar).await?
             }
         };
+
+        let duplicate_entrypoints = self
+            .packages
+            .iter()
+            .filter(|pkg| pkg.is_entrypoint)
+            .duplicates_by(|pkg| pkg.package.name.clone())
+            .map(|pkg| pkg.package.name.clone())
+            .collect_vec();
+
+        if !duplicate_entrypoints.is_empty() {
+            return Err(InstallError::DuplicateEntrypoints(PackageNameList(
+                duplicate_entrypoints,
+            )));
+        }
+
         install(
             self.packages,
             package_db,
@@ -149,6 +164,17 @@ pub enum InstallError {
     Integrity(PackageName, RemotePackageDbIntegrityError),
     #[error(transparent)]
     ProjectTreeError(#[from] ProjectTreeError),
+    #[error("cannot install duplicate entrypoints: {0}")]
+    DuplicateEntrypoints(PackageNameList),
+}
+
+#[derive(Debug)]
+pub struct PackageNameList(Vec<PackageName>);
+
+impl Display for PackageNameList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0.iter().map(|pkg| pkg.to_string()).join(", ").as_str())
+    }
 }
 
 async fn install(
@@ -228,7 +254,6 @@ async fn install_impl(
                         install_spec.build_behaviour,
                         install_spec.pin,
                         install_spec.opt,
-                        install_spec.is_entrypoint,
                         &tree,
                         &config,
                         progress_arc,
@@ -246,7 +271,6 @@ async fn install_impl(
                         install_spec.build_behaviour,
                         install_spec.pin,
                         install_spec.opt,
-                        install_spec.is_entrypoint,
                         &config,
                         progress_arc,
                     )
@@ -312,7 +336,6 @@ async fn install_rockspec(
     behaviour: BuildBehaviour,
     pin: PinnedState,
     opt: OptState,
-    is_entrypoint: bool,
     tree: &Tree,
     config: &Config,
     progress_arc: Arc<Progress<MultiProgress>>,
@@ -357,7 +380,6 @@ async fn install_binary_rock(
     behaviour: BuildBehaviour,
     pin: PinnedState,
     opt: OptState,
-    is_entrypoint: bool,
     config: &Config,
     progress_arc: Arc<Progress<MultiProgress>>,
 ) -> Result<LocalPackage, InstallError> {
