@@ -4,7 +4,8 @@ use crate::{
     build::{Build, BuildBehaviour, BuildError},
     config::{Config, LuaVersionUnset},
     lockfile::{
-        LocalPackage, LocalPackageId, LockConstraint, Lockfile, PinnedState, ReadOnly, ReadWrite,
+        LocalPackage, LocalPackageId, LockConstraint, Lockfile, OptState, PinnedState, ReadOnly,
+        ReadWrite,
     },
     lua_rockspec::BuildBackendSpec,
     luarocks::{
@@ -14,7 +15,7 @@ use crate::{
             LuaRocksInstallation,
         },
     },
-    package::{PackageName, PackageReq},
+    package::PackageName,
     progress::{MultiProgress, Progress, ProgressBar},
     project::{Project, ProjectTreeError},
     remote_package_db::{RemotePackageDB, RemotePackageDBError, RemotePackageDbIntegrityError},
@@ -28,7 +29,8 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use super::{
-    resolve::get_all_dependencies, DownloadedRockspec, RemoteRockDownload, SearchAndDownloadError,
+    install_spec::PackageInstallSpec, resolve::get_all_dependencies, DownloadedRockspec,
+    RemoteRockDownload, SearchAndDownloadError,
 };
 
 /// A rocks package installer, providing fine-grained control
@@ -38,8 +40,7 @@ pub struct Install<'a> {
     config: &'a Config,
     tree: &'a Tree,
     package_db: Option<RemotePackageDB>,
-    packages: Vec<(BuildBehaviour, PackageReq)>,
-    pin: PinnedState,
+    packages: Vec<PackageInstallSpec>,
     progress: Option<Arc<Progress<MultiProgress>>>,
     project: Option<&'a Project>,
 }
@@ -52,7 +53,6 @@ impl<'a> Install<'a> {
             tree,
             package_db: None,
             packages: Vec::new(),
-            pin: PinnedState::default(),
             progress: None,
             project: None,
         }
@@ -70,7 +70,7 @@ impl<'a> Install<'a> {
     /// Specify packages to install, along with each package's build behaviour.
     pub fn packages<I>(self, packages: I) -> Self
     where
-        I: IntoIterator<Item = (BuildBehaviour, PackageReq)>,
+        I: IntoIterator<Item = PackageInstallSpec>,
     {
         Self {
             packages: self.packages.into_iter().chain(packages).collect_vec(),
@@ -79,12 +79,8 @@ impl<'a> Install<'a> {
     }
 
     /// Add a package to the set of packages to install.
-    pub fn package(self, behaviour: BuildBehaviour, package: PackageReq) -> Self {
-        self.packages(std::iter::once((behaviour, package)))
-    }
-
-    pub fn pin(self, pin: PinnedState) -> Self {
-        Self { pin, ..self }
+    pub fn package(self, package: PackageInstallSpec) -> Self {
+        self.packages(std::iter::once(package))
     }
 
     /// Pass a `MultiProgress` to this installer.
@@ -119,7 +115,6 @@ impl<'a> Install<'a> {
         };
         install(
             self.packages,
-            self.pin,
             package_db,
             self.project,
             self.tree,
@@ -157,8 +152,7 @@ pub enum InstallError {
 }
 
 async fn install(
-    packages: Vec<(BuildBehaviour, PackageReq)>,
-    pin: PinnedState,
+    packages: Vec<PackageInstallSpec>,
     package_db: RemotePackageDB,
     project: Option<&Project>,
     tree: &Tree,
@@ -172,7 +166,6 @@ where
 
     install_impl(
         packages,
-        pin,
         Arc::new(package_db),
         config,
         &tree,
@@ -185,8 +178,7 @@ where
 // TODO(vhyrro): This function has too many arguments. Refactor it.
 #[allow(clippy::too_many_arguments)]
 async fn install_impl(
-    packages: Vec<(BuildBehaviour, PackageReq)>,
-    pin: PinnedState,
+    packages: Vec<PackageInstallSpec>,
     package_db: Arc<RemotePackageDB>,
     config: &Config,
     tree: &Tree,
@@ -198,7 +190,6 @@ async fn install_impl(
     get_all_dependencies(
         tx,
         packages,
-        pin,
         package_db.clone(),
         Arc::new(lockfile.clone()),
         config,
@@ -235,7 +226,8 @@ async fn install_impl(
                         rockspec_download,
                         install_spec.spec.constraint(),
                         install_spec.build_behaviour,
-                        pin,
+                        install_spec.pin,
+                        install_spec.opt,
                         &tree,
                         &config,
                         progress_arc,
@@ -251,7 +243,8 @@ async fn install_impl(
                         packed_rock,
                         install_spec.spec.constraint(),
                         install_spec.build_behaviour,
-                        pin,
+                        install_spec.pin,
+                        install_spec.opt,
                         &config,
                         progress_arc,
                     )
@@ -305,6 +298,7 @@ async fn install_rockspec(
     constraint: LockConstraint,
     behaviour: BuildBehaviour,
     pin: PinnedState,
+    opt: OptState,
     tree: &Tree,
     config: &Config,
     progress_arc: Arc<Progress<MultiProgress>>,
@@ -327,6 +321,7 @@ async fn install_rockspec(
 
     let pkg = Build::new(&rockspec, tree, config, &bar)
         .pin(pin)
+        .opt(opt)
         .constraint(constraint)
         .behaviour(behaviour)
         .source(source)
@@ -346,6 +341,7 @@ async fn install_binary_rock(
     constraint: LockConstraint,
     behaviour: BuildBehaviour,
     pin: PinnedState,
+    opt: OptState,
     config: &Config,
     progress_arc: Arc<Progress<MultiProgress>>,
 ) -> Result<LocalPackage, InstallError> {
@@ -366,6 +362,7 @@ async fn install_binary_rock(
         &bar,
     )
     .pin(pin)
+    .opt(opt)
     .constraint(constraint)
     .behaviour(behaviour)
     .install()

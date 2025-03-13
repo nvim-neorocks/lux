@@ -3,7 +3,8 @@
 use inquire::Confirm;
 use lux_lib::{
     build::BuildBehaviour,
-    lockfile::PinnedState,
+    lockfile::{OptState, PinnedState},
+    operations::PackageInstallSpec,
     package::PackageReq,
     tree::{RockMatches, Tree},
 };
@@ -13,7 +14,7 @@ pub fn apply_build_behaviour(
     pin: PinnedState,
     force: bool,
     tree: &Tree,
-) -> Vec<(BuildBehaviour, PackageReq)> {
+) -> Vec<PackageInstallSpec> {
     package_reqs
         .into_iter()
         .filter_map(|req| {
@@ -34,7 +35,7 @@ pub fn apply_build_behaviour(
                 }
                 _ => Some(BuildBehaviour::from(force)),
             };
-            build_behaviour.map(|it| (it, req))
+            build_behaviour.map(|it| PackageInstallSpec::new(req, it, pin, OptState::Required))
         })
         .collect()
 }

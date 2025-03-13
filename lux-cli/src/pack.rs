@@ -5,8 +5,9 @@ use eyre::{eyre, OptionExt, Result};
 use lux_lib::{
     build::{Build, BuildBehaviour},
     config::{Config, LuaVersion},
+    lockfile::{OptState, PinnedState},
     lua_rockspec::RemoteLuaRockspec,
-    operations::{self, Install},
+    operations::{self, Install, PackageInstallSpec},
     package::PackageReq,
     progress::MultiProgress,
     project::Project,
@@ -72,7 +73,12 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
                     let temp_dir = TempDir::new("lux-pack")?.into_path();
                     let tree = Tree::new(temp_dir.clone(), lua_version.clone())?;
                     let packages = Install::new(&tree, &config)
-                        .package(BuildBehaviour::Force, package_req)
+                        .package(PackageInstallSpec::new(
+                            package_req,
+                            BuildBehaviour::Force,
+                            PinnedState::default(),
+                            OptState::default(),
+                        ))
                         .progress(progress)
                         .install()
                         .await?;
