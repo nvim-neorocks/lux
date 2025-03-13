@@ -25,9 +25,9 @@ use url::Url;
 use crate::{
     config::{LuaVersion, LuaVersionUnset},
     hash::HasIntegrity,
-    package::{PackageName, PackageReq, PackageVersion},
+    package::{PackageName, PackageVersion},
     project::ProjectRoot,
-    rockspec::Rockspec,
+    rockspec::{lua_dependency::LuaDependencySpec, Rockspec},
 };
 
 #[derive(Error, Debug)]
@@ -51,10 +51,10 @@ pub struct LocalLuaRockspec {
     version: PackageVersion,
     description: RockDescription,
     supported_platforms: PlatformSupport,
-    dependencies: PerPlatform<Vec<PackageReq>>,
-    build_dependencies: PerPlatform<Vec<PackageReq>>,
+    dependencies: PerPlatform<Vec<LuaDependencySpec>>,
+    build_dependencies: PerPlatform<Vec<LuaDependencySpec>>,
     external_dependencies: PerPlatform<HashMap<String, ExternalDependencySpec>>,
-    test_dependencies: PerPlatform<Vec<PackageReq>>,
+    test_dependencies: PerPlatform<Vec<LuaDependencySpec>>,
     build: PerPlatform<BuildSpec>,
     source: PerPlatform<RemoteRockSource>,
     test: PerPlatform<TestSpec>,
@@ -167,11 +167,11 @@ impl Rockspec for LocalLuaRockspec {
         &self.supported_platforms
     }
 
-    fn dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+    fn dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {
         &self.dependencies
     }
 
-    fn build_dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+    fn build_dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {
         &self.build_dependencies
     }
 
@@ -179,7 +179,7 @@ impl Rockspec for LocalLuaRockspec {
         &self.external_dependencies
     }
 
-    fn test_dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+    fn test_dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {
         &self.test_dependencies
     }
 
@@ -298,11 +298,11 @@ impl Rockspec for RemoteLuaRockspec {
         self.local.supported_platforms()
     }
 
-    fn dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+    fn dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {
         self.local.dependencies()
     }
 
-    fn build_dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+    fn build_dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {
         self.local.build_dependencies()
     }
 
@@ -310,7 +310,7 @@ impl Rockspec for RemoteLuaRockspec {
         self.local.external_dependencies()
     }
 
-    fn test_dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+    fn test_dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {
         self.local.test_dependencies()
     }
 

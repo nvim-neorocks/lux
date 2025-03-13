@@ -16,6 +16,7 @@ use crate::{
     lockfile::RemotePackageSourceUrl,
     lua_rockspec::{DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue},
     remote_package_source::RemotePackageSource,
+    rockspec::lua_dependency::LuaDependencySpec,
 };
 
 #[derive(Clone, Debug)]
@@ -255,9 +256,9 @@ impl mlua::UserData for PackageReq {
 }
 
 /// Wrapper structs for proper serialization of various dependency types.
-pub(crate) struct Dependencies<'a>(pub(crate) &'a Vec<PackageReq>);
-pub(crate) struct BuildDependencies<'a>(pub(crate) &'a Vec<PackageReq>);
-pub(crate) struct TestDependencies<'a>(pub(crate) &'a Vec<PackageReq>);
+pub(crate) struct Dependencies<'a>(pub(crate) &'a Vec<LuaDependencySpec>);
+pub(crate) struct BuildDependencies<'a>(pub(crate) &'a Vec<LuaDependencySpec>);
+pub(crate) struct TestDependencies<'a>(pub(crate) &'a Vec<LuaDependencySpec>);
 
 impl DisplayAsLuaKV for Dependencies<'_> {
     fn display_lua(&self) -> DisplayLuaKV {

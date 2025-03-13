@@ -177,5 +177,6 @@ in {
       inherit (luxCliCargo) pname version;
       src = cleanCargoSrc;
       cargoArtifacts = lux-deps;
+      cargoClippyExtraArgs = "--all-targets -- --deny warnings";
     });
 }

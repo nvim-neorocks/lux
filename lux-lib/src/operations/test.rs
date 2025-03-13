@@ -8,7 +8,7 @@ use crate::{
     path::Paths,
     progress::{MultiProgress, Progress},
     project::{project_toml::LocalProjectTomlValidationError, Project, ProjectTreeError},
-    rockspec::Rockspec,
+    rockspec::{lua_dependency::LuaDependencySpec, Rockspec},
     tree::Tree,
 };
 use bon::Builder;
@@ -105,7 +105,13 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
     } else {
         let mut lockfile = test.project.lockfile()?.write_guard();
 
-        let test_dependencies = rocks.test_dependencies().current_platform().clone();
+        let test_dependencies = rocks
+            .test_dependencies()
+            .current_platform()
+            .iter()
+            .map(LuaDependencySpec::package_req)
+            .cloned()
+            .collect_vec();
 
         Sync::new(&test_tree, &mut lockfile, test.config)
             .progress(test.progress.clone())
@@ -117,6 +123,7 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
             .dependencies()
             .current_platform()
             .iter()
+            .map(LuaDependencySpec::package_req)
             .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
             .cloned()
             .collect_vec();
@@ -210,9 +217,9 @@ async fn ensure_dependencies(
         .current_platform()
         .iter()
         .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
-        .filter_map(|req| {
+        .filter_map(|dep| {
             let build_behaviour = if test_tree
-                .match_rocks(req)
+                .match_rocks(dep.package_req())
                 .is_ok_and(|matches| matches.is_found())
             {
                 Some(BuildBehaviour::Force)
@@ -221,7 +228,7 @@ async fn ensure_dependencies(
             };
             build_behaviour.map(|build_behaviour| {
                 PackageInstallSpec::new(
-                    req.clone(),
+                    dep.package_req().clone(),
                     build_behaviour,
                     PinnedState::default(),
                     OptState::default(),
@@ -240,9 +247,9 @@ async fn ensure_dependencies(
         .current_platform()
         .iter()
         .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
-        .filter_map(|req| {
+        .filter_map(|dep| {
             let build_behaviour = if project_tree
-                .match_rocks(req)
+                .match_rocks(dep.package_req())
                 .is_ok_and(|matches| matches.is_found())
             {
                 Some(BuildBehaviour::Force)
@@ -251,7 +258,7 @@ async fn ensure_dependencies(
             };
             build_behaviour.map(|build_behaviour| {
                 PackageInstallSpec::new(
-                    req.clone(),
+                    dep.package_req().clone(),
                     build_behaviour,
                     PinnedState::default(),
                     OptState::default(),

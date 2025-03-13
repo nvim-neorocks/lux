@@ -6,6 +6,7 @@ use crate::lua_rockspec::LocalRockSource;
 use crate::lua_rockspec::LuaRockspecError;
 use crate::lua_rockspec::RemoteLuaRockspec;
 use crate::lua_rockspec::RockSourceSpec;
+use crate::rockspec::lua_dependency::LuaDependencySpec;
 use std::io;
 use std::{collections::HashMap, path::PathBuf};
 
@@ -36,7 +37,7 @@ use super::ProjectRoot;
 
 fn parse_map_to_package_vec_opt<'de, D>(
     deserializer: D,
-) -> Result<Option<Vec<PackageReq>>, D::Error>
+) -> Result<Option<Vec<LuaDependencySpec>>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -45,7 +46,7 @@ where
 
     Ok(packages.map(|pkgs| {
         pkgs.into_iter()
-            .map(|(name, version_req)| PackageReq { name, version_req })
+            .map(|(name, version_req)| PackageReq { name, version_req }.into())
             .collect()
     }))
 }
@@ -90,13 +91,13 @@ pub struct PartialProjectToml {
     #[serde(default)]
     pub(crate) supported_platforms: Option<HashMap<PlatformIdentifier, bool>>,
     #[serde(default, deserialize_with = "parse_map_to_package_vec_opt")]
-    pub(crate) dependencies: Option<Vec<PackageReq>>,
+    pub(crate) dependencies: Option<Vec<LuaDependencySpec>>,
     #[serde(default, deserialize_with = "parse_map_to_package_vec_opt")]
-    pub(crate) build_dependencies: Option<Vec<PackageReq>>,
+    pub(crate) build_dependencies: Option<Vec<LuaDependencySpec>>,
     #[serde(default)]
     pub(crate) external_dependencies: Option<HashMap<String, ExternalDependencySpec>>,
     #[serde(default, deserialize_with = "parse_map_to_package_vec_opt")]
-    pub(crate) test_dependencies: Option<Vec<PackageReq>>,
+    pub(crate) test_dependencies: Option<Vec<LuaDependencySpec>>,
     #[serde(default)]
     pub(crate) source: Option<RockSourceInternal>,
     #[serde(default)]
@@ -137,6 +138,12 @@ impl PartialProjectToml {
     pub fn into_local(&self) -> Result<LocalProjectToml, LocalProjectTomlValidationError> {
         let project_toml = self.clone();
 
+        let lua: LuaDependencySpec = PackageReq {
+            name: "lua".into(),
+            version_req: project_toml.lua.clone().unwrap_or(PackageVersionReq::any()),
+        }
+        .into();
+
         let validated = LocalProjectToml {
             internal: project_toml.clone(),
 
@@ -144,7 +151,6 @@ impl PartialProjectToml {
             version: project_toml.version,
             lua: project_toml
                 .lua
-                .clone()
                 .ok_or(LocalProjectTomlValidationError::NoLuaVersion)?,
             description: project_toml.description.unwrap_or_default(),
             supported_platforms: PlatformSupport::parse(
@@ -168,10 +174,7 @@ impl PartialProjectToml {
                     .dependencies
                     .unwrap_or_default()
                     .into_iter()
-                    .chain(std::iter::once(PackageReq {
-                        name: "lua".into(),
-                        version_req: project_toml.lua.unwrap_or(PackageVersionReq::any()),
-                    }))
+                    .chain(std::iter::once(lua))
                     .collect(),
             ),
             build_dependencies: PerPlatform::new(
@@ -269,12 +272,12 @@ impl PartialProjectToml {
                 .as_ref()
                 .and_then(|deps| {
                     deps.iter()
-                        .find(|dep| dep.name == "lua".into())
+                        .find(|dep| dep.name() == &"lua".into())
                         .and_then(|dep| {
-                            if dep.version_req.is_any() {
+                            if dep.version_req().is_any() {
                                 None
                             } else {
-                                Some(dep.version_req.clone())
+                                Some(dep.version_req().clone())
                             }
                         })
                 })
@@ -289,7 +292,7 @@ impl PartialProjectToml {
                 .dependencies
                 .map(|deps| {
                     deps.into_iter()
-                        .filter(|dep| dep.name != "lua".into())
+                        .filter(|dep| dep.name() != &"lua".into())
                         .collect()
                 })
                 .or(self.dependencies),
@@ -346,7 +349,14 @@ impl LuaVersionCompatibility for PartialProjectToml {
             &self
                 .dependencies
                 .as_ref()
-                .map(|deps| PerPlatform::new(deps.clone()))
+                .map(|deps| {
+                    PerPlatform::new(
+                        deps.iter()
+                            .filter(|dep| *dep.name() == "lua".into())
+                            .cloned()
+                            .collect_vec(),
+                    )
+                })
                 .unwrap_or_default(),
         )
     }
@@ -356,7 +366,14 @@ impl LuaVersionCompatibility for PartialProjectToml {
             &self
                 .test_dependencies
                 .as_ref()
-                .map(|deps| PerPlatform::new(deps.clone()))
+                .map(|deps| {
+                    PerPlatform::new(
+                        deps.iter()
+                            .filter(|dep| *dep.name() == "lua".into())
+                            .cloned()
+                            .collect_vec(),
+                    )
+                })
                 .unwrap_or_default(),
         )
         .or(self.lua_version())
@@ -374,10 +391,10 @@ pub struct LocalProjectToml {
     rockspec_format: Option<RockspecFormat>,
     description: RockDescription,
     supported_platforms: PlatformSupport,
-    dependencies: PerPlatform<Vec<PackageReq>>,
-    build_dependencies: PerPlatform<Vec<PackageReq>>,
+    dependencies: PerPlatform<Vec<LuaDependencySpec>>,
+    build_dependencies: PerPlatform<Vec<LuaDependencySpec>>,
     external_dependencies: PerPlatform<HashMap<String, ExternalDependencySpec>>,
-    test_dependencies: PerPlatform<Vec<PackageReq>>,
+    test_dependencies: PerPlatform<Vec<LuaDependencySpec>>,
     test: PerPlatform<TestSpec>,
     build: PerPlatform<BuildSpec>,
 
@@ -414,11 +431,11 @@ impl Rockspec for LocalProjectToml {
         &self.supported_platforms
     }
 
-    fn dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+    fn dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {
         &self.dependencies
     }
 
-    fn build_dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+    fn build_dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {
         &self.build_dependencies
     }
 
@@ -426,7 +443,7 @@ impl Rockspec for LocalProjectToml {
         &self.external_dependencies
     }
 
-    fn test_dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+    fn test_dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {
         &self.test_dependencies
     }
 
@@ -483,9 +500,11 @@ version = "{}""#,
             let mut dependencies = self.internal.dependencies.clone().unwrap_or_default();
             dependencies.insert(
                 0,
-                PackageReq {
-                    name: "lua".into(),
-                    version_req: self.lua.clone(),
+                LuaDependencySpec {
+                    package_req: PackageReq {
+                        name: "lua".into(),
+                        version_req: self.lua.clone(),
+                    },
                 },
             );
             template.push(Dependencies(&dependencies).display_lua());
@@ -572,11 +591,11 @@ impl Rockspec for RemoteProjectToml {
         self.local.supported_platforms()
     }
 
-    fn dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+    fn dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {
         self.local.dependencies()
     }
 
-    fn build_dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+    fn build_dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {
         self.local.build_dependencies()
     }
 
@@ -584,7 +603,7 @@ impl Rockspec for RemoteProjectToml {
         self.local.external_dependencies()
     }
 
-    fn test_dependencies(&self) -> &PerPlatform<Vec<PackageReq>> {
+    fn test_dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {
         self.local.test_dependencies()
     }
 
@@ -641,9 +660,11 @@ version = "{}""#,
             let mut dependencies = self.local.internal.dependencies.clone().unwrap_or_default();
             dependencies.insert(
                 0,
-                PackageReq {
-                    name: "lua".into(),
-                    version_req: self.local.lua.clone(),
+                LuaDependencySpec {
+                    package_req: PackageReq {
+                        name: "lua".into(),
+                        version_req: self.local.lua.clone(),
+                    },
                 },
             );
             template.push(Dependencies(&dependencies).display_lua());
@@ -768,9 +789,8 @@ impl UserData for RemoteProjectToml {
 mod tests {
     use crate::{
         lua_rockspec::{PartialLuaRockspec, PerPlatform, RemoteLuaRockspec},
-        package::PackageReq,
         project::ProjectRoot,
-        rockspec::Rockspec,
+        rockspec::{lua_dependency::LuaDependencySpec, Rockspec},
     };
 
     use super::PartialProjectToml;
@@ -969,7 +989,7 @@ mod tests {
             .to_lua_rockspec()
             .unwrap();
 
-        let sorted_package_reqs = |v: &PerPlatform<Vec<PackageReq>>| {
+        let sorted_package_reqs = |v: &PerPlatform<Vec<LuaDependencySpec>>| {
             let mut v = v.current_platform().clone();
             v.sort_by(|a, b| a.name().cmp(b.name()));
             v
@@ -1120,7 +1140,7 @@ mod tests {
 
         let merged = project_toml.merge(partial_rockspec).into_remote().unwrap();
 
-        let sorted_package_reqs = |v: &PerPlatform<Vec<PackageReq>>| {
+        let sorted_package_reqs = |v: &PerPlatform<Vec<LuaDependencySpec>>| {
             let mut v = v.current_platform().clone();
             v.sort_by(|a, b| a.name().cmp(b.name()));
             v
