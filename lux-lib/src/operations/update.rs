@@ -321,7 +321,7 @@ fn mk_install_spec(
         req.clone(),
         BuildBehaviour::default(),
         PinnedState::Unpinned,
-        package.opt().clone(),
+        package.opt(),
         is_entrypoint,
     )
 }

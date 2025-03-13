@@ -652,7 +652,7 @@ impl LocalPackageLock {
     }
 
     fn is_entrypoint(&self, package: &LocalPackageId) -> bool {
-        self.entrypoints.contains(&package)
+        self.entrypoints.contains(package)
     }
 
     fn list(&self) -> HashMap<PackageName, Vec<LocalPackage>> {
@@ -960,6 +960,14 @@ impl<P: LockfilePermissions> ProjectLockfile<P> {
             LocalPackageLockType::Regular => self.dependencies.get(id),
             LocalPackageLockType::Test => self.test_dependencies.get(id),
             LocalPackageLockType::Build => self.build_dependencies.get(id),
+        }
+    }
+
+    pub fn is_entrypoint(&self, package: &LocalPackageId, deps: &LocalPackageLockType) -> bool {
+        match deps {
+            LocalPackageLockType::Regular => self.dependencies.is_entrypoint(package),
+            LocalPackageLockType::Test => self.test_dependencies.is_entrypoint(package),
+            LocalPackageLockType::Build => self.build_dependencies.is_entrypoint(package),
         }
     }
 

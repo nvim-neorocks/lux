@@ -207,7 +207,7 @@ impl Tree {
             OptState::Required => etc_root.join(&layout_config.etc),
             OptState::Optional => etc_root.join(&layout_config.opt_etc),
         };
-        if let Some(_) = layout_config.etc_root {
+        if layout_config.etc_root.is_some() {
             etc = etc.join(format!("{}", package.name()));
         }
         let lib = rock_path.join("lib");
