@@ -81,11 +81,17 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
             .wrap_err("error creating project lockfile.")?;
     }
 
-    build::Build::new(&rockspec, &tree, &config, &progress.map(|p| p.new_bar()))
-        .pin(pin)
-        .behaviour(BuildBehaviour::Force)
-        .build()
-        .await?;
+    build::Build::new(
+        &rockspec,
+        &tree,
+        true,
+        &config,
+        &progress.map(|p| p.new_bar()),
+    )
+    .pin(pin)
+    .behaviour(BuildBehaviour::Force)
+    .build()
+    .await?;
 
     Ok(())
 }

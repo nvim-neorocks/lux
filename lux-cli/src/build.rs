@@ -127,7 +127,7 @@ Use --ignore-lockfile to force a new build.
             )?;
     }
 
-    build::Build::new(&rocks, &tree, &config, &progress.map(|p| p.new_bar()))
+    build::Build::new(&rocks, &tree, true, &config, &progress.map(|p| p.new_bar()))
         .behaviour(BuildBehaviour::Force)
         .build()
         .await?;

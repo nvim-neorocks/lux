@@ -115,7 +115,7 @@ impl LuaRocksInstallation {
 
         if !self.tree.match_rocks(&luarocks_req)?.is_found() {
             let rockspec = RemoteLuaRockspec::new(LUAROCKS_ROCKSPEC).unwrap();
-            let pkg = Build::new(&rockspec, &self.tree, &self.config, progress)
+            let pkg = Build::new(&rockspec, &self.tree, true, &self.config, progress)
                 .constraint(luarocks_req.version_req().clone().into())
                 .build()
                 .await?;
@@ -189,7 +189,7 @@ impl LuaRocksInstallation {
             let tree = self.tree.clone();
             tokio::spawn(async move {
                 let rockspec = install_spec.downloaded_rock.rockspec();
-                let pkg = Build::new(rockspec, &tree, &config, &bar)
+                let pkg = Build::new(rockspec, &tree, true, &config, &bar)
                     .constraint(install_spec.spec.constraint())
                     .behaviour(install_spec.build_behaviour)
                     .build()
