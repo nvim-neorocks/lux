@@ -1,8 +1,4 @@
 [workspace]
-members = [
-  "lux-lib",
-  "lux-cli",
-  "xtask",
-  # "lux-lua",
-]
+members = ["lux-lib", "lux-cli", "lux-workspace-hack", "xtask", "lux-lua"]
+default-members = ["lux-cli", "lux-lib"]
 resolver = "2"

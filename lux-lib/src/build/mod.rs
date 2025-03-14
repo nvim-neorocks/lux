@@ -15,7 +15,6 @@ use crate::{
     remote_package_source::RemotePackageSource,
     tree::{RockLayout, Tree},
 };
-pub(crate) mod utils;
 use bon::{builder, Builder};
 use cmake::CMakeError;
 use command::CommandError;
@@ -25,6 +24,7 @@ use indicatif::style::TemplateError;
 use itertools::Itertools;
 use luarocks::LuarocksBuildError;
 use make::MakeError;
+use mlua::FromLua;
 use patch::{Patch, PatchError};
 use rust_mlua::RustError;
 use ssri::Integrity;
@@ -40,6 +40,7 @@ mod make;
 mod patch;
 mod rust_mlua;
 mod treesitter_parser;
+pub(crate) mod utils;
 
 pub mod external_dependency;
 pub mod variables;
@@ -138,6 +139,12 @@ pub enum BuildError {
 pub enum BuildBehaviour {
     NoForce,
     Force,
+}
+
+impl FromLua for BuildBehaviour {
+    fn from_lua(value: mlua::Value, lua: &mlua::Lua) -> mlua::Result<Self> {
+        Ok(bool::from_lua(value, lua)?.into())
+    }
 }
 
 impl Default for BuildBehaviour {
