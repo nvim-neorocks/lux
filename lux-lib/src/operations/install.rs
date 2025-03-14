@@ -15,7 +15,7 @@ use crate::{
             LuaRocksInstallation,
         },
     },
-    package::PackageName,
+    package::{PackageName, PackageNameList},
     progress::{MultiProgress, Progress, ProgressBar},
     project::{Project, ProjectTreeError},
     remote_package_db::{RemotePackageDB, RemotePackageDBError, RemotePackageDbIntegrityError},
@@ -113,6 +113,22 @@ impl<'a> Install<'a> {
                 RemotePackageDB::from_config(self.config, &bar).await?
             }
         };
+
+        let duplicate_entrypoints = self
+            .packages
+            .iter()
+            .filter(|pkg| pkg.is_entrypoint)
+            .map(|pkg| pkg.package.name())
+            .duplicates()
+            .cloned()
+            .collect_vec();
+
+        if !duplicate_entrypoints.is_empty() {
+            return Err(InstallError::DuplicateEntrypoints(PackageNameList::new(
+                duplicate_entrypoints,
+            )));
+        }
+
         install(
             self.packages,
             package_db,
@@ -149,6 +165,8 @@ pub enum InstallError {
     Integrity(PackageName, RemotePackageDbIntegrityError),
     #[error(transparent)]
     ProjectTreeError(#[from] ProjectTreeError),
+    #[error("cannot install duplicate entrypoints: {0}")]
+    DuplicateEntrypoints(PackageNameList),
 }
 
 async fn install(
@@ -228,6 +246,7 @@ async fn install_impl(
                         install_spec.build_behaviour,
                         install_spec.pin,
                         install_spec.opt,
+                        install_spec.is_entrypoint,
                         &tree,
                         &config,
                         progress_arc,
@@ -245,6 +264,7 @@ async fn install_impl(
                         install_spec.build_behaviour,
                         install_spec.pin,
                         install_spec.opt,
+                        install_spec.is_entrypoint,
                         &config,
                         progress_arc,
                     )
@@ -255,42 +275,52 @@ async fn install_impl(
                 ),
             };
 
-            Ok::<_, InstallError>((pkg.id(), pkg))
+            Ok::<_, InstallError>((pkg.id(), (pkg, install_spec.is_entrypoint)))
         })
     }))
     .await
     .into_iter()
     .flatten()
-    .try_collect::<_, HashMap<LocalPackageId, LocalPackage>, _>()?;
+    .try_collect::<_, HashMap<LocalPackageId, (LocalPackage, bool)>, _>()?;
 
-    let write_dependency =
-        |lockfile: &mut Lockfile<ReadWrite>, id: &LocalPackageId, pkg: &LocalPackage| {
-            lockfile.add(pkg);
+    let write_dependency = |lockfile: &mut Lockfile<ReadWrite>,
+                            id: &LocalPackageId,
+                            pkg: &LocalPackage,
+                            is_entrypoint: bool| {
+        if is_entrypoint {
+            lockfile.add_entrypoint(pkg);
+        }
 
-            all_packages
-                .get(id)
-                .map(|pkg| pkg.spec.dependencies())
-                .unwrap_or_default()
-                .into_iter()
-                .for_each(|dependency_id| {
-                    lockfile.add_dependency(
-                        pkg,
-                        installed_packages
-                            .get(dependency_id)
-                            .expect("required dependency not found"),
-                    );
-                });
-        };
+        all_packages
+            .get(id)
+            .map(|pkg| pkg.spec.dependencies())
+            .unwrap_or_default()
+            .into_iter()
+            .for_each(|dependency_id| {
+                lockfile.add_dependency(
+                    pkg,
+                    installed_packages
+                        .get(dependency_id)
+                        .map(|(pkg, _)| pkg)
+                        .expect("required dependency not found"),
+                );
+            });
+    };
 
     lockfile.map_then_flush(|lockfile| {
         installed_packages
             .iter()
-            .for_each(|(id, pkg)| write_dependency(lockfile, id, pkg));
+            .for_each(|(id, (pkg, is_entrypoint))| {
+                write_dependency(lockfile, id, pkg, *is_entrypoint)
+            });
 
         Ok::<_, io::Error>(())
     })?;
 
-    Ok(installed_packages.into_values().collect_vec())
+    Ok(installed_packages
+        .into_values()
+        .map(|(pkg, _)| pkg)
+        .collect_vec())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -300,6 +330,7 @@ async fn install_rockspec(
     behaviour: BuildBehaviour,
     pin: PinnedState,
     opt: OptState,
+    is_entrypoint: bool,
     tree: &Tree,
     config: &Config,
     progress_arc: Arc<Progress<MultiProgress>>,
@@ -320,7 +351,7 @@ async fn install_rockspec(
             .await?;
     }
 
-    let pkg = Build::new(&rockspec, tree, config, &bar)
+    let pkg = Build::new(&rockspec, tree, is_entrypoint, config, &bar)
         .pin(pin)
         .opt(opt)
         .constraint(constraint)
@@ -344,6 +375,7 @@ async fn install_binary_rock(
     behaviour: BuildBehaviour,
     pin: PinnedState,
     opt: OptState,
+    is_entrypoint: bool,
     config: &Config,
     progress_arc: Arc<Progress<MultiProgress>>,
 ) -> Result<LocalPackage, InstallError> {
@@ -360,6 +392,7 @@ async fn install_binary_rock(
         &rockspec,
         rockspec_download.source,
         packed_rock,
+        is_entrypoint,
         config,
         &bar,
     )

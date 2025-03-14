@@ -3,8 +3,8 @@ use crate::{
         utils::escape_path,
         variables::{self, HasVariables},
     },
-    config::LuaVersion,
-    lockfile::{LocalPackage, LocalPackageId, Lockfile, ReadOnly},
+    config::{tree::RockLayoutConfig, Config, LuaVersion},
+    lockfile::{LocalPackage, LocalPackageId, Lockfile, OptState, ReadOnly},
     package::PackageReq,
 };
 use std::{io, path::PathBuf};
@@ -13,6 +13,8 @@ use itertools::Itertools;
 use mlua::{ExternalResult, IntoLua};
 
 mod list;
+
+const LOCKFILE_NAME: &str = "lux.lock";
 
 /// A tree is a collection of files where installed rocks are located.
 ///
@@ -31,6 +33,8 @@ pub struct Tree {
     version: LuaVersion,
     /// The root of the tree.
     root: PathBuf,
+    /// The rock layout config for this tree
+    entrypoint_layout: RockLayoutConfig,
 }
 
 /// Change-agnostic way of referencing various paths for a rock.
@@ -106,7 +110,9 @@ impl mlua::UserData for RockLayout {
 }
 
 impl Tree {
-    pub fn new(root: PathBuf, version: LuaVersion) -> io::Result<Self> {
+    /// NOTE: This is exposed for use by the config module.
+    /// Use `Config::tree()`
+    pub(crate) fn new(root: PathBuf, version: LuaVersion, config: &Config) -> io::Result<Self> {
         let path_with_version = root.join(version.to_string());
 
         // Ensure that the root and the version directory exist.
@@ -114,8 +120,18 @@ impl Tree {
 
         // Ensure that the bin directory exists.
         std::fs::create_dir_all(root.join("bin"))?;
-
-        Ok(Self { root, version })
+        let lockfile_path = root.join(LOCKFILE_NAME);
+        let rock_layout_config = if lockfile_path.is_file() {
+            let lockfile = Lockfile::load(lockfile_path, None)?;
+            lockfile.entrypoint_layout
+        } else {
+            config.entrypoint_layout().clone()
+        };
+        Ok(Self {
+            root,
+            version,
+            entrypoint_layout: rock_layout_config,
+        })
     }
 
     pub fn root(&self) -> PathBuf {
@@ -173,15 +189,49 @@ impl Tree {
         }
     }
 
-    /// Create a `RockLayout` for a package, without creating the directories.
-    pub fn rock_layout(&self, package: &LocalPackage) -> RockLayout {
+    /// Get the `RockLayout` for an installed package.
+    pub fn installed_rock_layout(&self, package: &LocalPackage) -> io::Result<RockLayout> {
+        let lockfile = self.lockfile()?;
+        if lockfile.is_entrypoint(&package.id()) {
+            Ok(self.entrypoint_layout(package))
+        } else {
+            Ok(self.dependency_layout(package))
+        }
+    }
+
+    /// Create a `RockLayout` for an entrypoint
+    pub fn entrypoint_layout(&self, package: &LocalPackage) -> RockLayout {
+        self.mk_rock_layout(package, &self.entrypoint_layout)
+    }
+
+    /// Create a `RockLayout` for a dependency
+    pub fn dependency_layout(&self, package: &LocalPackage) -> RockLayout {
+        self.mk_rock_layout(package, &RockLayoutConfig::default())
+    }
+
+    /// Create a `RockLayout` for a package.
+    fn mk_rock_layout(
+        &self,
+        package: &LocalPackage,
+        layout_config: &RockLayoutConfig,
+    ) -> RockLayout {
         let rock_path = self.root_for(package);
         let bin = self.bin();
-        let etc = rock_path.join("etc");
+        let etc_root = match layout_config.etc_root {
+            Some(ref etc_root) => self.root().join(etc_root),
+            None => rock_path.clone(),
+        };
+        let mut etc = match package.spec.opt {
+            OptState::Required => etc_root.join(&layout_config.etc),
+            OptState::Optional => etc_root.join(&layout_config.opt_etc),
+        };
+        if layout_config.etc_root.is_some() {
+            etc = etc.join(format!("{}", package.name()));
+        }
         let lib = rock_path.join("lib");
         let src = rock_path.join("src");
-        let conf = etc.join("conf");
-        let doc = etc.join("doc");
+        let conf = etc.join(&layout_config.conf);
+        let doc = etc.join(&layout_config.doc);
 
         RockLayout {
             rock_path,
@@ -194,24 +244,29 @@ impl Tree {
         }
     }
 
-    /// Create a `RockLayout` for a package, creating the directories.
-    pub fn rock(&self, package: &LocalPackage) -> io::Result<RockLayout> {
-        let rock_layout = self.rock_layout(package);
-        std::fs::create_dir_all(&rock_layout.etc)?;
+    /// Create a `RockLayout` for an entrypoint package, creating the `lib` and `src` directories.
+    pub fn entrypoint(&self, package: &LocalPackage) -> io::Result<RockLayout> {
+        let rock_layout = self.entrypoint_layout(package);
         std::fs::create_dir_all(&rock_layout.lib)?;
         std::fs::create_dir_all(&rock_layout.src)?;
-        std::fs::create_dir_all(&rock_layout.conf)?;
-        std::fs::create_dir_all(&rock_layout.doc)?;
+        Ok(rock_layout)
+    }
+
+    /// Create a `RockLayout` for a dependency package, creating the `lib` and `src` directories.
+    pub fn dependency(&self, package: &LocalPackage) -> io::Result<RockLayout> {
+        let rock_layout = self.dependency_layout(package);
+        std::fs::create_dir_all(&rock_layout.lib)?;
+        std::fs::create_dir_all(&rock_layout.src)?;
         Ok(rock_layout)
     }
 
     pub fn lockfile(&self) -> io::Result<Lockfile<ReadOnly>> {
-        Lockfile::new(self.lockfile_path())
+        Lockfile::new(self.lockfile_path(), self.entrypoint_layout.clone())
     }
 
     /// Get this tree's lockfile path.
     pub fn lockfile_path(&self) -> PathBuf {
-        self.root().join("lux.lock")
+        self.root().join(LOCKFILE_NAME)
     }
 }
 
@@ -235,10 +290,10 @@ impl mlua::UserData for Tree {
             },
         );
         methods.add_method("rock_layout", |_, this, package: LocalPackage| {
-            Ok(this.rock_layout(&package))
+            Ok(this.installed_rock_layout(&package)?)
         });
         methods.add_method("rock", |_, this, package: LocalPackage| {
-            this.rock(&package).into_lua_err()
+            this.dependency(&package).into_lua_err()
         });
         methods.add_method("lockfile", |_, this, ()| this.lockfile().into_lua_err());
     }
@@ -285,15 +340,13 @@ mod tests {
 
     use crate::{
         build::variables::HasVariables,
-        config::LuaVersion,
+        config::{ConfigBuilder, LuaVersion},
         lockfile::{LocalPackage, LocalPackageHashes, LockConstraint},
         package::{PackageName, PackageSpec, PackageVersion},
         remote_package_source::RemotePackageSource,
         rockspec::RockBinaries,
         tree::RockLayout,
     };
-
-    use super::Tree;
 
     #[test]
     fn rock_layout() {
@@ -304,7 +357,12 @@ mod tests {
         temp.copy_from(&tree_path, &["**"]).unwrap();
         let tree_path = temp.to_path_buf();
 
-        let tree = Tree::new(tree_path.clone(), LuaVersion::Lua51).unwrap();
+        let config = ConfigBuilder::new()
+            .unwrap()
+            .tree(Some(tree_path.clone()))
+            .build()
+            .unwrap();
+        let tree = config.tree(LuaVersion::Lua51).unwrap();
 
         let mock_hashes = LocalPackageHashes {
             rockspec: "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
@@ -326,7 +384,7 @@ mod tests {
 
         let id = package.id();
 
-        let neorg = tree.rock(&package).unwrap();
+        let neorg = tree.dependency(&package).unwrap();
 
         assert_eq!(
             neorg,
@@ -352,7 +410,7 @@ mod tests {
 
         let id = package.id();
 
-        let lua_cjson = tree.rock(&package).unwrap();
+        let lua_cjson = tree.dependency(&package).unwrap();
 
         assert_eq!(
             lua_cjson,
@@ -377,7 +435,12 @@ mod tests {
         temp.copy_from(&tree_path, &["**"]).unwrap();
         let tree_path = temp.to_path_buf();
 
-        let tree = Tree::new(tree_path, LuaVersion::Lua51).unwrap();
+        let config = ConfigBuilder::new()
+            .unwrap()
+            .tree(Some(tree_path.clone()))
+            .build()
+            .unwrap();
+        let tree = config.tree(LuaVersion::Lua51).unwrap();
         let result = tree.list().unwrap();
         // note: sorted_redaction doesn't work because we have a nested Vec
         let sorted_result: Vec<(PackageName, Vec<PackageVersion>)> = result
@@ -407,7 +470,12 @@ mod tests {
         temp.copy_from(&tree_path, &["**"]).unwrap();
         let tree_path = temp.to_path_buf();
 
-        let tree = Tree::new(tree_path.clone(), LuaVersion::Lua51).unwrap();
+        let config = ConfigBuilder::new()
+            .unwrap()
+            .tree(Some(tree_path.clone()))
+            .build()
+            .unwrap();
+        let tree = config.tree(LuaVersion::Lua51).unwrap();
 
         let mock_hashes = LocalPackageHashes {
             rockspec: "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
@@ -419,7 +487,7 @@ mod tests {
         };
 
         let neorg = tree
-            .rock(&LocalPackage::from(
+            .dependency(&LocalPackage::from(
                 &PackageSpec::parse("neorg".into(), "8.0.0-1-1".into()).unwrap(),
                 LockConstraint::Unconstrained,
                 RockBinaries::default(),
