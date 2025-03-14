@@ -40,7 +40,7 @@ impl Paths {
             .flat_map(|(_, packages)| {
                 packages
                     .into_iter()
-                    .map(|package| tree.rock_layout(&package))
+                    .map(|package| tree.installed_rock_layout(&package))
                     .collect_vec()
             })
             .try_fold(Self::default(&tree), |mut paths, package| {

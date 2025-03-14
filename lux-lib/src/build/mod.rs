@@ -55,6 +55,8 @@ pub struct Build<'a, R: Rockspec + HasIntegrity> {
     #[builder(start_fn)]
     tree: &'a Tree,
     #[builder(start_fn)]
+    is_entrypoint: bool,
+    #[builder(start_fn)]
     config: &'a Config,
 
     #[builder(start_fn)]
@@ -329,7 +331,11 @@ async fn do_build<R: Rockspec + HasIntegrity>(
     match tree.lockfile()?.get(&package.id()) {
         Some(package) if build.behaviour == BuildBehaviour::NoForce => Ok(package.clone()),
         _ => {
-            let output_paths = tree.rock(&package)?;
+            let output_paths = if build.is_entrypoint {
+                tree.entrypoint(&package)?
+            } else {
+                tree.dependency(&package)?
+            };
 
             let lua = LuaInstallation::new(&lua_version, build.config);
 

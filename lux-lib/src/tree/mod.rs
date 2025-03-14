@@ -189,14 +189,32 @@ impl Tree {
         }
     }
 
-    /// Create a `RockLayout` for a package, without creating the directories.
-    pub fn rock_layout(&self, package: &LocalPackage) -> io::Result<RockLayout> {
+    /// Get the `RockLayout` for an installed package.
+    pub fn installed_rock_layout(&self, package: &LocalPackage) -> io::Result<RockLayout> {
         let lockfile = self.lockfile()?;
-        let layout_config = if lockfile.is_entrypoint(&package.id()) {
-            self.entrypoint_layout.clone()
+        if lockfile.is_entrypoint(&package.id()) {
+            Ok(self.entrypoint_layout(package))
         } else {
-            RockLayoutConfig::default()
-        };
+            Ok(self.dependency_layout(package))
+        }
+    }
+
+    /// Create a `RockLayout` for an entrypoint
+    pub fn entrypoint_layout(&self, package: &LocalPackage) -> RockLayout {
+        self.mk_rock_layout(package, &self.entrypoint_layout)
+    }
+
+    /// Create a `RockLayout` for a dependency
+    pub fn dependency_layout(&self, package: &LocalPackage) -> RockLayout {
+        self.mk_rock_layout(package, &RockLayoutConfig::default())
+    }
+
+    /// Create a `RockLayout` for a package.
+    fn mk_rock_layout(
+        &self,
+        package: &LocalPackage,
+        layout_config: &RockLayoutConfig,
+    ) -> RockLayout {
         let rock_path = self.root_for(package);
         let bin = self.bin();
         let etc_root = match layout_config.etc_root {
@@ -215,7 +233,7 @@ impl Tree {
         let conf = etc.join(&layout_config.conf);
         let doc = etc.join(&layout_config.doc);
 
-        Ok(RockLayout {
+        RockLayout {
             rock_path,
             etc,
             lib,
@@ -223,12 +241,20 @@ impl Tree {
             bin,
             conf,
             doc,
-        })
+        }
     }
 
-    /// Create a `RockLayout` for a package, creating the `lib` and `src` directories.
-    pub fn rock(&self, package: &LocalPackage) -> io::Result<RockLayout> {
-        let rock_layout = self.rock_layout(package)?;
+    /// Create a `RockLayout` for an entrypoint package, creating the `lib` and `src` directories.
+    pub fn entrypoint(&self, package: &LocalPackage) -> io::Result<RockLayout> {
+        let rock_layout = self.entrypoint_layout(package);
+        std::fs::create_dir_all(&rock_layout.lib)?;
+        std::fs::create_dir_all(&rock_layout.src)?;
+        Ok(rock_layout)
+    }
+
+    /// Create a `RockLayout` for a dependency package, creating the `lib` and `src` directories.
+    pub fn dependency(&self, package: &LocalPackage) -> io::Result<RockLayout> {
+        let rock_layout = self.dependency_layout(package);
         std::fs::create_dir_all(&rock_layout.lib)?;
         std::fs::create_dir_all(&rock_layout.src)?;
         Ok(rock_layout)
@@ -264,10 +290,10 @@ impl mlua::UserData for Tree {
             },
         );
         methods.add_method("rock_layout", |_, this, package: LocalPackage| {
-            Ok(this.rock_layout(&package)?)
+            Ok(this.installed_rock_layout(&package)?)
         });
         methods.add_method("rock", |_, this, package: LocalPackage| {
-            this.rock(&package).into_lua_err()
+            this.dependency(&package).into_lua_err()
         });
         methods.add_method("lockfile", |_, this, ()| this.lockfile().into_lua_err());
     }
@@ -358,7 +384,7 @@ mod tests {
 
         let id = package.id();
 
-        let neorg = tree.rock(&package).unwrap();
+        let neorg = tree.dependency(&package).unwrap();
 
         assert_eq!(
             neorg,
@@ -384,7 +410,7 @@ mod tests {
 
         let id = package.id();
 
-        let lua_cjson = tree.rock(&package).unwrap();
+        let lua_cjson = tree.dependency(&package).unwrap();
 
         assert_eq!(
             lua_cjson,
@@ -461,7 +487,7 @@ mod tests {
         };
 
         let neorg = tree
-            .rock(&LocalPackage::from(
+            .dependency(&LocalPackage::from(
                 &PackageSpec::parse("neorg".into(), "8.0.0-1-1".into()).unwrap(),
                 LockConstraint::Unconstrained,
                 RockBinaries::default(),

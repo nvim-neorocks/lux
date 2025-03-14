@@ -246,6 +246,7 @@ async fn install_impl(
                         install_spec.build_behaviour,
                         install_spec.pin,
                         install_spec.opt,
+                        install_spec.is_entrypoint,
                         &tree,
                         &config,
                         progress_arc,
@@ -263,6 +264,7 @@ async fn install_impl(
                         install_spec.build_behaviour,
                         install_spec.pin,
                         install_spec.opt,
+                        install_spec.is_entrypoint,
                         &config,
                         progress_arc,
                     )
@@ -328,6 +330,7 @@ async fn install_rockspec(
     behaviour: BuildBehaviour,
     pin: PinnedState,
     opt: OptState,
+    is_entrypoint: bool,
     tree: &Tree,
     config: &Config,
     progress_arc: Arc<Progress<MultiProgress>>,
@@ -348,7 +351,7 @@ async fn install_rockspec(
             .await?;
     }
 
-    let pkg = Build::new(&rockspec, tree, config, &bar)
+    let pkg = Build::new(&rockspec, tree, is_entrypoint, config, &bar)
         .pin(pin)
         .opt(opt)
         .constraint(constraint)
@@ -372,6 +375,7 @@ async fn install_binary_rock(
     behaviour: BuildBehaviour,
     pin: PinnedState,
     opt: OptState,
+    is_entrypoint: bool,
     config: &Config,
     progress_arc: Arc<Progress<MultiProgress>>,
 ) -> Result<LocalPackage, InstallError> {
@@ -388,6 +392,7 @@ async fn install_binary_rock(
         &rockspec,
         rockspec_download.source,
         packed_rock,
+        is_entrypoint,
         config,
         &bar,
     )

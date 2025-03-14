@@ -28,7 +28,7 @@ async fn builtin_build() {
 
     let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
 
-    Build::new(&rockspec, &tree, &config, &Progress::Progress(bar))
+    Build::new(&rockspec, &tree, true, &config, &Progress::Progress(bar))
         .behaviour(Force)
         .build()
         .await
@@ -56,7 +56,7 @@ async fn make_build() {
 
     let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
 
-    Build::new(&rockspec, &tree, &config, &Progress::Progress(bar))
+    Build::new(&rockspec, &tree, true, &config, &Progress::Progress(bar))
         .behaviour(Force)
         .build()
         .await
@@ -96,7 +96,7 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
 
     let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
 
-    Build::new(&rockspec, &tree, &config, &Progress::Progress(bar))
+    Build::new(&rockspec, &tree, true, &config, &Progress::Progress(bar))
         .behaviour(Force)
         .build()
         .await
@@ -124,7 +124,7 @@ async fn treesitter_parser_build() {
 
     let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
 
-    Build::new(&rockspec, &tree, &config, &Progress::Progress(bar))
+    Build::new(&rockspec, &tree, true, &config, &Progress::Progress(bar))
         .behaviour(Force)
         .build()
         .await
