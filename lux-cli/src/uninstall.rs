@@ -2,12 +2,16 @@ use std::io;
 
 use clap::Args;
 use eyre::{eyre, Result};
+use inquire::Confirm;
 use itertools::Itertools;
 use lux_lib::{
+    build::BuildBehaviour,
     config::{Config, LuaVersion},
-    operations,
+    lockfile::LocalPackageId,
+    operations::{self, PackageInstallSpec},
     package::PackageReq,
-    tree::RockMatches,
+    progress::MultiProgress,
+    tree::{self, RockMatches},
 };
 
 #[derive(Args)]
@@ -59,10 +63,95 @@ Please specify the exact package to uninstall:
         ));
     }
 
+    let lockfile = tree.lockfile()?;
+    let non_entrypoints = packages
+        .iter()
+        .filter_map(|pkg_id| {
+            if lockfile.is_entrypoint(pkg_id) {
+                None
+            } else {
+                Some(unsafe { lockfile.get_unchecked(pkg_id) }.name().to_string())
+            }
+        })
+        .collect_vec();
+    if !non_entrypoints.is_empty() {
+        return Err(eyre!(
+            "
+Cannot uninstall dependencies:
+{:#?}
+",
+            non_entrypoints,
+        ));
+    }
+
+    let (dependencies, entrypoints): (Vec<LocalPackageId>, Vec<LocalPackageId>) = packages
+        .iter()
+        .cloned()
+        .partition(|pkg_id| lockfile.is_dependency(pkg_id));
+
     operations::Remove::new(&config)
-        .packages(packages)
+        .packages(entrypoints)
         .remove()
         .await?;
+
+    if !dependencies.is_empty() {
+        let package_names = dependencies
+            .iter()
+            .map(|pkg_id| unsafe { lockfile.get_unchecked(pkg_id) }.name().to_string())
+            .collect_vec();
+        let prompt = if package_names.len() == 1 {
+            format!(
+                "
+            Package {} can be removed from the entrypoints, but it is also a dependency, so it will have to be reinstalled.
+Reinstall?
+            ",
+                package_names[0]
+            )
+        } else {
+            format!(
+                "
+            The following packages can be removed from the entrypoints, but are also dependencies:
+{:#?}
+
+They will have to be reinstalled.
+Reinstall?
+            ",
+                package_names
+            )
+        };
+        if Confirm::new(&prompt)
+            .with_default(false)
+            .prompt()
+            .expect("Error prompting for reinstall")
+        {
+            let reinstall_specs = dependencies
+                .iter()
+                .map(|pkg_id| {
+                    let package = unsafe { lockfile.get_unchecked(pkg_id) };
+                    PackageInstallSpec::new(
+                        package.clone().into_package_req(),
+                        BuildBehaviour::Force,
+                        package.pinned(),
+                        package.opt(),
+                        tree::EntryType::DependencyOnly,
+                    )
+                })
+                .collect_vec();
+            let progress = MultiProgress::new_arc();
+            operations::Remove::new(&config)
+                .packages(dependencies)
+                .progress(progress.clone())
+                .remove()
+                .await?;
+            operations::Install::new(&tree, &config)
+                .packages(reinstall_specs)
+                .progress(progress)
+                .install()
+                .await?;
+        } else {
+            return Err(eyre!("Operation cancelled."));
+        }
+    };
 
     Ok(())
 }

@@ -653,6 +653,13 @@ impl LocalPackageLock {
         self.entrypoints.contains(package)
     }
 
+    fn is_dependency(&self, package: &LocalPackageId) -> bool {
+        self.rocks
+            .values()
+            .flat_map(|rock| rock.dependencies())
+            .any(|dep_id| dep_id == package)
+    }
+
     fn list(&self) -> HashMap<PackageName, Vec<LocalPackage>> {
         self.rocks()
             .values()
@@ -785,7 +792,7 @@ pub struct Lockfile<P: LockfilePermissions> {
     pub(crate) entrypoint_layout: RockLayoutConfig,
 }
 
-pub(crate) enum LocalPackageLockType {
+pub enum LocalPackageLockType {
     Regular,
     Test,
     Build,
@@ -848,6 +855,10 @@ impl<P: LockfilePermissions> Lockfile<P> {
         self.lock.rocks()
     }
 
+    pub fn is_dependency(&self, package: &LocalPackageId) -> bool {
+        self.lock.is_dependency(package)
+    }
+
     pub fn is_entrypoint(&self, package: &LocalPackageId) -> bool {
         self.lock.is_entrypoint(package)
     }
@@ -862,6 +873,17 @@ impl<P: LockfilePermissions> Lockfile<P> {
 
     pub fn get(&self, id: &LocalPackageId) -> Option<&LocalPackage> {
         self.lock.get(id)
+    }
+
+    /// Unsafe because this assumes a prior check if the package is present
+    ///
+    /// # Safety
+    ///
+    /// Ensure that the package is present in the lockfile before calling this function.
+    pub unsafe fn get_unchecked(&self, id: &LocalPackageId) -> &LocalPackage {
+        self.lock
+            .get(id)
+            .expect("error getting package from lockfile")
     }
 
     pub(crate) fn list(&self) -> HashMap<PackageName, Vec<LocalPackage>> {
