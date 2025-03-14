@@ -17,7 +17,7 @@ use crate::{
     project::{Project, ProjectError, ProjectTreeError},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
     rockspec::Rockspec,
-    tree::Tree,
+    tree::{self, Tree},
 };
 
 use super::{Install, InstallError, PackageInstallSpec, Remove, RemoveError, SyncError};
@@ -316,12 +316,16 @@ fn mk_install_spec(
     (package, req): &(LocalPackage, PackageReq),
     lockfile: &Lockfile<ReadOnly>,
 ) -> PackageInstallSpec {
-    let is_entrypoint = lockfile.is_entrypoint(&package.id());
+    let entry_type = if lockfile.is_entrypoint(&package.id()) {
+        tree::EntryType::Entrypoint
+    } else {
+        tree::EntryType::DependencyOnly
+    };
     PackageInstallSpec::new(
         req.clone(),
         BuildBehaviour::default(),
         PinnedState::Unpinned,
         package.opt(),
-        is_entrypoint,
+        entry_type,
     )
 }

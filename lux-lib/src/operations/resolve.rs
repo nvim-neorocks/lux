@@ -14,6 +14,7 @@ use crate::{
     progress::{MultiProgress, Progress},
     remote_package_db::RemotePackageDB,
     rockspec::Rockspec,
+    tree,
 };
 
 use super::{Download, PackageInstallSpec, RemoteRockDownload, SearchAndDownloadError};
@@ -25,7 +26,7 @@ pub(crate) struct PackageInstallData {
     pub opt: OptState,
     pub downloaded_rock: RemoteRockDownload,
     pub spec: LocalPackageSpec,
-    pub is_entrypoint: bool,
+    pub entry_type: tree::EntryType,
 }
 
 #[async_recursion]
@@ -50,7 +51,7 @@ where
                      build_behaviour,
                      ..
                  }| {
-                    build_behaviour == &BuildBehaviour::Force
+                    *build_behaviour == BuildBehaviour::Force
                         || lockfile.has_rock(package, None).is_none()
                 },
             )
@@ -61,7 +62,7 @@ where
                      build_behaviour,
                      pin,
                      opt,
-                     is_entrypoint,
+                     entry_type,
                  }| {
                     let config = config.clone();
                     let tx = tx.clone();
@@ -86,12 +87,25 @@ where
                             .iter()
                             .filter(|dep| !dep.name().eq(&"lua".into()))
                             .map(|dep| {
+                                // If we're forcing a rebuild, retain the `EntryType`
+                                // of existing dependencies
+                                let entry_type = if build_behaviour == BuildBehaviour::Force
+                                    && lockfile.has_rock(dep.package_req(), None).is_some_and(
+                                        |installed_rock| {
+                                            lockfile.is_entrypoint(&installed_rock.id())
+                                        },
+                                    ) {
+                                    tree::EntryType::Entrypoint
+                                } else {
+                                    tree::EntryType::DependencyOnly
+                                };
+
                                 PackageInstallSpec::new(
                                     dep.package_req().clone(),
                                     build_behaviour,
                                     pin,
                                     opt,
-                                    false,
+                                    entry_type,
                                 )
                             })
                             .collect_vec();
@@ -123,7 +137,7 @@ where
                             opt,
                             spec: local_spec.clone(),
                             downloaded_rock,
-                            is_entrypoint,
+                            entry_type,
                         };
 
                         tx.send(install_spec).unwrap();

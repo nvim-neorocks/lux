@@ -20,7 +20,7 @@ use crate::{
     project::{Project, ProjectTreeError},
     remote_package_db::{RemotePackageDB, RemotePackageDBError, RemotePackageDbIntegrityError},
     rockspec::Rockspec,
-    tree::Tree,
+    tree::{self, Tree},
 };
 
 use bytes::Bytes;
@@ -117,7 +117,7 @@ impl<'a> Install<'a> {
         let duplicate_entrypoints = self
             .packages
             .iter()
-            .filter(|pkg| pkg.is_entrypoint)
+            .filter(|pkg| pkg.entry_type == tree::EntryType::Entrypoint)
             .map(|pkg| pkg.package.name())
             .duplicates()
             .cloned()
@@ -246,7 +246,7 @@ async fn install_impl(
                         install_spec.build_behaviour,
                         install_spec.pin,
                         install_spec.opt,
-                        install_spec.is_entrypoint,
+                        install_spec.entry_type,
                         &tree,
                         &config,
                         progress_arc,
@@ -264,7 +264,7 @@ async fn install_impl(
                         install_spec.build_behaviour,
                         install_spec.pin,
                         install_spec.opt,
-                        install_spec.is_entrypoint,
+                        install_spec.entry_type,
                         &config,
                         progress_arc,
                     )
@@ -275,19 +275,19 @@ async fn install_impl(
                 ),
             };
 
-            Ok::<_, InstallError>((pkg.id(), (pkg, install_spec.is_entrypoint)))
+            Ok::<_, InstallError>((pkg.id(), (pkg, install_spec.entry_type)))
         })
     }))
     .await
     .into_iter()
     .flatten()
-    .try_collect::<_, HashMap<LocalPackageId, (LocalPackage, bool)>, _>()?;
+    .try_collect::<_, HashMap<LocalPackageId, (LocalPackage, tree::EntryType)>, _>()?;
 
     let write_dependency = |lockfile: &mut Lockfile<ReadWrite>,
                             id: &LocalPackageId,
                             pkg: &LocalPackage,
-                            is_entrypoint: bool| {
-        if is_entrypoint {
+                            entry_type: tree::EntryType| {
+        if entry_type == tree::EntryType::Entrypoint {
             lockfile.add_entrypoint(pkg);
         }
 
@@ -330,7 +330,7 @@ async fn install_rockspec(
     behaviour: BuildBehaviour,
     pin: PinnedState,
     opt: OptState,
-    is_entrypoint: bool,
+    entry_type: tree::EntryType,
     tree: &Tree,
     config: &Config,
     progress_arc: Arc<Progress<MultiProgress>>,
@@ -351,7 +351,7 @@ async fn install_rockspec(
             .await?;
     }
 
-    let pkg = Build::new(&rockspec, tree, is_entrypoint, config, &bar)
+    let pkg = Build::new(&rockspec, tree, entry_type, config, &bar)
         .pin(pin)
         .opt(opt)
         .constraint(constraint)
@@ -375,7 +375,7 @@ async fn install_binary_rock(
     behaviour: BuildBehaviour,
     pin: PinnedState,
     opt: OptState,
-    is_entrypoint: bool,
+    entry_type: tree::EntryType,
     config: &Config,
     progress_arc: Arc<Progress<MultiProgress>>,
 ) -> Result<LocalPackage, InstallError> {
@@ -392,7 +392,7 @@ async fn install_binary_rock(
         &rockspec,
         rockspec_download.source,
         packed_rock,
-        is_entrypoint,
+        entry_type,
         config,
         &bar,
     )

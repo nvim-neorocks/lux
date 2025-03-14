@@ -29,7 +29,7 @@ pub async fn install(data: Install, config: Config) -> Result<()> {
     let lua_version = LuaVersion::from(&config)?;
     let tree = config.tree(lua_version)?;
 
-    let packages = apply_build_behaviour(data.package_req, pin, data.force, &tree);
+    let packages = apply_build_behaviour(data.package_req, pin, data.force, &tree)?;
 
     // TODO(vhyrro): If the tree doesn't exist then error out.
     operations::Install::new(&tree, &config)

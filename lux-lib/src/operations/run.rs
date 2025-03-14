@@ -10,6 +10,7 @@ use crate::{
     path::Paths,
     project::{Project, ProjectTreeError},
     remote_package_db::RemotePackageDBError,
+    tree,
 };
 use bon::Builder;
 use itertools::Itertools;
@@ -118,7 +119,7 @@ pub async fn install_command(command: &str, config: &Config) -> Result<(), Insta
         BuildBehaviour::default(),
         PinnedState::default(),
         OptState::default(),
-        true,
+        tree::EntryType::Entrypoint,
     );
     Install::new(&config.tree(LuaVersion::from(config)?)?, config)
         .package(install_spec)

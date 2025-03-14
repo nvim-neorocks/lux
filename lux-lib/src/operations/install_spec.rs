@@ -2,6 +2,7 @@ use crate::{
     build::BuildBehaviour,
     lockfile::{OptState, PinnedState},
     package::PackageReq,
+    tree,
 };
 
 /// Specifies how to install a package
@@ -10,7 +11,7 @@ pub struct PackageInstallSpec {
     pub(crate) build_behaviour: BuildBehaviour,
     pub(crate) pin: PinnedState,
     pub(crate) opt: OptState,
-    pub(crate) is_entrypoint: bool,
+    pub(crate) entry_type: tree::EntryType,
 }
 
 impl PackageInstallSpec {
@@ -19,14 +20,14 @@ impl PackageInstallSpec {
         build_behaviour: BuildBehaviour,
         pin: PinnedState,
         opt: OptState,
-        is_entrypoint: bool,
+        entry_type: tree::EntryType,
     ) -> Self {
         Self {
             package,
             build_behaviour,
             pin,
             opt,
-            is_entrypoint,
+            entry_type,
         }
     }
 }

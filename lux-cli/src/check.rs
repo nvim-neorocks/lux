@@ -6,6 +6,7 @@ use lux_lib::{
     operations::{Install, PackageInstallSpec, Run},
     progress::MultiProgress,
     project::Project,
+    tree,
 };
 
 pub async fn check(config: Config) -> Result<()> {
@@ -16,7 +17,7 @@ pub async fn check(config: Config) -> Result<()> {
         BuildBehaviour::default(),
         PinnedState::default(),
         OptState::default(),
-        true,
+        tree::EntryType::Entrypoint,
     );
 
     Install::new(&project.tree(&config)?, &config)

@@ -299,6 +299,12 @@ impl mlua::UserData for Tree {
     }
 }
 
+#[derive(Copy, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+pub enum EntryType {
+    Entrypoint,
+    DependencyOnly,
+}
+
 #[derive(Clone, Debug)]
 pub enum RockMatches {
     NotFound(PackageReq),

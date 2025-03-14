@@ -11,7 +11,7 @@ use crate::{
     package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress},
     rockspec::lua_dependency::LuaDependencySpec,
-    tree::Tree,
+    tree::{self, Tree},
 };
 use bon::{builder, Builder};
 use itertools::Itertools;
@@ -133,7 +133,7 @@ async fn do_sync(
         .iter()
         .for_each(|pkg| args.project_lockfile.remove(pkg, lock_type));
 
-    let mut to_add: Vec<(bool, LocalPackage)> = Vec::new();
+    let mut to_add: Vec<(tree::EntryType, LocalPackage)> = Vec::new();
 
     let mut report = SyncReport {
         added: Vec::new(),
@@ -141,10 +141,15 @@ async fn do_sync(
     };
     for (id, local_package) in args.project_lockfile.rocks(lock_type) {
         if dest_lockfile.get(id).is_none() {
-            let is_entrypoint = args
+            let entry_type = if args
                 .project_lockfile
-                .is_entrypoint(&local_package.id(), lock_type);
-            to_add.push((is_entrypoint, local_package.clone()));
+                .is_entrypoint(&local_package.id(), lock_type)
+            {
+                tree::EntryType::Entrypoint
+            } else {
+                tree::EntryType::DependencyOnly
+            };
+            to_add.push((entry_type, local_package.clone()));
         }
     }
     for (id, local_package) in dest_lockfile.rocks() {
@@ -156,13 +161,13 @@ async fn do_sync(
     let packages_to_install = to_add
         .iter()
         .cloned()
-        .map(|(is_entrypoint, pkg)| {
+        .map(|(entry_type, pkg)| {
             PackageInstallSpec::new(
                 pkg.clone().into_package_req(),
                 BuildBehaviour::Force,
                 pkg.pinned(),
                 pkg.opt(),
-                is_entrypoint,
+                entry_type,
             )
         })
         .collect_vec();
@@ -219,7 +224,7 @@ async fn do_sync(
                 BuildBehaviour::Force,
                 *pkg.pin(),
                 *pkg.opt(),
-                true,
+                tree::EntryType::Entrypoint,
             )
         });
 

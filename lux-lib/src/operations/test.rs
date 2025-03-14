@@ -9,7 +9,7 @@ use crate::{
     progress::{MultiProgress, Progress},
     project::{project_toml::LocalProjectTomlValidationError, Project, ProjectTreeError},
     rockspec::Rockspec,
-    tree::Tree,
+    tree::{self, Tree},
 };
 use bon::Builder;
 use itertools::Itertools;
@@ -195,7 +195,7 @@ pub async fn ensure_busted(
             BuildBehaviour::default(),
             PinnedState::default(),
             OptState::default(),
-            true,
+            tree::EntryType::Entrypoint,
         );
         Install::new(tree, config)
             .package(install_spec)
@@ -237,7 +237,7 @@ async fn ensure_dependencies(
                     build_behaviour,
                     *dep.pin(),
                     *dep.opt(),
-                    true,
+                    tree::EntryType::Entrypoint,
                 )
             })
         });
@@ -268,7 +268,7 @@ async fn ensure_dependencies(
                     build_behaviour,
                     *dep.pin(),
                     *dep.opt(),
-                    true,
+                    tree::EntryType::Entrypoint,
                 )
             })
         });

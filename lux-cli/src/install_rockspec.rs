@@ -14,6 +14,7 @@ use lux_lib::{
     progress::MultiProgress,
     project::Project,
     rockspec::{LuaVersionCompatibility, Rockspec},
+    tree,
 };
 
 #[derive(Args, Default)]
@@ -66,7 +67,7 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
                 BuildBehaviour::NoForce,
                 pin,
                 OptState::Required,
-                false,
+                tree::EntryType::DependencyOnly,
             )
         });
 
@@ -84,7 +85,7 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
     build::Build::new(
         &rockspec,
         &tree,
-        true,
+        tree::EntryType::Entrypoint,
         &config,
         &progress.map(|p| p.new_bar()),
     )

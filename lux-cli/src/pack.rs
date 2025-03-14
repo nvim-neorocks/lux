@@ -11,6 +11,7 @@ use lux_lib::{
     package::PackageReq,
     progress::MultiProgress,
     project::Project,
+    tree,
 };
 use tempdir::TempDir;
 
@@ -78,7 +79,7 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
                             BuildBehaviour::Force,
                             PinnedState::default(),
                             OptState::default(),
-                            true,
+                            tree::EntryType::Entrypoint,
                         ))
                         .progress(progress)
                         .install()
@@ -122,7 +123,7 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
             let bar = progress.map(|p| p.new_bar());
             let config = config.with_tree(temp_dir);
             let tree = config.tree(lua_version)?;
-            let package = Build::new(&rockspec, &tree, true, &config, &bar)
+            let package = Build::new(&rockspec, &tree, tree::EntryType::Entrypoint, &config, &bar)
                 .build()
                 .await?;
             let rock_path = operations::Pack::new(dest_dir, tree, package).pack()?;

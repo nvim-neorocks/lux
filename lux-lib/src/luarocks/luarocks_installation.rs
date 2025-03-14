@@ -22,7 +22,7 @@ use crate::{
     progress::{MultiProgress, Progress, ProgressBar},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
     rockspec::Rockspec,
-    tree::Tree,
+    tree::{self, Tree},
 };
 
 #[derive(Error, Debug)]
@@ -115,10 +115,16 @@ impl LuaRocksInstallation {
 
         if !self.tree.match_rocks(&luarocks_req)?.is_found() {
             let rockspec = RemoteLuaRockspec::new(LUAROCKS_ROCKSPEC).unwrap();
-            let pkg = Build::new(&rockspec, &self.tree, true, &self.config, progress)
-                .constraint(luarocks_req.version_req().clone().into())
-                .build()
-                .await?;
+            let pkg = Build::new(
+                &rockspec,
+                &self.tree,
+                tree::EntryType::Entrypoint,
+                &self.config,
+                progress,
+            )
+            .constraint(luarocks_req.version_req().clone().into())
+            .build()
+            .await?;
             lockfile.add_entrypoint(&pkg);
         }
 
@@ -157,7 +163,7 @@ impl LuaRocksInstallation {
                 BuildBehaviour::default(),
                 PinnedState::default(),
                 OptState::default(),
-                true,
+                tree::EntryType::Entrypoint,
             )
         })
         .collect_vec();
@@ -189,7 +195,7 @@ impl LuaRocksInstallation {
             let tree = self.tree.clone();
             tokio::spawn(async move {
                 let rockspec = install_spec.downloaded_rock.rockspec();
-                let pkg = Build::new(rockspec, &tree, true, &config, &bar)
+                let pkg = Build::new(rockspec, &tree, tree::EntryType::Entrypoint, &config, &bar)
                     .constraint(install_spec.spec.constraint())
                     .behaviour(install_spec.build_behaviour)
                     .build()
@@ -197,21 +203,18 @@ impl LuaRocksInstallation {
 
                 bar.map(|b| b.finish_and_clear());
 
-                Ok::<_, InstallBuildDependenciesError>((
-                    pkg.id(),
-                    (pkg, install_spec.is_entrypoint),
-                ))
+                Ok::<_, InstallBuildDependenciesError>((pkg.id(), (pkg, install_spec.entry_type)))
             })
         }))
         .await
         .into_iter()
         .flatten()
-        .try_collect::<_, HashMap<LocalPackageId, (LocalPackage, bool)>, _>()?;
+        .try_collect::<_, HashMap<LocalPackageId, (LocalPackage, tree::EntryType)>, _>()?;
 
         installed_packages
             .iter()
-            .for_each(|(id, (pkg, is_entrypoint))| {
-                if *is_entrypoint {
+            .for_each(|(id, (pkg, entry_type))| {
+                if *entry_type == tree::EntryType::Entrypoint {
                     lockfile.add_entrypoint(pkg);
                 }
 

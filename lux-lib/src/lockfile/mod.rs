@@ -100,8 +100,6 @@ impl<'de> Deserialize<'de> for PinnedState {
     }
 }
 
-/// For now, this doesn't have much meaning.
-/// It may be used later.
 #[derive(Copy, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub enum OptState {
     /// A required package
@@ -854,6 +852,10 @@ impl<P: LockfilePermissions> Lockfile<P> {
         self.lock.is_entrypoint(package)
     }
 
+    pub fn entry_type(&self, package: &LocalPackageId) -> bool {
+        self.lock.is_entrypoint(package)
+    }
+
     pub(crate) fn local_pkg_lock(&self) -> &LocalPackageLock {
         &self.lock
     }
@@ -963,7 +965,11 @@ impl<P: LockfilePermissions> ProjectLockfile<P> {
         }
     }
 
-    pub fn is_entrypoint(&self, package: &LocalPackageId, deps: &LocalPackageLockType) -> bool {
+    pub(crate) fn is_entrypoint(
+        &self,
+        package: &LocalPackageId,
+        deps: &LocalPackageLockType,
+    ) -> bool {
         match deps {
             LocalPackageLockType::Regular => self.dependencies.is_entrypoint(package),
             LocalPackageLockType::Test => self.test_dependencies.is_entrypoint(package),

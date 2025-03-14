@@ -22,6 +22,7 @@ use crate::{
     progress::{Progress, ProgressBar},
     remote_package_source::RemotePackageSource,
     rockspec::Rockspec,
+    tree,
 };
 use crate::{lockfile::RemotePackageSourceUrl, rockspec::LuaVersionCompatibility};
 
@@ -49,7 +50,7 @@ pub(crate) struct BinaryRockInstall<'a> {
     source: RemotePackageSource,
     pin: PinnedState,
     opt: OptState,
-    is_entrypoint: bool,
+    entry_type: tree::EntryType,
     constraint: LockConstraint,
     behaviour: BuildBehaviour,
     config: &'a Config,
@@ -61,7 +62,7 @@ impl<'a> BinaryRockInstall<'a> {
         rockspec: &'a RemoteLuaRockspec,
         source: RemotePackageSource,
         rock_bytes: Bytes,
-        is_entrypoint: bool,
+        entry_type: tree::EntryType,
         config: &'a Config,
         progress: &'a Progress<ProgressBar>,
     ) -> Self {
@@ -75,7 +76,7 @@ impl<'a> BinaryRockInstall<'a> {
             behaviour: BuildBehaviour::default(),
             pin: PinnedState::default(),
             opt: OptState::default(),
-            is_entrypoint,
+            entry_type,
         }
     }
 
@@ -144,10 +145,9 @@ impl<'a> BinaryRockInstall<'a> {
                     return Err(InstallBinaryRockError::RockManifestNotFound);
                 }
                 let rock_manifest_content = std::fs::read_to_string(rock_manifest_file)?;
-                let output_paths = if self.is_entrypoint {
-                    tree.entrypoint(&package)?
-                } else {
-                    tree.dependency(&package)?
+                let output_paths = match self.entry_type {
+                    tree::EntryType::Entrypoint => tree.entrypoint(&package)?,
+                    tree::EntryType::DependencyOnly => tree.dependency(&package)?,
                 };
                 let rock_manifest = RockManifest::new(&rock_manifest_content)?;
                 install_manifest_entries(
@@ -263,7 +263,7 @@ mod test {
             &rockspec,
             RemotePackageSource::Test,
             rock.bytes,
-            true,
+            tree::EntryType::Entrypoint,
             &config,
             &Progress::Progress(bar),
         )
@@ -320,7 +320,7 @@ mod test {
             &rockspec,
             RemotePackageSource::Test,
             rock.bytes,
-            true,
+            tree::EntryType::Entrypoint,
             &config,
             &Progress::Progress(bar),
         )

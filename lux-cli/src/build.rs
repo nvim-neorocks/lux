@@ -13,6 +13,7 @@ use lux_lib::{
     progress::MultiProgress,
     project::Project,
     rockspec::Rockspec,
+    tree,
 };
 
 #[derive(Args, Default)]
@@ -61,7 +62,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                     BuildBehaviour::default(),
                     *dep.pin(),
                     *dep.opt(),
-                    true,
+                    tree::EntryType::Entrypoint,
                 )
             });
 
@@ -84,7 +85,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                     BuildBehaviour::default(),
                     *dep.pin(),
                     *dep.opt(),
-                    true,
+                    tree::EntryType::Entrypoint,
                 )
             })
             .collect_vec();
@@ -127,10 +128,16 @@ Use --ignore-lockfile to force a new build.
             )?;
     }
 
-    build::Build::new(&rocks, &tree, true, &config, &progress.map(|p| p.new_bar()))
-        .behaviour(BuildBehaviour::Force)
-        .build()
-        .await?;
+    build::Build::new(
+        &rocks,
+        &tree,
+        tree::EntryType::Entrypoint,
+        &config,
+        &progress.map(|p| p.new_bar()),
+    )
+    .behaviour(BuildBehaviour::Force)
+    .build()
+    .await?;
 
     Ok(())
 }

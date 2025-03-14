@@ -5,6 +5,7 @@ use lux_lib::{
     config::{ConfigBuilder, LuaVersion},
     lua_rockspec::RemoteLuaRockspec,
     progress::{MultiProgress, Progress},
+    tree,
 };
 use tempdir::TempDir;
 
@@ -28,11 +29,17 @@ async fn builtin_build() {
 
     let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
 
-    Build::new(&rockspec, &tree, true, &config, &Progress::Progress(bar))
-        .behaviour(Force)
-        .build()
-        .await
-        .unwrap();
+    Build::new(
+        &rockspec,
+        &tree,
+        tree::EntryType::Entrypoint,
+        &config,
+        &Progress::Progress(bar),
+    )
+    .behaviour(Force)
+    .build()
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
@@ -56,11 +63,17 @@ async fn make_build() {
 
     let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
 
-    Build::new(&rockspec, &tree, true, &config, &Progress::Progress(bar))
-        .behaviour(Force)
-        .build()
-        .await
-        .unwrap();
+    Build::new(
+        &rockspec,
+        &tree,
+        tree::EntryType::Entrypoint,
+        &config,
+        &Progress::Progress(bar),
+    )
+    .behaviour(Force)
+    .build()
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
@@ -96,11 +109,17 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
 
     let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
 
-    Build::new(&rockspec, &tree, true, &config, &Progress::Progress(bar))
-        .behaviour(Force)
-        .build()
-        .await
-        .unwrap();
+    Build::new(
+        &rockspec,
+        &tree,
+        tree::EntryType::Entrypoint,
+        &config,
+        &Progress::Progress(bar),
+    )
+    .behaviour(Force)
+    .build()
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
@@ -124,9 +143,15 @@ async fn treesitter_parser_build() {
 
     let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
 
-    Build::new(&rockspec, &tree, true, &config, &Progress::Progress(bar))
-        .behaviour(Force)
-        .build()
-        .await
-        .unwrap();
+    Build::new(
+        &rockspec,
+        &tree,
+        tree::EntryType::Entrypoint,
+        &config,
+        &Progress::Progress(bar),
+    )
+    .behaviour(Force)
+    .build()
+    .await
+    .unwrap();
 }
