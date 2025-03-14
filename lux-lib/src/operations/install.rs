@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, io, sync::Arc};
+use std::{collections::HashMap, io, sync::Arc};
 
 use crate::{
     build::{Build, BuildBehaviour, BuildError},
@@ -15,7 +15,7 @@ use crate::{
             LuaRocksInstallation,
         },
     },
-    package::PackageName,
+    package::{PackageName, PackageNameList},
     progress::{MultiProgress, Progress, ProgressBar},
     project::{Project, ProjectTreeError},
     remote_package_db::{RemotePackageDB, RemotePackageDBError, RemotePackageDbIntegrityError},
@@ -118,12 +118,13 @@ impl<'a> Install<'a> {
             .packages
             .iter()
             .filter(|pkg| pkg.is_entrypoint)
-            .duplicates_by(|pkg| pkg.package.name.clone())
-            .map(|pkg| pkg.package.name.clone())
+            .map(|pkg| pkg.package.name())
+            .duplicates()
+            .cloned()
             .collect_vec();
 
         if !duplicate_entrypoints.is_empty() {
-            return Err(InstallError::DuplicateEntrypoints(PackageNameList(
+            return Err(InstallError::DuplicateEntrypoints(PackageNameList::new(
                 duplicate_entrypoints,
             )));
         }
@@ -166,15 +167,6 @@ pub enum InstallError {
     ProjectTreeError(#[from] ProjectTreeError),
     #[error("cannot install duplicate entrypoints: {0}")]
     DuplicateEntrypoints(PackageNameList),
-}
-
-#[derive(Debug)]
-pub struct PackageNameList(Vec<PackageName>);
-
-impl Display for PackageNameList {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.0.iter().map(|pkg| pkg.to_string()).join(", ").as_str())
-    }
 }
 
 async fn install(

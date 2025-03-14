@@ -1,7 +1,4 @@
-use lux_lib::{
-    config::{ConfigBuilder, LuaVersion},
-    tree::Tree,
-};
+use lux_lib::config::{ConfigBuilder, LuaVersion};
 use mlua::{IntoLua, Lua};
 use tempdir::TempDir;
 

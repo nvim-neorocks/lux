@@ -409,6 +409,21 @@ impl Display for PackageName {
     }
 }
 
+#[derive(Debug)]
+pub struct PackageNameList(Vec<PackageName>);
+
+impl PackageNameList {
+    pub(crate) fn new(package_names: Vec<PackageName>) -> Self {
+        Self(package_names)
+    }
+}
+
+impl Display for PackageNameList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0.iter().map(|pkg| pkg.to_string()).join(", ").as_str())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

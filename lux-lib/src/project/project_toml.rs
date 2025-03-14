@@ -8,6 +8,7 @@ use crate::lua_rockspec::LocalRockSource;
 use crate::lua_rockspec::LuaRockspecError;
 use crate::lua_rockspec::RemoteLuaRockspec;
 use crate::lua_rockspec::RockSourceSpec;
+use crate::package::PackageNameList;
 use crate::rockspec::lua_dependency::LuaDependencySpec;
 use std::io;
 use std::{collections::HashMap, path::PathBuf};
@@ -93,6 +94,12 @@ pub enum LocalProjectTomlValidationError {
     CopyDirectoriesContainRockspecName(Option<String>),
     #[error(transparent)]
     RockSourceError(#[from] RockSourceError),
+    #[error("duplicate dependencies: {0}")]
+    DuplicateDependencies(PackageNameList),
+    #[error("duplicate test dependencies: {0}")]
+    DuplicateTestDependencies(PackageNameList),
+    #[error("duplicate build dependencies: {0}")]
+    DuplicateBuildDependencies(PackageNameList),
 }
 
 #[derive(Debug, Error)]
@@ -171,6 +178,36 @@ impl PartialProjectToml {
             version_req: project_toml.lua.clone().unwrap_or(PackageVersionReq::any()),
         }
         .into();
+
+        let get_duplicates = |dependencies: &Option<Vec<LuaDependencySpec>>| {
+            dependencies
+                .iter()
+                .flat_map(|deps| {
+                    deps.iter()
+                        .map(|dep| dep.package_req().name())
+                        .duplicates()
+                        .cloned()
+                })
+                .collect_vec()
+        };
+        let duplicate_dependencies = get_duplicates(&self.dependencies);
+        if !duplicate_dependencies.is_empty() {
+            return Err(LocalProjectTomlValidationError::DuplicateDependencies(
+                PackageNameList::new(duplicate_dependencies),
+            ));
+        }
+        let duplicate_test_dependencies = get_duplicates(&self.test_dependencies);
+        if !duplicate_test_dependencies.is_empty() {
+            return Err(LocalProjectTomlValidationError::DuplicateTestDependencies(
+                PackageNameList::new(duplicate_test_dependencies),
+            ));
+        }
+        let duplicate_build_dependencies = get_duplicates(&self.build_dependencies);
+        if !duplicate_build_dependencies.is_empty() {
+            return Err(LocalProjectTomlValidationError::DuplicateBuildDependencies(
+                PackageNameList::new(duplicate_build_dependencies),
+            ));
+        }
 
         let validated = LocalProjectToml {
             internal: project_toml.clone(),
