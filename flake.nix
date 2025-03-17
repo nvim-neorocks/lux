@@ -57,6 +57,7 @@
                   ra-multiplex
                   cargo-nextest
                   cargo-hakari
+                  cargo-insta
                   clippy
                   taplo
                   lua_pkg
