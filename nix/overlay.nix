@@ -18,7 +18,6 @@
 
     buildInputs =
       [
-        luajit
         openssl
         libgit2
         gnupg
@@ -43,6 +42,7 @@
       pname = "lux";
       version = "0.1.0";
       src = cleanCargoSrc;
+      buildInputs = commonArgs.buildInputs ++ [final.luajit];
     });
 
   individualCrateArgs =
@@ -67,16 +67,30 @@
         lua54 = "5.4";
       }
       ."${luaVersion}";
+    luaPkg = final.${"lua" + builtins.replaceStrings ["."] ["_"] canonicalLuaVersion};
   in
     craneLib.buildPackage (individualCrateArgs
       // {
         pname = "lux-lua-${canonicalLuaVersion}";
         inherit (luxLuaCargo) version;
-        cargoExtraArgs = "-p ${luxLuaCargo.pname} --features ${luaVersion}";
+        cargoExtraArgs = "-p ${luxLuaCargo.pname} --no-default-features --features ${luaVersion}";
 
-        installPhase = ''
+        buildInputs = individualCrateArgs.buildInputs ++ [luaPkg];
+
+        # HACK: For some reason, linking via pkg-config fails on darwin
+        env =
+          (individualCrateArgs.env or {})
+          // final.lib.optionalAttrs final.stdenv.isDarwin {
+            LUA_LIB = "${luaPkg}/lib";
+            LUA_INCLUDE_DIR = "${luaPkg}/include";
+            RUSTFLAGS = "-L ${luaPkg}/lib -llua";
+          };
+
+        installPhase = let
+          libExt = final.stdenv.hostPlatform.extensions.sharedLibrary;
+        in ''
           mkdir -p $out/${canonicalLuaVersion}
-          cp target/${buildType}/liblux_lua.so $out/${canonicalLuaVersion}/lux.so
+          cp target/${buildType}/liblux_lua${libExt} $out/${canonicalLuaVersion}/lux.so
         '';
       });
 
@@ -100,6 +114,8 @@
       // {
         inherit (luxCliCargo) pname version;
         inherit buildType;
+
+        buildInputs = individualCrateArgs.buildInputs ++ [final.luajit];
 
         cargoExtraArgs = "-p ${luxCliCargo.pname}";
 
@@ -144,6 +160,9 @@ in {
     // {
       inherit (luxCliCargo) pname version;
       src = self;
+
+      buildInputs = commonArgs.buildInputs ++ [final.luajit];
+
       nativeCheckInputs = with final; [
         cacert
         cargo-nextest
@@ -177,6 +196,7 @@ in {
     // {
       inherit (luxCliCargo) pname version;
       src = cleanCargoSrc;
+      buildInputs = commonArgs.buildInputs ++ [final.luajit];
       cargoArtifacts = lux-deps;
       cargoClippyExtraArgs = "--all-targets -- --deny warnings";
     });

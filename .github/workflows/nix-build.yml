@@ -38,3 +38,6 @@ jobs:
     - name: Build devShell
       run: nix build ".#devShells.${{matrix.job.target}}.default" --accept-flake-config --log-lines 500
       shell: bash
+    - name: Build package
+      run: nix build ".#packages.${{matrix.job.target}}.default" -Lv --accept-flake-config
+      shell: bash
