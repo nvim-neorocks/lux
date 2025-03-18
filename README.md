@@ -60,9 +60,14 @@ The following table provides a brief (incomplete) comparison:
 | add/remove dependencies                                               | :white_check_mark:           | :x:                |
 | luarocks.org manifest namespaces                                      | :white_check_mark:           | :white_check_mark: |
 | luarocks.org dev packages                                             | :white_check_mark:           | :white_check_mark: |
+| versioning                                                            | SemVer[^3]                   | arbitrary          |
 
 [^1]: Supported via a compatibility layer that uses luarocks as a backend.
 [^2]: [You Aren't Gonna Need It.](https://martinfowler.com/bliki/Yagni.html)
+[^3]: Mostly compatible with the luarocks version parser,
+      which allows an arbitrary number of version components.
+      To comply with SemVer, we treat anything after the third version component
+      (except for the specrev) as a prerelease/build version.
 
 ## :book: License
 
