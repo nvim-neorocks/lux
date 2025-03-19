@@ -76,8 +76,12 @@ async fn main() {
         Commands::Update(update_args) => update::update(update_args, config).await.unwrap(),
         Commands::Info(info_data) => info::info(info_data, config).await.unwrap(),
         Commands::Path(path_data) => path::path(path_data, config).await.unwrap(),
-        Commands::Pin(pin_data) => pin::set_pinned_state(pin_data, config, Pinned).unwrap(),
-        Commands::Unpin(pin_data) => pin::set_pinned_state(pin_data, config, Unpinned).unwrap(),
+        Commands::Pin(pin_data) => pin::set_pinned_state(pin_data, config, Pinned)
+            .await
+            .unwrap(),
+        Commands::Unpin(pin_data) => pin::set_pinned_state(pin_data, config, Unpinned)
+            .await
+            .unwrap(),
         Commands::Upload(upload_data) => upload::upload(upload_data, config).await.unwrap(),
         Commands::Check => check::check(config).await.unwrap(),
         Commands::Add(add_data) => add::add(add_data, config).await.unwrap(),

@@ -13,7 +13,6 @@ use std::{
 use thiserror::Error;
 use toml_edit::{DocumentMut, Item};
 
-use crate::package::{PackageName, PackageReq};
 use crate::{
     config::{Config, LuaVersion},
     lockfile::{ProjectLockfile, ReadOnly},
@@ -23,10 +22,14 @@ use crate::{
     },
     remote_package_db::RemotePackageDB,
     rockspec::{
-        lua_dependency::{DependencyType, LuaDependencyType},
+        lua_dependency::{DependencyType, LuaDependencySpec, LuaDependencyType},
         LuaVersionCompatibility,
     },
     tree::Tree,
+};
+use crate::{
+    lockfile::PinnedState,
+    package::{PackageName, PackageReq},
 };
 
 pub mod project_toml;
@@ -70,6 +73,21 @@ pub enum ProjectEditError {
 pub enum ProjectTreeError {
     Io(#[from] io::Error),
     LuaVersionError(#[from] LuaVersionError),
+}
+
+#[derive(Error, Debug)]
+pub enum PinError {
+    #[error("package {0} not found in dependencies")]
+    PackageNotFound(PackageName),
+    #[error("dependency {dep} is already {}pinned!", if *.pin_state == PinnedState::Unpinned { "un" } else { "" })]
+    PinStateUnchanged {
+        pin_state: PinnedState,
+        dep: PackageName,
+    },
+    #[error(transparent)]
+    Toml(#[from] toml_edit::TomlError),
+    #[error(transparent)]
+    Io(#[from] tokio::io::Error),
 }
 
 /// A newtype for the project root directory.
@@ -464,6 +482,8 @@ impl Project {
             }
         }
 
+        tokio::fs::write(self.toml_path(), project_toml.to_string()).await?;
+
         Ok(())
     }
 
@@ -498,6 +518,89 @@ impl Project {
             self.upgrade(LuaDependencyType::Test(packages), package_db)
                 .await?;
         }
+        Ok(())
+    }
+
+    pub async fn set_pinned_state(
+        &mut self,
+        dependencies: LuaDependencyType<PackageName>,
+        pin: PinnedState,
+    ) -> Result<(), PinError> {
+        let mut project_toml =
+            toml_edit::DocumentMut::from_str(&tokio::fs::read_to_string(self.toml_path()).await?)?;
+
+        prepare_dependency_tables(&mut project_toml);
+        let table = match dependencies {
+            LuaDependencyType::Regular(_) => &mut project_toml["dependencies"],
+            LuaDependencyType::Build(_) => &mut project_toml["build_dependencies"],
+            LuaDependencyType::Test(_) => &mut project_toml["test_dependencies"],
+        };
+
+        match dependencies {
+            LuaDependencyType::Regular(ref _deps) => {
+                self.toml.dependencies = Some(
+                    self.toml
+                        .dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|dep| LuaDependencySpec { pin, ..dep })
+                        .collect(),
+                )
+            }
+            LuaDependencyType::Build(ref _deps) => {
+                self.toml.build_dependencies = Some(
+                    self.toml
+                        .build_dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|dep| LuaDependencySpec { pin, ..dep })
+                        .collect(),
+                )
+            }
+            LuaDependencyType::Test(ref _deps) => {
+                self.toml.test_dependencies = Some(
+                    self.toml
+                        .test_dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|dep| LuaDependencySpec { pin, ..dep })
+                        .collect(),
+                )
+            }
+        }
+
+        match dependencies {
+            LuaDependencyType::Regular(ref deps)
+            | LuaDependencyType::Build(ref deps)
+            | LuaDependencyType::Test(ref deps) => {
+                for dep in deps {
+                    let mut dep_item = table[dep.to_string()].clone();
+                    match dep_item {
+                        version @ Item::Value(_) => match &pin {
+                            PinnedState::Unpinned => {}
+                            PinnedState::Pinned => {
+                                let mut dep_entry = toml_edit::table().into_table().unwrap();
+                                dep_entry.set_implicit(true);
+                                dep_entry["version"] = version;
+                                dep_entry["pin"] = toml_edit::value(true);
+                                table[dep.to_string()] = toml_edit::Item::Table(dep_entry);
+                            }
+                        },
+                        Item::Table(_) => {
+                            dep_item["pin".to_string()] = toml_edit::value(pin.as_bool());
+                            table[dep.to_string()] = dep_item;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        tokio::fs::write(self.toml_path(), project_toml.to_string()).await?;
+
         Ok(())
     }
 }
@@ -644,5 +747,46 @@ mod tests {
         assert!(
             matches!(&rocks.source().current_platform().source_spec, RockSourceSpec::Url(url) if url == &Url::parse("https://github.com/custom/url").unwrap())
         );
+    }
+
+    #[tokio::test]
+    async fn test_pin_dependencies() {
+        test_pin_unpin_dependencies(PinnedState::Pinned).await
+    }
+
+    #[tokio::test]
+    async fn test_unpin_dependencies() {
+        test_pin_unpin_dependencies(PinnedState::Unpinned).await
+    }
+
+    async fn test_pin_unpin_dependencies(pin: PinnedState) {
+        let sample_project: PathBuf = "resources/test/sample-project-dependencies/".into();
+        let project_root = assert_fs::TempDir::new().unwrap();
+        project_root.copy_from(&sample_project, &["**"]).unwrap();
+        let project_root: PathBuf = project_root.path().into();
+        let mut project = Project::from(&project_root).unwrap().unwrap();
+        let pin_dependencies = vec!["lua-cjson".into(), "plenary.nvim".into()];
+        project
+            .set_pinned_state(
+                LuaDependencyType::Regular(pin_dependencies.clone()),
+                pin,
+            )
+            .await
+            .unwrap();
+        let check = |project: &Project| {
+            for name in &pin_dependencies {
+                assert!(project
+                    .toml()
+                    .dependencies
+                    .clone()
+                    .unwrap_or_default()
+                    .iter()
+                    .any(|dep| dep.name() == name && dep.pin == pin));
+            }
+        };
+        check(&project);
+        // check again after reloading lux.toml
+        let reloaded_project = Project::from(&project_root).unwrap().unwrap();
+        check(&reloaded_project);
     }
 }
