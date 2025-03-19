@@ -11,6 +11,8 @@ use lux_lib::{
     rockspec::LuaVersionCompatibility,
 };
 
+use crate::build::{self, Build};
+
 #[derive(Args, Default)]
 #[clap(disable_help_flag = true)]
 pub struct RunLua {
@@ -24,6 +26,9 @@ pub struct RunLua {
     /// Print help
     #[arg(long)]
     help: bool,
+
+    #[clap(flatten)]
+    build: Build,
 }
 
 pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
@@ -54,15 +59,20 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
             );
         }
     }
-    let tree = config.tree(lua_version)?;
+
+    if project.is_some() {
+        build::build(run_lua.build, config.clone()).await?;
+    }
 
     let paths = if let Some(project) = project {
+        let tree = project.tree(&config)?;
         let mut paths = Paths::new(tree)?;
 
         paths.prepend(&Paths::new(project.tree(&config)?)?);
 
         paths
     } else {
+        let tree = config.tree(lua_version)?;
         Paths::new(tree)?
     };
 
@@ -114,6 +124,8 @@ Arguments:
 {}
 
 Options:
+  --lua       Path to the Lua interpreter to use
+  --no-lock   When building a project, ignore the project's lockfile and don't create one
   -h, --help  Print help
 ",
         lua_help,
