@@ -3,7 +3,7 @@ use lux_lib::{
     build::BuildBehaviour,
     config::Config,
     lockfile::{OptState, PinnedState},
-    operations::{Install, PackageInstallSpec, Run},
+    operations::{Exec, Install, PackageInstallSpec},
     progress::MultiProgress,
     project::Project,
     tree,
@@ -26,11 +26,11 @@ pub async fn check(config: Config) -> Result<()> {
         .install()
         .await?;
 
-    Run::new("luacheck", Some(&project), &config)
+    Exec::new("luacheck", Some(&project), &config)
         .arg(project.root().to_string_lossy())
         .arg("--exclude-files")
         .arg(project.tree(&config)?.root().to_string_lossy())
-        .run()
+        .exec()
         .await?;
 
     Ok(())

@@ -8,6 +8,7 @@ use config::ConfigCmd;
 use debug::Debug;
 use doc::Doc;
 use download::Download;
+use exec::Exec;
 use info::Info;
 use install::Install;
 use install_rockspec::InstallRockspec;
@@ -18,7 +19,6 @@ use pack::Pack;
 use path::Path;
 use pin::ChangePin;
 use remove::Remove;
-use run::Run;
 use run_lua::RunLua;
 use search::Search;
 use test::Test;
@@ -35,6 +35,7 @@ pub mod config;
 pub mod debug;
 pub mod doc;
 pub mod download;
+pub mod exec;
 pub mod fetch;
 pub mod format;
 pub mod info;
@@ -49,7 +50,6 @@ pub mod pin;
 pub mod project;
 pub mod purge;
 pub mod remove;
-pub mod run;
 pub mod run_lua;
 pub mod search;
 pub mod test;
@@ -175,11 +175,10 @@ pub enum Commands {
     Purge,
     /// Remove a rock from the current project's lux.toml dependencies.
     Remove(Remove),
-    /// Run a command that has been installed with lux.
-    /// If the command is not found:
-    /// When run from within a lux project, this command will build the project.
-    /// Otherwise, it will try to install a package named after the command.
-    Run(Run),
+    /// Execute a command that has been installed with lux.
+    /// If the command is not found, a package named after the command
+    /// will be installed.
+    Exec(Exec),
     /// Query the luarocks servers.
     #[command(arg_required_else_help = true)]
     Search(Search),

@@ -21,8 +21,8 @@ use super::{InstallError, PackageInstallSpec};
 /// Rocks package runner, providing fine-grained control
 /// over how a package should be run.
 #[derive(Builder)]
-#[builder(start_fn = new, finish_fn(name = _run, vis = ""))]
-pub struct Run<'a> {
+#[builder(start_fn = new, finish_fn(name = _exec, vis = ""))]
+pub struct Exec<'a> {
     #[builder(start_fn)]
     command: &'a str,
     #[builder(start_fn)]
@@ -34,7 +34,7 @@ pub struct Run<'a> {
     args: Vec<String>,
 }
 
-impl<State: run_builder::State> RunBuilder<'_, State> {
+impl<State: exec_builder::State> ExecBuilder<'_, State> {
     pub fn arg(mut self, arg: impl Into<String>) -> Self {
         self.args.push(arg.into());
         self
@@ -45,16 +45,16 @@ impl<State: run_builder::State> RunBuilder<'_, State> {
         self
     }
 
-    pub async fn run(self) -> Result<(), RunError>
+    pub async fn exec(self) -> Result<(), ExecError>
     where
-        State: run_builder::IsComplete,
+        State: exec_builder::IsComplete,
     {
-        run(self._run()).await
+        exec(self._exec()).await
     }
 }
 
 #[derive(Error, Debug)]
-pub enum RunError {
+pub enum ExecError {
     #[error("Running {0} failed!")]
     RunFailure(String),
     #[error("failed to execute `{0}`: {1}")]
@@ -69,7 +69,7 @@ pub enum RunError {
     ProjectTreeError(#[from] ProjectTreeError),
 }
 
-async fn run(run: Run<'_>) -> Result<(), RunError> {
+async fn exec(run: Exec<'_>) -> Result<(), ExecError> {
     let lua_version = run
         .project
         .map(|project| project.lua_version(run.config))
@@ -91,13 +91,13 @@ async fn run(run: Run<'_>) -> Result<(), RunError> {
         .status()
     {
         Ok(status) => Ok(status),
-        Err(err) => Err(RunError::RunCommandFailure(run.command.to_string(), err)),
+        Err(err) => Err(ExecError::RunCommandFailure(run.command.to_string(), err)),
     }?;
 
     if status.success() {
         Ok(())
     } else {
-        Err(RunError::RunFailure(run.command.to_string()))
+        Err(ExecError::RunFailure(run.command.to_string()))
     }
 }
 
