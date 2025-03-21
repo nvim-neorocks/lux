@@ -649,7 +649,7 @@ mod tests {
     };
 
     #[tokio::test]
-    async fn add_various_dependencies() {
+    async fn test_add_various_dependencies() {
         let sample_project: PathBuf = "resources/test/sample-project-busted/".into();
         let project_root = assert_fs::TempDir::new().unwrap();
         project_root.copy_from(&sample_project, &["**"]).unwrap();
@@ -729,7 +729,36 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn extra_rockspec_parsing() {
+    async fn test_remove_dependencies() {
+        let sample_project: PathBuf = "resources/test/sample-project-dependencies/".into();
+        let project_root = assert_fs::TempDir::new().unwrap();
+        project_root.copy_from(&sample_project, &["**"]).unwrap();
+        let project_root: PathBuf = project_root.path().into();
+        let mut project = Project::from(&project_root).unwrap().unwrap();
+        let remove_dependencies = vec!["lua-cjson".into(), "plenary.nvim".into()];
+        project
+            .remove(DependencyType::Regular(remove_dependencies.clone()))
+            .await
+            .unwrap();
+        let check = |project: &Project| {
+            for name in &remove_dependencies {
+                assert!(!project
+                    .toml()
+                    .dependencies
+                    .clone()
+                    .unwrap_or_default()
+                    .iter()
+                    .any(|dep| dep.name() == name));
+            }
+        };
+        check(&project);
+        // check again after reloading lux.toml
+        let reloaded_project = Project::from(&project_root).unwrap().unwrap();
+        check(&reloaded_project);
+    }
+
+    #[tokio::test]
+    async fn test_extra_rockspec_parsing() {
         let sample_project: PathBuf = "resources/test/sample-project-extra-rockspec".into();
         let project_root = assert_fs::TempDir::new().unwrap();
         project_root.copy_from(&sample_project, &["**"]).unwrap();
@@ -767,10 +796,7 @@ mod tests {
         let mut project = Project::from(&project_root).unwrap().unwrap();
         let pin_dependencies = vec!["lua-cjson".into(), "plenary.nvim".into()];
         project
-            .set_pinned_state(
-                LuaDependencyType::Regular(pin_dependencies.clone()),
-                pin,
-            )
+            .set_pinned_state(LuaDependencyType::Regular(pin_dependencies.clone()), pin)
             .await
             .unwrap();
         let check = |project: &Project| {
