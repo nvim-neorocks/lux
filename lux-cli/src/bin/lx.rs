@@ -4,8 +4,9 @@ use clap::Parser;
 use lux_cli::{
     add, build, check, config,
     debug::Debug,
-    doc, download, fetch, format, info, install, install_lua, install_rockspec, list, outdated,
-    pack, path, pin, project, purge, remove, run, run_lua, search, test, uninstall, unpack, update,
+    doc, download, exec, fetch, format, info, install, install_lua, install_rockspec, list,
+    outdated, pack, path, pin, project, purge, remove, run_lua, search, test, uninstall, unpack,
+    update,
     upload::{self},
     which, Cli, Commands,
 };
@@ -71,7 +72,7 @@ async fn main() {
         Commands::Fmt => format::format().unwrap(),
         Commands::Purge => purge::purge(config).await.unwrap(),
         Commands::Remove(remove_args) => remove::remove(remove_args, config).await.unwrap(),
-        Commands::Run(run_args) => run::run(run_args, config).await.unwrap(),
+        Commands::Exec(run_args) => exec::exec(run_args, config).await.unwrap(),
         Commands::Test(test) => test::test(test, config).await.unwrap(),
         Commands::Update(update_args) => update::update(update_args, config).await.unwrap(),
         Commands::Info(info_data) => info::info(info_data, config).await.unwrap(),

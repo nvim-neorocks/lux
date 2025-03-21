@@ -14,14 +14,14 @@ use which::which;
 use crate::build::Build;
 
 #[derive(Args)]
-pub struct Run {
+pub struct Exec {
     /// The command to run.
     command: String,
     /// Arguments to pass to the program.
     args: Option<Vec<String>>,
 }
 
-pub async fn run(run: Run, config: Config) -> Result<()> {
+pub async fn exec(run: Exec, config: Config) -> Result<()> {
     let project = Project::current()?;
     let lua_version = match &project {
         Some(prj) => prj.toml().lua_version_matches(&config)?,
@@ -39,9 +39,9 @@ pub async fn run(run: Run, config: Config) -> Result<()> {
             None => install_command(&run.command, &config).await?,
         }
     };
-    operations::Run::new(&run.command, project.as_ref(), &config)
+    operations::Exec::new(&run.command, project.as_ref(), &config)
         .args(run.args.unwrap_or_default())
-        .run()
+        .exec()
         .await?;
     Ok(())
 }
