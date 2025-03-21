@@ -89,6 +89,7 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
                 .test_dependencies()
                 .current_platform()
                 .clone();
+            let tree = project.test_tree(&config)?;
             Sync::new(&tree, &mut lockfile, &config)
                 .packages(packages)
                 .progress(progress.clone())

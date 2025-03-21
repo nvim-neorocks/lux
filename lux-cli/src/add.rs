@@ -103,6 +103,7 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
     let test_packages = data.test.unwrap_or_default();
     if !test_packages.is_empty() {
         if let Some(lockfile) = project.try_lockfile()? {
+            let tree = project.test_tree(&config)?;
             let mut lockfile = lockfile.write_guard();
             Sync::new(&tree, &mut lockfile, &config)
                 .progress(progress.clone())

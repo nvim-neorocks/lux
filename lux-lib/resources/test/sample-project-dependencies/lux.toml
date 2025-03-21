@@ -1,0 +1,16 @@
+package = "sample-project"
+version = "0.1.0"
+lua = "5.1"
+
+[source]
+url = "https://github.com/nvim-neorocks/luarocks-stub"
+
+[dependencies]
+lua-cjson = "2.1.0"
+
+[dependencies."plenary.nvim"]
+version = "0.1.4"
+pin = true
+
+[build]
+type = "builtin"
