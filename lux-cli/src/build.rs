@@ -29,9 +29,9 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     let progress = Arc::clone(&progress_arc);
 
     let tree = project.tree(&config)?;
-    let rocks = project.toml().into_local()?;
+    let project_toml = project.toml().into_local()?;
 
-    let dependencies = rocks
+    let dependencies = project_toml
         .dependencies()
         .current_platform()
         .iter()
@@ -39,7 +39,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         .cloned()
         .collect_vec();
 
-    let build_dependencies = rocks
+    let build_dependencies = project_toml
         .build_dependencies()
         .current_platform()
         .iter()
@@ -129,7 +129,7 @@ Use --ignore-lockfile to force a new build.
     }
 
     build::Build::new(
-        &rocks,
+        &project_toml,
         &tree,
         tree::EntryType::Entrypoint,
         &config,

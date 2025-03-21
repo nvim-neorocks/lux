@@ -1,0 +1,16 @@
+package = "lux"
+version = "0.1.0"
+lua = ">=5.1"
+
+[description]
+summary = "A luxurious package manager for Lua"
+maintainer = "vhyrro"
+license = "MIT"
+labels = [ "luarocks", "package-manager" ]
+
+[dependencies]
+# Add your dependencies here
+# `busted = ">=2.0"`
+
+[build]
+type = "builtin"
