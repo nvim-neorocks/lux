@@ -122,6 +122,8 @@ pub struct PartialProjectToml {
     pub(crate) build: BuildSpecInternal,
     pub(crate) rockspec_format: Option<RockspecFormat>,
     #[serde(default)]
+    pub(crate) run: Option<RunSpec>,
+    #[serde(default)]
     pub(crate) lua: Option<PackageVersionReq>,
     #[serde(default)]
     pub(crate) description: Option<RockDescription>,
@@ -229,6 +231,7 @@ impl PartialProjectToml {
                 .lua
                 .ok_or(LocalProjectTomlValidationError::NoLuaVersion)?,
             description: project_toml.description.unwrap_or_default(),
+            run: project_toml.run.map(PerPlatform::new),
             supported_platforms: PlatformSupport::parse(
                 &project_toml
                     .supported_platforms
@@ -359,6 +362,7 @@ impl PartialProjectToml {
                 })
                 .or(self.lua),
             build: other.build.unwrap_or(self.build),
+            run: None,
             description: other.description.or(self.description),
             supported_platforms: other
                 .supported_platforms
@@ -456,6 +460,14 @@ impl LuaVersionCompatibility for PartialProjectToml {
     }
 }
 
+// TODO(vhyrro): Move this struct into a different directory.
+pub struct RunSpec {
+    /// The command to execute when running the project
+    command: String,
+    /// Arguments to pass to the command
+    args: Vec<String>,
+}
+
 /// The `lux.toml` file, after being properly deserialized.
 /// This struct may be used to build a local version of a project.
 /// To build a rockspec, use `RemoteProjectToml`.
@@ -465,6 +477,7 @@ pub struct LocalProjectToml {
     version: PackageVersion,
     lua: PackageVersionReq,
     rockspec_format: Option<RockspecFormat>,
+    run: Option<PerPlatform<RunSpec>>,
     description: RockDescription,
     supported_platforms: PlatformSupport,
     dependencies: PerPlatform<Vec<LuaDependencySpec>>,
@@ -482,6 +495,10 @@ pub struct LocalProjectToml {
 }
 
 impl LocalProjectToml {
+    pub fn run(&self) -> &PerPlatform<RunSpec> {
+        &self.run
+    }
+
     pub fn to_lua_rockspec(&self) -> Result<LocalLuaRockspec, LuaRockspecError> {
         LocalLuaRockspec::new(
             &self.to_lua_rockspec_string(),
