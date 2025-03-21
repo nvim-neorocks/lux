@@ -16,6 +16,7 @@ use std::{collections::HashMap, path::PathBuf};
 use itertools::Itertools;
 use mlua::ExternalResult;
 use mlua::UserData;
+use nonempty::NonEmpty;
 use serde::{Deserialize, Deserializer};
 use ssri::Integrity;
 use thiserror::Error;
@@ -121,6 +122,8 @@ pub struct PartialProjectToml {
     pub(crate) version: PackageVersion,
     pub(crate) build: BuildSpecInternal,
     pub(crate) rockspec_format: Option<RockspecFormat>,
+    #[serde(default)]
+    pub(crate) run: Option<RunSpec>,
     #[serde(default)]
     pub(crate) lua: Option<PackageVersionReq>,
     #[serde(default)]
@@ -229,6 +232,7 @@ impl PartialProjectToml {
                 .lua
                 .ok_or(LocalProjectTomlValidationError::NoLuaVersion)?,
             description: project_toml.description.unwrap_or_default(),
+            run: project_toml.run.map(PerPlatform::new),
             supported_platforms: PlatformSupport::parse(
                 &project_toml
                     .supported_platforms
@@ -359,6 +363,7 @@ impl PartialProjectToml {
                 })
                 .or(self.lua),
             build: other.build.unwrap_or(self.build),
+            run: None,
             description: other.description.or(self.description),
             supported_platforms: other
                 .supported_platforms
@@ -456,6 +461,36 @@ impl LuaVersionCompatibility for PartialProjectToml {
     }
 }
 
+#[derive(Debug, Error)]
+#[error("`{0}` should not be used as a `command` as it is not cross-platform.
+You should only change the default `command` if it is a different Lua interpreter that behaves identically on all platforms.
+Consider removing the `command` field and letting Lux choose the default Lua interpreter instead.")]
+pub(crate) struct RunCommandError(String);
+
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct RunCommand(String);
+
+impl RunCommand {
+    pub(crate) fn new(command: String) -> Result<Self, RunCommandError> {
+        match command.as_str() {
+            // Common Lua interpreters that could lead to cross-platform issues
+            "lua" | "lua5.1" | "lua5.2" | "lua5.3" | "lua5.4" | "luajit" => {
+                Err(RunCommandError(command))
+            }
+            _ => Ok(Self(command)),
+        }
+    }
+}
+
+// TODO(vhyrro): Move this struct into a different directory.
+#[derive(Debug, Clone, Deserialize)]
+pub struct RunSpec {
+    /// The command to execute when running the project
+    pub(crate) command: Option<RunCommand>,
+    /// Arguments to pass to the command
+    pub(crate) args: NonEmpty<String>,
+}
+
 /// The `lux.toml` file, after being properly deserialized.
 /// This struct may be used to build a local version of a project.
 /// To build a rockspec, use `RemoteProjectToml`.
@@ -465,6 +500,7 @@ pub struct LocalProjectToml {
     version: PackageVersion,
     lua: PackageVersionReq,
     rockspec_format: Option<RockspecFormat>,
+    run: Option<PerPlatform<RunSpec>>,
     description: RockDescription,
     supported_platforms: PlatformSupport,
     dependencies: PerPlatform<Vec<LuaDependencySpec>>,
@@ -482,6 +518,10 @@ pub struct LocalProjectToml {
 }
 
 impl LocalProjectToml {
+    pub fn run(&self) -> Option<&PerPlatform<RunSpec>> {
+        self.run.as_ref()
+    }
+
     pub fn to_lua_rockspec(&self) -> Result<LocalLuaRockspec, LuaRockspecError> {
         LocalLuaRockspec::new(
             &self.to_lua_rockspec_string(),

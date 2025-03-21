@@ -2229,6 +2229,7 @@ dependencies = [
  "md5",
  "mlua",
  "nix-nar",
+ "nonempty",
  "openssl",
  "pathdiff",
  "pkg-config",
@@ -2529,6 +2530,15 @@ dependencies = [
  "is_executable",
  "symlink",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "nonempty"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "549e471b99ccaf2f89101bec68f4d244457d5a95a9c3d0672e9564124397741d"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
