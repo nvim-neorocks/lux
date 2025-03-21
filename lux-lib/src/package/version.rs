@@ -19,12 +19,6 @@ pub enum PackageVersion {
     DevVer(DevVer),
 }
 
-impl IntoLua for PackageVersion {
-    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
-        self.to_string().into_lua(lua)
-    }
-}
-
 impl PackageVersion {
     pub fn parse(text: &str) -> Result<Self, PackageVersionParseError> {
         PackageVersion::from_str(text)
@@ -48,6 +42,12 @@ impl PackageVersion {
                 })
             }
         }
+    }
+}
+
+impl IntoLua for PackageVersion {
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        self.to_string().into_lua(lua)
     }
 }
 
@@ -147,16 +147,28 @@ pub struct SemVer {
 
 impl Display for SemVer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let str = format!(
-            "{}-{}",
-            self.version
-                .to_string()
-                .split('.')
-                .take(self.component_count)
-                .join("."),
-            self.specrev
-        );
+        let (version_str, remainder) = split_semver_version(&self.version.to_string());
+        let mut luarocks_version_str = version_str.split('.').take(self.component_count).join(".");
+        if let Some(remainder) = remainder {
+            // luarocks allows and arbitrary number of '.' separators
+            // We treat anything after the third '.' as a semver prerelease/build version,
+            // so we have to convert it back for luarocks.
+            luarocks_version_str.push_str(&format!(".{}", remainder));
+        }
+        let str = format!("{}-{}", luarocks_version_str, self.specrev);
         str.fmt(f)
+    }
+}
+
+fn split_semver_version(version_str: &str) -> (String, Option<String>) {
+    if let Some(pos) = version_str.rfind('-') {
+        if let Some(pre_build_str) = version_str.get(pos + 1..) {
+            (version_str[..pos].into(), Some(pre_build_str.into()))
+        } else {
+            (version_str[..pos].into(), None)
+        }
+    } else {
+        (version_str.into(), None)
     }
 }
 
@@ -316,22 +328,37 @@ impl FromStr for PackageVersionReq {
     type Err = PackageVersionReqError;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        let text = text
-            .split('-')
-            .map(str::to_string)
-            .coalesce(|version, rest| {
-                Ok(format!(
-                    "{version}{}",
-                    rest.trim_start_matches(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
-                ))
-            })
-            .collect::<String>();
+        let text = correct_version_req_str(text);
 
         if is_dev_version_str(text.trim_start_matches("==").trim()) {
             return Ok(PackageVersionReq::Dev(text));
         }
 
         Ok(PackageVersionReq::SemVer(parse_version_req(&text)?))
+    }
+}
+
+fn correct_version_req_str(text: &str) -> String {
+    text.chars()
+        .chunk_by(|t| t.is_alphanumeric() || matches!(t, '-' | '_' | '.'))
+        .into_iter()
+        .map(|(is_version_str, chars)| (is_version_str, chars.collect::<String>()))
+        .map(|(is_version_str, chunk)| {
+            if is_version_str && !is_dev_version_str(&chunk) {
+                let version_str = trim_specrev(&chunk);
+                correct_prerelease_version_string(version_str)
+            } else {
+                chunk
+            }
+        })
+        .collect::<String>()
+}
+
+fn trim_specrev(version_str: &str) -> &str {
+    if let Some(pos) = version_str.rfind('-') {
+        &version_str[..pos]
+    } else {
+        version_str
     }
 }
 
@@ -431,6 +458,10 @@ fn parse_pessimistic_version_constraint(version_constraint: String) -> Result<St
 /// compliant digits to a pre-release identifier.
 fn correct_version_string(version: &str) -> String {
     let version = append_minor_patch_if_missing(version);
+    correct_prerelease_version_string(&version)
+}
+
+fn correct_prerelease_version_string(version: &str) -> String {
     let parts: Vec<&str> = version.split('.').collect();
     if parts.len() > 3 {
         let corrected_version = format!(
@@ -588,6 +619,10 @@ mod tests {
         assert_eq!(
             PackageVersionReq::parse("> 1-1, < 1.2-2").unwrap(),
             PackageVersionReq::SemVer("> 1, < 1.2".parse().unwrap())
+        );
+        assert_eq!(
+            PackageVersionReq::parse("> 2.1.0.10, < 2.1.1").unwrap(),
+            PackageVersionReq::SemVer("> 2.1.0-10, < 2.1.1".parse().unwrap())
         );
     }
 }
