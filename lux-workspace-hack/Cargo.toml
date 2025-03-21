@@ -38,7 +38,7 @@ parking_lot = { version = "0.12", features = ["arc_lock", "send_guard"] }
 percent-encoding = { version = "2" }
 predicates = { version = "3" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa", "perf", "unicode"] }
-serde = { version = "1", features = ["derive", "rc"] }
+serde = { version = "1", features = ["alloc", "derive", "rc"] }
 similar = { version = "2", features = ["inline", "serde"] }
 smallvec = { version = "1", default-features = false, features = ["const_new"] }
 time = { version = "0.3", default-features = false, features = ["formatting", "macros", "parsing"] }
@@ -53,7 +53,7 @@ indexmap = { version = "1", default-features = false, features = ["std"] }
 memchr = { version = "2" }
 proc-macro2 = { version = "1" }
 quote = { version = "1" }
-serde = { version = "1", features = ["derive", "rc"] }
+serde = { version = "1", features = ["alloc", "derive", "rc"] }
 smallvec = { version = "1", default-features = false, features = ["const_new"] }
 syn = { version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 toml = { version = "0.8" }
