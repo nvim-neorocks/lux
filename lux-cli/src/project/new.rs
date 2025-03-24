@@ -1,4 +1,4 @@
-use std::{error::Error, path::PathBuf, str::FromStr};
+use std::{error::Error, fmt::Display, path::PathBuf, str::FromStr};
 
 use clap::Args;
 use eyre::{eyre, Result};
@@ -22,10 +22,26 @@ use lux_lib::{
 //   E.g. if there is a `Cargo.toml` in the project root we can infer the user wants to use the
 //   Rust build backend.
 
+/// The type of directory to create when making the project.
+#[derive(Debug, Clone, clap::ValueEnum)]
+enum SourceDirType {
+    Src,
+    Lua,
+}
+
+impl Display for SourceDirType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Src => write!(f, "src"),
+            Self::Lua => write!(f, "lua"),
+        }
+    }
+}
+
 #[derive(Args)]
 pub struct NewProject {
     /// The directory of the project.
-    directory: PathBuf,
+    target: PathBuf,
 
     /// The project's name.
     #[arg(long)]
@@ -51,6 +67,20 @@ pub struct NewProject {
     /// Examples: ">=5.1", "5.1"
     #[arg(long, value_parser = clap_parse_version)]
     lua_versions: Option<PackageReq>,
+
+    #[arg(long)]
+    main: Option<SourceDirType>,
+}
+
+struct NewProjectValidated {
+    target: PathBuf,
+    name: String,
+    description: String,
+    maintainer: String,
+    labels: Vec<String>,
+    lua_versions: PackageReq,
+    main: SourceDirType,
+    license: Option<LicenseId>,
 }
 
 fn clap_parse_license(s: &str) -> std::result::Result<LicenseId, String> {
@@ -103,7 +133,7 @@ fn validate_license(input: &str) -> std::result::Result<Validation, Box<dyn Erro
 }
 
 pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
-    let project = Project::from_exact(cli_flags.directory.clone())?;
+    let project = Project::from_exact(cli_flags.target.clone())?;
     let render_config = RenderConfig::default_colored()
         .with_prompt_prefix(Styled::new(">").with_fg(inquire::ui::Color::LightGreen));
 
@@ -121,38 +151,49 @@ pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
         return Err(eyre!("cancelled creation of project (already exists)"));
     };
 
-    let (package_name, description, license, labels, maintainer, lua_versions) = match cli_flags {
+    let validated = match cli_flags {
         // If all parameters are provided then don't bother prompting the user
         NewProject {
-            name: Some(name),
             description: Some(description),
+            main: Some(main),
             labels: Some(labels),
-            license,
             lua_versions: Some(lua_versions),
             maintainer: Some(maintainer),
-            ..
-        } => Ok::<_, eyre::Report>((name, description, license, labels, maintainer, lua_versions)),
-
-        NewProject {
-            name,
+            name: Some(name),
+            license,
+            target,
+        } => Ok::<_, eyre::Report>(NewProjectValidated {
             description,
             labels,
             license,
             lua_versions,
+            main,
             maintainer,
-            ref directory,
+            name,
+            target,
+        }),
+
+        NewProject {
+            description,
+            labels,
+            license,
+            lua_versions,
+            main,
+            maintainer,
+            name,
+            target,
         } => {
             let mut spinner = Spinner::new(
                 Spinners::Dots,
                 "Fetching remote repository metadata... ".into(),
             );
 
-            let repo_metadata = match github_metadata::get_metadata_for(Some(directory)).await {
-                Ok(value) => value.map_or_else(|| RepoMetadata::default(directory), Ok),
+            let repo_metadata = match github_metadata::get_metadata_for(Some(&target)).await {
+                Ok(value) => value.map_or_else(|| RepoMetadata::default(&target), Ok),
                 Err(_) => {
                     println!("Could not fetch remote repo metadata, defaulting to empty values.");
 
-                    RepoMetadata::default(directory)
+                    RepoMetadata::default(&target)
                 }
             }?;
 
@@ -253,20 +294,22 @@ pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
                 Ok,
             )?;
 
-            Ok((
-                package_name,
+            Ok(NewProjectValidated {
+                target,
+                name: package_name,
                 description,
-                license,
                 labels,
-                maintainer,
+                license,
                 lua_versions,
-            ))
+                maintainer,
+                main: main.unwrap_or(SourceDirType::Src),
+            })
         }
     }?;
 
-    let _ = std::fs::create_dir_all(&cli_flags.directory);
+    let _ = std::fs::create_dir_all(&validated.target);
 
-    let rocks_path = cli_flags.directory.join(PROJECT_TOML);
+    let rocks_path = validated.target.join(PROJECT_TOML);
 
     std::fs::write(
         &rocks_path,
@@ -279,32 +322,49 @@ lua = "{lua_version_req}"
 [description]
 summary = "{summary}"
 maintainer = "{maintainer}"
-license = "{license}"
 labels = [ {labels} ]
+{license}
 
 [dependencies]
 # Add your dependencies here
 # `busted = ">=2.0"`
 
+[run]
+args = [ "{main}/main.lua" ]
+
 [build]
 type = "builtin"
     "#,
-            package_name = package_name,
-            summary = description,
-            license = license
-                .map(|license| license.name)
-                .unwrap_or("*** enter a license ***"),
-            maintainer = maintainer,
-            labels = labels
+            package_name = validated.name,
+            summary = validated.description,
+            license = validated
+                .license
+                .map(|license| format!(r#"license = "{}""#, license.name))
+                .unwrap_or_default(),
+            maintainer = validated.maintainer,
+            labels = validated
+                .labels
                 .into_iter()
                 .map(|label| "\"".to_string() + &label + "\"")
                 .join(", "),
-            lua_version_req = lua_versions.version_req(),
+            lua_version_req = validated.lua_versions.version_req(),
+            main = validated.main,
         )
         .trim(),
     )?;
 
-    println!("Done!");
+    let main_dir = validated.target.join(validated.main.to_string());
+    if main_dir.exists() {
+        eprintln!(
+            "Directory `{}/` already exists - we won't make any changes to it.",
+            main_dir.display()
+        );
+    } else {
+        std::fs::create_dir(&main_dir)?;
+        std::fs::write(main_dir.join("main.lua"), r#"print("Hello world!")"#)?;
+    }
+
+    println!("All done!");
 
     Ok(())
 }
