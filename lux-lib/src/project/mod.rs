@@ -136,6 +136,30 @@ impl Project {
         Self::from(&std::env::current_dir()?)
     }
 
+    pub fn from_exact(start: impl AsRef<Path>) -> Result<Option<Self>, ProjectError> {
+        if !start.as_ref().exists() {
+            return Ok(None);
+        }
+
+        if start.as_ref().join(PROJECT_TOML).exists() {
+            let toml_content = std::fs::read_to_string(start.as_ref().join(PROJECT_TOML))?;
+            let root = start.as_ref();
+
+            let mut project = Project {
+                root: ProjectRoot(root.to_path_buf()),
+                toml: PartialProjectToml::new(&toml_content, ProjectRoot(root.to_path_buf()))?,
+            };
+
+            if let Some(extra_rockspec) = project.extra_rockspec()? {
+                project.toml = project.toml.merge(extra_rockspec);
+            }
+
+            Ok(Some(project))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn from(start: impl AsRef<Path>) -> Result<Option<Self>, ProjectError> {
         if !start.as_ref().exists() {
             return Ok(None);
