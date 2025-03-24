@@ -8,6 +8,7 @@ use crate::lua_rockspec::LocalRockSource;
 use crate::lua_rockspec::LuaRockspecError;
 use crate::lua_rockspec::RemoteLuaRockspec;
 use crate::lua_rockspec::RockSourceSpec;
+use crate::operations::RunCommand;
 use crate::package::PackageNameList;
 use crate::rockspec::lua_dependency::LuaDependencySpec;
 use std::io;
@@ -458,27 +459,6 @@ impl LuaVersionCompatibility for PartialProjectToml {
                 .unwrap_or_default(),
         )
         .or(self.lua_version())
-    }
-}
-
-#[derive(Debug, Error)]
-#[error("`{0}` should not be used as a `command` as it is not cross-platform.
-You should only change the default `command` if it is a different Lua interpreter that behaves identically on all platforms.
-Consider removing the `command` field and letting Lux choose the default Lua interpreter instead.")]
-pub(crate) struct RunCommandError(String);
-
-#[derive(Debug, Clone, Deserialize)]
-pub(crate) struct RunCommand(String);
-
-impl RunCommand {
-    pub(crate) fn new(command: String) -> Result<Self, RunCommandError> {
-        match command.as_str() {
-            // Common Lua interpreters that could lead to cross-platform issues
-            "lua" | "lua5.1" | "lua5.2" | "lua5.3" | "lua5.4" | "luajit" => {
-                Err(RunCommandError(command))
-            }
-            _ => Ok(Self(command)),
-        }
     }
 }
 
