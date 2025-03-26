@@ -6,6 +6,7 @@ use itertools::Itertools;
 use lux_lib::{
     config::{Config, LuaVersion},
     lua_installation::get_installed_lua_version,
+    operations::{self, LuaBinary},
     path::Paths,
     project::Project,
     rockspec::LuaVersionCompatibility,
@@ -32,76 +33,29 @@ pub struct RunLua {
 }
 
 pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
-    let lua_cmd = run_lua.lua.unwrap_or("lua".into());
+    let lua_cmd = run_lua.lua.map(LuaBinary::Custom).unwrap_or(LuaBinary::Lua);
+
     if run_lua.help {
         return print_lua_help(&lua_cmd);
     }
+
     let project = Project::current()?;
     let lua_version = match &project {
         Some(prj) => prj.toml().lua_version_matches(&config)?,
         None => LuaVersion::from(&config)?,
     };
-    match get_installed_lua_version(&lua_cmd).and_then(|ver| Ok(LuaVersion::from_version(ver)?)) {
-        Ok(installed_version) => {
-            if installed_version != lua_version {
-                return Err(eyre!(
-                    "{} -v (= {}) does not match expected Lua version {}",
-                    &lua_cmd,
-                    installed_version,
-                    &lua_version,
-                ));
-            }
-        }
-        Err(_) => {
-            eprintln!(
-                "⚠️ WARNING: Could not parse Lua version from '{} -v' output. Assuming Lua {} compatibility.",
-                &lua_cmd, lua_version
-            );
-        }
-    }
 
     if project.is_some() {
         build::build(run_lua.build, config.clone()).await?;
     }
 
-    let paths = if let Some(project) = project {
-        let tree = project.tree(&config)?;
-        let mut paths = Paths::new(tree)?;
+    operations::run_lua(lua_version, lua_cmd, &run_lua.args.unwrap_or_default()).await?;
 
-        paths.prepend(&Paths::new(project.tree(&config)?)?);
-
-        paths
-    } else {
-        let tree = config.tree(lua_version)?;
-        Paths::new(tree)?
-    };
-
-    let status = match Command::new(&lua_cmd)
-        .args(run_lua.args.unwrap_or_default())
-        .env("PATH", paths.path_prepended().joined())
-        .env("LUA_PATH", paths.package_path().joined())
-        .env("LUA_CPATH", paths.package_cpath().joined())
-        .status()
-    {
-        Ok(status) => Ok(status),
-        Err(err) => Err(eyre!("Failed to run {}: {}", &lua_cmd, err)),
-    }?;
-    if status.success() {
-        Ok(())
-    } else {
-        match status.code() {
-            Some(code) => Err(eyre!(
-                "{} exited with non-zero exit code: {}",
-                &lua_cmd,
-                code
-            )),
-            None => Err(eyre!("{} failed with unknown exit code.", &lua_cmd)),
-        }
-    }
+    Ok(())
 }
 
-fn print_lua_help(lua_cmd: &str) -> Result<()> {
-    let output = match Command::new(lua_cmd)
+fn print_lua_help(lua_cmd: &LuaBinary) -> Result<()> {
+    let output = match Command::new(lua_cmd.to_string())
         // HACK: This fails with exit 1, because lua doesn't actually have a help flag (╯°□°)╯︵ ┻━┻
         .arg("-h")
         .output()
