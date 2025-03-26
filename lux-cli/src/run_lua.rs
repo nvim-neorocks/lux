@@ -5,9 +5,7 @@ use eyre::{eyre, Result};
 use itertools::Itertools;
 use lux_lib::{
     config::{Config, LuaVersion},
-    lua_installation::get_installed_lua_version,
     operations::{self, LuaBinary},
-    path::Paths,
     project::Project,
     rockspec::LuaVersionCompatibility,
 };
@@ -40,16 +38,25 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
     }
 
     let project = Project::current()?;
-    let lua_version = match &project {
-        Some(prj) => prj.toml().lua_version_matches(&config)?,
-        None => LuaVersion::from(&config)?,
+    let (lua_version, root) = match &project {
+        Some(prj) => (
+            prj.toml().lua_version_matches(&config)?,
+            prj.root().to_path_buf(),
+        ),
+        None => (LuaVersion::from(&config)?, std::env::current_dir()?),
     };
 
     if project.is_some() {
         build::build(run_lua.build, config.clone()).await?;
     }
 
-    operations::run_lua(lua_version, lua_cmd, &run_lua.args.unwrap_or_default()).await?;
+    operations::run_lua(
+        &root,
+        lua_version,
+        lua_cmd,
+        &run_lua.args.unwrap_or_default(),
+    )
+    .await?;
 
     Ok(())
 }
@@ -71,7 +78,7 @@ fn print_lua_help(lua_cmd: &LuaBinary) -> Result<()> {
         .join("\n");
     print!(
         "
-Usage: lux lua -- [LUA_OPTIONS] [SCRIPT [ARGS]]...
+Usage: lx lua -- [LUA_OPTIONS] [SCRIPT [ARGS]]...
 
 Arguments:
   [LUA_OPTIONS]...

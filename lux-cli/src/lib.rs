@@ -19,6 +19,7 @@ use pack::Pack;
 use path::Path;
 use pin::ChangePin;
 use remove::Remove;
+use run::Run;
 use run_lua::RunLua;
 use search::Search;
 use test::Test;
@@ -50,6 +51,7 @@ pub mod pin;
 pub mod project;
 pub mod purge;
 pub mod remove;
+pub mod run;
 pub mod run_lua;
 pub mod search;
 pub mod test;
@@ -175,6 +177,8 @@ pub enum Commands {
     Purge,
     /// Remove a rock from the current project's lux.toml dependencies.
     Remove(Remove),
+    /// Run the current project with the provided arguments.
+    Run(Run),
     /// Execute a command that has been installed with lux.
     /// If the command is not found, a package named after the command
     /// will be installed.
