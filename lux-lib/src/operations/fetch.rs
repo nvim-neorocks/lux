@@ -72,26 +72,29 @@ where
     pub(crate) async fn fetch_internal(self) -> Result<RemotePackageSourceMetadata, FetchSrcError> {
         let fetch = self._build();
         match do_fetch_src(&fetch).await {
-            Err(err) => {
-                let package = PackageSpec::new(
-                    fetch.rockspec.package().clone(),
-                    fetch.rockspec.version().clone(),
-                );
-                fetch.progress.map(|p| {
-                    p.println(format!(
-                        "⚠️ WARNING: Failed to fetch source for {}: {}",
-                        &package, err
-                    ))
-                });
-                fetch
-                    .progress
-                    .map(|p| p.println("⚠️ Falling back to .src.rock archive"));
-                let metadata =
-                    FetchSrcRock::new(&package, fetch.dest_dir, fetch.config, fetch.progress)
-                        .fetch()
-                        .await?;
-                Ok(metadata)
-            }
+            Err(err) => match &fetch.rockspec.source().current_platform().source_spec {
+                RockSourceSpec::Git(_) | RockSourceSpec::Url(_) => {
+                    let package = PackageSpec::new(
+                        fetch.rockspec.package().clone(),
+                        fetch.rockspec.version().clone(),
+                    );
+                    fetch.progress.map(|p| {
+                        p.println(format!(
+                            "⚠️ WARNING: Failed to fetch source for {}: {}",
+                            &package, err
+                        ))
+                    });
+                    fetch
+                        .progress
+                        .map(|p| p.println("⚠️ Falling back to .src.rock archive"));
+                    let metadata =
+                        FetchSrcRock::new(&package, fetch.dest_dir, fetch.config, fetch.progress)
+                            .fetch()
+                            .await?;
+                    Ok(metadata)
+                }
+                RockSourceSpec::File(_) => Err(err),
+            },
             Ok(metadata) => Ok(metadata),
         }
     }
