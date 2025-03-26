@@ -468,7 +468,7 @@ pub struct RunSpec {
     /// The command to execute when running the project
     pub(crate) command: Option<RunCommand>,
     /// Arguments to pass to the command
-    pub(crate) args: NonEmpty<String>,
+    pub(crate) args: Option<NonEmpty<String>>,
 }
 
 /// The `lux.toml` file, after being properly deserialized.
@@ -1287,5 +1287,26 @@ mod tests {
             .unwrap()
             .into_local()
             .unwrap_err();
+    }
+
+    #[test]
+    fn project_toml_with_invalid_run_command() {
+        for command in ["lua", "lua5.1", "lua5.2", "lua5.3", "lua5.4", "luajit"] {
+            let project_toml = format!(
+                r#"
+                package = "my-package"
+                version = "1.0.0"
+                lua = "5.1"
+
+                [build]
+                type = "builtin"
+
+                [run]
+                command = "{command}"
+                "#,
+            );
+
+            PartialProjectToml::new(&project_toml, ProjectRoot::default()).unwrap_err();
+        }
     }
 }
