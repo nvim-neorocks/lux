@@ -2,7 +2,7 @@
 //!
 //! The interfaces exposed here ensure that the correct version of Lua is being used.
 
-use std::{fmt, io};
+use std::{fmt, io, path::Path};
 
 use thiserror::Error;
 use tokio::process::Command;
@@ -54,9 +54,10 @@ pub enum RunLuaError {
 }
 
 pub async fn run_lua(
+    root: &Path,
     expected_version: LuaVersion,
     binary_name: LuaBinary,
-    args: &[String],
+    args: &Vec<String>,
 ) -> Result<(), RunLuaError> {
     let lua_cmd = binary_name.to_string();
 
@@ -74,7 +75,12 @@ pub async fn run_lua(
         Err(_) => Err(RunLuaError::ParseLuaVersionError(lua_cmd.clone()))?,
     }
 
-    let status = match Command::new(&lua_cmd).args(args).status().await {
+    let status = match Command::new(&lua_cmd)
+        .current_dir(root)
+        .args(args)
+        .status()
+        .await
+    {
         Ok(status) => Ok(status),
         Err(err) => Err(RunLuaError::LuaCommandFailed {
             lua_cmd: lua_cmd.clone(),
