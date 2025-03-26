@@ -10,6 +10,7 @@ use std::io::Read;
 use std::path::Path;
 use thiserror::Error;
 
+use crate::build::utils::recursive_copy_dir;
 use crate::config::Config;
 use crate::hash::HasIntegrity;
 use crate::lockfile::RemotePackageSourceUrl;
@@ -234,19 +235,11 @@ async fn do_fetch_src<R: Rockspec>(
             }
         }
         RockSourceSpec::File(path) => {
-            if path.is_dir() {
+            let hash = if path.is_dir() {
                 progress.map(|p| p.set_message(format!("📋 Copying {}", path.display())));
-
-                for file in walkdir::WalkDir::new(path).into_iter().flatten() {
-                    if file.file_type().is_file() {
-                        let filepath = file.path();
-                        let relative_path = filepath.strip_prefix(path).unwrap();
-                        let target = dest_dir.join(relative_path);
-                        let parent = target.parent().unwrap();
-                        std::fs::create_dir_all(parent)?;
-                        std::fs::copy(filepath, target)?;
-                    }
-                }
+                recursive_copy_dir(&path.to_path_buf(), dest_dir)?;
+                progress.map(|p| p.finish_and_clear());
+                dest_dir.hash()?
             } else {
                 let mut file = File::open(path)?;
                 let mut buffer = Vec::new();
@@ -265,10 +258,11 @@ async fn do_fetch_src<R: Rockspec>(
                     dest_dir,
                     progress,
                 )
-                .await?
-            }
+                .await?;
+                path.hash()?
+            };
             RemotePackageSourceMetadata {
-                hash: path.hash()?,
+                hash,
                 source_url: RemotePackageSourceUrl::File { path: path.clone() },
             }
         }
