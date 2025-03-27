@@ -10,24 +10,84 @@ jobs:
   test:
     strategy:
       matrix:
-        os: ["ubuntu-24.04", "macos-14"] # TODO: add windows-2019?
-        lua-version: ["lua51", "lua52", "lua53", "lua54", "luajit"]
+        os: ["ubuntu-24.04", "macos-14", "windows-2019"]
+        lua: [
+          { version: "5.1", devShell: "lua51" },
+          { version: "5.2", devShell: "lua52" },
+          { version: "5.3", devShell: "lua53" },
+          { version: "5.4", devShell: "lua54" },
+          { version: "luajit-2.0", devShell: "luajit" }
+        ]
+        exclude:
+          - os: windows-2019
+            lua: { version: "5.1", devShell: "lua51" }
+          - os: windows-2019
+            lua: { version: "5.2", devShell: "lua52" }
+          - os: windows-2019
+            lua: { version: "5.3", devShell: "lua53" }
+          - os: windows-2019
+            lua: { version: "5.4", devShell: "lua54" }
       fail-fast: false
           
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: cachix/cachix-action@v16
-        with:
-          name: neorocks
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: Install neovim
         uses: rhysd/action-setup-vim@v1 # Used by the 'run' integration test
         with:
           neovim: true
-          version: v0.10.3
-      - name: Integration tests
-        run: | 
-          nix develop .#${{ matrix.lua-version }} --command cargo nextest run --test "*"
-        shell: bash
+          version: v0.11.0
+
+      # Linux/macOS
+      - name: Install Nix
+        if: runner.os != 'Windows'
+        uses: DeterminateSystems/nix-installer-action@main
+      - name: Setup cachix
+        if: runner.os != 'Windows'
+        uses: cachix/cachix-action@v16
+        with:
+          name: neorocks
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      - name: Run tests (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: nix develop .#${{ matrix.lua.devShell }} --command cargo nextest run --test "*"
+
+      # Windows
+      - name: Install C/C++ Compiler
+        if: runner.os == 'Windows'
+        uses: rlalik/setup-cpp-compiler@master
+        with:
+          compiler: clang-latest
+      - name: Install MSVC Compiler Toolchain
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Install Build dependencies
+        if: runner.os == 'Windows'
+        run: |
+          $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\ProgramData\chocolatey\bin"
+          [Environment]::SetEnvironmentVariable("Path", $env:PATH, "Machine")
+          choco install -y --no-progress openssl libgit2 gnupg gpg4win pkgconfiglite
+          echo "OPENSSL_DIR=C:\Program Files\OpenSSL" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Install Lua
+        uses: leafo/gh-actions-lua@master
+        if: runner.os == 'Windows'
+        with:
+          luaVersion: ${{ matrix.lua.version }}
+      - name: Install Rust Toolchain
+        if: runner.os == 'Windows'
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install cargo-nextest
+        if: runner.os == 'Windows'
+        uses: taiki-e/install-action@nextest
+        # Force mlua to use the bundled LuaJIT on Windows
+      - name: Set environment variables for LuaJIT (Windows)
+        if: runner.os == 'Windows' && matrix.lua.feature == 'luajit'
+        run: |
+          echo "MLUA_LUAJIT_DYNAMIC=0" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "MLUA_BUILD_EMBEDDED_LUA=1" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "MLUA_VENDORED=1" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: cargo nextest run --test "*"
+        env:
+          VCPKGRS_DYNAMIC: 1
