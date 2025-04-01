@@ -283,6 +283,7 @@ pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
                                 vec!["5.1", "5.2", "5.3", "5.4"]
                             )
                             .without_filtering()
+                            .with_vim_mode(true)
                             .with_help_message(
                                 "This is equivalent to the 'lua >= {version}' constraint."
                             )
