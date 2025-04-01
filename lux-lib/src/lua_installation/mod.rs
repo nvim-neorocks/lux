@@ -151,7 +151,9 @@ impl LuaInstallation {
                 .iter()
                 .map(|p| format!("-I{}", p.display()))
                 .chain(info.defines.iter().map(|(k, v)| match v {
-                    Some(val) => format!("-D{}={}", k, val),
+                    Some(val) => {
+                        format!("-D{}={}", k, val)
+                    }
                     None => format!("-D{}", k),
                 }))
                 .collect_vec()
@@ -160,28 +162,42 @@ impl LuaInstallation {
         }
     }
 
-    pub(crate) fn link_args(&self) -> Vec<String> {
+    pub(crate) fn link_args(&self, compiler: &cc::Tool) -> Vec<String> {
         if let Some(info) = &self.lib_info {
             info.link_paths
                 .iter()
-                .map(|p| format!("-L{}", p.display()))
-                .chain(info.libs.iter().map(|lib| format!("-l{}", lib)))
+                .map(|p| format_dir_link_arg(p, compiler))
+                .chain(
+                    info.libs
+                        .iter()
+                        .map(|lib| format_lib_link_arg(lib, compiler)),
+                )
                 .chain(info.ld_args.iter().map(|ld_arg_group| {
                     ld_arg_group
                         .iter()
-                        .map(|arg| format!("-Wl,{}", arg))
+                        .map(|arg| format_linker_arg(arg, compiler))
                         .collect::<Vec<_>>()
                         .join(" ")
                 }))
                 .collect_vec()
         } else {
-            let link_lua_arg = match self.version {
-                LuaVersion::LuaJIT => "-lluajit-5.1",
-                LuaVersion::LuaJIT52 => "-lluajit-5.2",
-                _ => "-llua",
+            let link_lua_arg = if compiler.is_like_msvc() {
+                match self.version {
+                    LuaVersion::LuaJIT | LuaVersion::LuaJIT52 => "luajit.lib",
+                    LuaVersion::Lua51 => "lua5.1.lib",
+                    LuaVersion::Lua52 => "lua5.2.lib",
+                    LuaVersion::Lua53 => "lua5.3.lib",
+                    LuaVersion::Lua54 => "lua5.4.lib",
+                }
+            } else {
+                match self.version {
+                    LuaVersion::LuaJIT => "-lluajit-5.1",
+                    LuaVersion::LuaJIT52 => "-lluajit-5.2",
+                    _ => "-llua",
+                }
             };
             vec![
-                format!("-L{}", self.lib_dir.display()),
+                format_dir_link_arg(&self.lib_dir, compiler),
                 link_lua_arg.to_string(),
             ]
         }
@@ -194,6 +210,30 @@ impl LuaInstallation {
             .bin
             .as_ref()
             .map(|bin| bin.clone().to_slash_lossy().to_string()))
+    }
+}
+
+fn format_dir_link_arg(dir: &Path, compiler: &cc::Tool) -> String {
+    if compiler.is_like_msvc() {
+        format!("/LIBPATH:{}", dir.display())
+    } else {
+        format!("-L{}", dir.display())
+    }
+}
+
+fn format_lib_link_arg(lib: &str, compiler: &cc::Tool) -> String {
+    if compiler.is_like_msvc() {
+        format!("{}.lib", lib)
+    } else {
+        format!("-l{}", lib)
+    }
+}
+
+fn format_linker_arg(arg: &str, compiler: &cc::Tool) -> String {
+    if compiler.is_like_msvc() {
+        format!("-Wl,{}", arg)
+    } else {
+        format!("/link {}", arg)
     }
 }
 

@@ -113,29 +113,66 @@ pub(crate) fn compile_c_files(
     let build = build
         .cargo_output(false)
         .cargo_metadata(false)
-        .cargo_debug(false)
         .cargo_warnings(false)
-        .debug(false)
+        .warnings(false)
+        .flag("-w") // Suppress all warnings
         .files(files)
         .host(std::env::consts::OS)
-        .opt_level(3)
+        .opt_level(2)
         .out_dir(intermediate_dir)
         .target(&host.to_string());
+
+    let is_msvc = build.try_get_compiler()?.is_like_msvc();
+    if is_msvc {
+        build.flag("/DLL");
+    } else {
+        build.shared_flag(true);
+    }
 
     for arg in lua.compile_args() {
         build.flag(&arg);
     }
 
-    let objects = build.try_compile_intermediates()?;
-    let output = build
-        .try_get_compiler()?
-        .to_command()
-        .args(["-shared", "-o"])
-        .arg(parent.join(file))
-        .arg(format!("-L{}", lua.lib_dir.to_string_lossy())) // TODO: In luarocks, this is behind a link_lua_explicitly config option Library directory
-        .args(lua.link_args())
-        .args(&objects)
-        .output()?;
+    let objects = build
+        .try_compile_intermediates()
+        .map_err(BuildError::CompileIntermediatesError)?;
+
+    let output_file = format!("{}", parent.join(file).display());
+    let (out_args, lib_args) = if is_msvc {
+        (
+            vec![
+                "/link".into(),
+                format!("/OUT:{}", output_file),
+                "/DLL".into(),
+            ],
+            format!("/LIBPATH:{}", lua.lib_dir.display()),
+        )
+    } else {
+        (
+            vec!["-shared".into(), "-o".into(), output_file],
+            format!("-L{}", lua.lib_dir.display()),
+        )
+    };
+
+    let output = if is_msvc {
+        build
+            .try_get_compiler()?
+            .to_command()
+            .args(&objects) // MSVC wants the objects first
+            .args(out_args)
+            .arg(lib_args)
+            .args(lua.link_args(&build.try_get_compiler()?))
+            .output()?
+    } else {
+        build
+            .try_get_compiler()?
+            .to_command()
+            .args(out_args)
+            .arg(lib_args)
+            .args(lua.link_args(&build.try_get_compiler()?)) // NOTE: In luarocks, this is behind a link_lua_explicitly config option Library directory
+            .args(&objects)
+            .output()?
+    };
     validate_output(output)?;
     Ok(())
 }
@@ -144,7 +181,7 @@ pub(crate) fn compile_c_files(
 
 /// the extension for Lua libraries.
 pub(crate) fn lua_lib_extension() -> &'static str {
-    if cfg!(target_os = "windows") {
+    if cfg!(target_env = "msvc") {
         "dll"
     } else {
         "so"
@@ -153,7 +190,7 @@ pub(crate) fn lua_lib_extension() -> &'static str {
 
 /// the extension for Lua objects.
 pub(crate) fn lua_obj_extension() -> &'static str {
-    if cfg!(target_os = "windows") {
+    if cfg!(target_env = "msvc") {
         "obj"
     } else {
         "o"
@@ -161,8 +198,8 @@ pub(crate) fn lua_obj_extension() -> &'static str {
 }
 
 pub(crate) fn default_cflags() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "/nologo /MD /O2"
+    if cfg!(target_env = "msvc") {
+        "/NOLOGO /MD /O2"
     } else {
         "-O2"
     }
@@ -171,8 +208,8 @@ pub(crate) fn default_cflags() -> &'static str {
 pub(crate) fn default_libflag() -> &'static str {
     if cfg!(target_os = "macos") {
         "-bundle -undefined dynamic_lookup -all_load"
-    } else if cfg!(target_os = "windows") {
-        "/nologo /dll"
+    } else if cfg!(target_env = "msvc") {
+        "/NOLOGO /DLL"
     } else {
         "-shared"
     }
@@ -216,16 +253,22 @@ pub(crate) fn compile_c_modules(
     let build = build
         .cargo_output(false)
         .cargo_metadata(false)
-        .cargo_debug(false)
         .cargo_warnings(false)
-        .debug(false)
+        .warnings(false)
+        .flag("-w") // Suppress all warnings
         .files(source_files)
         .host(std::env::consts::OS)
         .includes(&include_dirs)
-        .opt_level(3)
+        .opt_level(2)
         .out_dir(intermediate_dir)
-        .shared_flag(true)
         .target(&host.to_string());
+
+    let is_msvc = build.try_get_compiler()?.is_like_msvc();
+    if is_msvc {
+        build.flag("/DLL");
+    } else {
+        build.shared_flag(true);
+    }
 
     for arg in lua.compile_args() {
         build.flag(&arg);
@@ -244,29 +287,66 @@ pub(crate) fn compile_c_modules(
         )
     });
     // See https://github.com/rust-lang/cc-rs/issues/594#issuecomment-2110551057
-    let objects = build.try_compile_intermediates()?;
+    let objects = build
+        .try_compile_intermediates()
+        .map_err(BuildError::CompileIntermediatesError)?;
 
-    let libdir_args = data
-        .libdirs
-        .iter()
-        .map(|libdir| format!("-L{}", source_dir.join(libdir).to_str().unwrap()));
+    let libdir_args = data.libdirs.iter().map(|libdir| {
+        if is_msvc {
+            format!("/LIBPATH:{}", source_dir.join(libdir).display())
+        } else {
+            format!("-L{}", source_dir.join(libdir).display())
+        }
+    });
 
-    let library_args = data
-        .libraries
-        .iter()
-        .map(|library| format!("-l{}", library.to_str().unwrap()));
+    let library_args = data.libraries.iter().map(|library| {
+        if is_msvc {
+            format!("{}.lib", library.to_str().unwrap())
+        } else {
+            format!("-l{}", library.to_str().unwrap())
+        }
+    });
 
-    let output = build
-        .try_get_compiler()?
-        .to_command()
-        .args(["-shared", "-o"])
-        .arg(parent.join(file))
-        .arg(format!("-L{}", lua.lib_dir.to_string_lossy())) // TODO: In luarocks, this is behind a link_lua_explicitly config option Library directory
-        .args(lua.link_args())
-        .args(&objects)
-        .args(libdir_args)
-        .args(library_args)
-        .output()?;
+    let output_file = format!("{}", parent.join(file).display());
+    let (out_args, lib_args) = if is_msvc {
+        (
+            vec![
+                "/link".into(),
+                format!("/OUT:{}", output_file),
+                "/DLL".into(),
+            ],
+            format!("/LIBPATH:{}", lua.lib_dir.display()),
+        )
+    } else {
+        (
+            vec!["-shared".into(), "-o".into(), output_file],
+            format!("-L{}", lua.lib_dir.display()),
+        )
+    };
+
+    let output = if is_msvc {
+        build
+            .try_get_compiler()?
+            .to_command()
+            .args(&objects) // MSVC wants the objects first
+            .args(out_args)
+            .arg(lib_args)
+            .args(lua.link_args(&build.try_get_compiler()?))
+            .args(libdir_args)
+            .args(library_args)
+            .output()?
+    } else {
+        build
+            .try_get_compiler()?
+            .to_command()
+            .args(out_args)
+            .arg(lib_args)
+            .args(lua.link_args(&build.try_get_compiler()?)) // NOTE: In luarocks, this is behind a link_lua_explicitly config option Library directory
+            .args(&objects)
+            .args(libdir_args)
+            .args(library_args)
+            .output()?
+    };
     validate_output(output)?;
 
     Ok(())
