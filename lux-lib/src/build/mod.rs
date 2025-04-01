@@ -109,6 +109,8 @@ pub enum BuildError {
     ExternalDependencyError(#[from] ExternalDependencyError),
     #[error(transparent)]
     PatchError(#[from] PatchError),
+    #[error("failed to compile intermediates: {0}")]
+    CompileIntermediatesError(cc::Error),
     #[error("failed to compile build modules: {0}")]
     CompilationError(#[from] cc::Error),
     #[error(transparent)]
