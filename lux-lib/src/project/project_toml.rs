@@ -188,12 +188,6 @@ impl PartialProjectToml {
             return Err(LocalProjectTomlValidationError::DependenciesContainLua);
         }
 
-        let lua: LuaDependencySpec = PackageReq {
-            name: "lua".into(),
-            version_req: project_toml.lua.clone().unwrap_or(PackageVersionReq::any()),
-        }
-        .into();
-
         let get_duplicates = |dependencies: &Option<Vec<LuaDependencySpec>>| {
             dependencies
                 .iter()
@@ -250,14 +244,7 @@ impl PartialProjectToml {
             )?,
             // Merge dependencies internally with lua version
             // so the output of `dependencies()` is consistent
-            dependencies: PerPlatform::new(
-                project_toml
-                    .dependencies
-                    .unwrap_or_default()
-                    .into_iter()
-                    .chain(std::iter::once(lua))
-                    .collect(),
-            ),
+            dependencies: PerPlatform::new(project_toml.dependencies.unwrap_or_default()),
             build_dependencies: PerPlatform::new(
                 project_toml.build_dependencies.unwrap_or_default(),
             ),
@@ -881,6 +868,8 @@ impl UserData for RemoteProjectToml {
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
+
     use crate::{
         lua_rockspec::{PartialLuaRockspec, PerPlatform, RemoteLuaRockspec},
         project::ProjectRoot,
@@ -1248,8 +1237,13 @@ mod tests {
             expected_rockspec.supported_platforms()
         );
         assert_eq!(
+            // We filter out the lua dependency here, as it is not marked
+            // as a dependency in TOML-based rockspecs
             sorted_package_reqs(merged.dependencies()),
             sorted_package_reqs(expected_rockspec.dependencies())
+                .into_iter()
+                .filter(|dep| dep.name() != &"lua".into())
+                .collect_vec(),
         );
         assert_eq!(
             sorted_package_reqs(merged.build_dependencies()),
