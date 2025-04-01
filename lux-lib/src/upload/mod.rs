@@ -1,12 +1,11 @@
 use std::env;
-use std::io::Read;
 
 use crate::lua_rockspec::{GitSource, LocalRockSource, RemoteRockSource, RockSourceSpec};
 use crate::project::project_toml::RemoteProjectTomlValidationError;
 use crate::rockspec::Rockspec;
 use crate::TOOL_VERSION;
 use crate::{config::Config, project::Project};
-use gpgme::{Context, Data};
+
 use reqwest::{
     multipart::{Form, Part},
     Client,
@@ -15,6 +14,11 @@ use serde::Deserialize;
 use serde_enum_str::Serialize_enum_str;
 use thiserror::Error;
 use url::Url;
+
+#[cfg(not(target_env = "msvc"))]
+use gpgme::{Context, Data};
+#[cfg(not(target_env = "msvc"))]
+use std::io::Read;
 
 /// A rocks package uploader, providing fine-grained control
 /// over how a package should be uploaded.
@@ -105,6 +109,7 @@ pub enum UploadError {
     RockExists(Url),
     #[error("unable to read rockspec: {0}")]
     RockspecRead(#[from] std::io::Error),
+    #[cfg(not(target_env = "msvc"))]
     #[error("{0}.\nHINT: If you'd like to skip the signing step supply `--sign-protocol none` to the CLI")]
     Signature(#[from] gpgme::Error),
     ToolCheck(#[from] ToolCheckError),
@@ -157,23 +162,45 @@ impl ApiKey {
     }
 }
 
-#[derive(Serialize_enum_str, Default, Clone)]
+#[derive(Serialize_enum_str, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[cfg_attr(feature = "clap", clap(rename_all = "lowercase"))]
 #[serde(rename_all = "lowercase")]
 pub enum SignatureProtocol {
-    Assuan,
-    CMS,
-    #[default]
-    Default,
-    G13,
-    GPGConf,
     None,
+    #[cfg(not(target_env = "msvc"))]
+    Assuan,
+    #[cfg(not(target_env = "msvc"))]
+    CMS,
+    #[cfg(not(target_env = "msvc"))]
+    Default,
+    #[cfg(not(target_env = "msvc"))]
+    G13,
+    #[cfg(not(target_env = "msvc"))]
+    GPGConf,
+    #[cfg(not(target_env = "msvc"))]
     OpenPGP,
+    #[cfg(not(target_env = "msvc"))]
     Spawn,
+    #[cfg(not(target_env = "msvc"))]
     UIServer,
 }
 
+#[cfg(not(target_env = "msvc"))]
+impl Default for SignatureProtocol {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
+#[cfg(target_env = "msvc")]
+impl Default for SignatureProtocol {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+#[cfg(not(target_env = "msvc"))]
 impl From<SignatureProtocol> for gpgme::Protocol {
     fn from(val: SignatureProtocol) -> Self {
         match val {
@@ -193,7 +220,8 @@ impl From<SignatureProtocol> for gpgme::Protocol {
 async fn upload_from_project(
     project: &Project,
     api_key: &ApiKey,
-    protocol: SignatureProtocol,
+    #[cfg(target_env = "msvc")] _protocol: SignatureProtocol,
+    #[cfg(not(target_env = "msvc"))] protocol: SignatureProtocol,
     config: &Config,
 ) -> Result<(), UploadError> {
     let client = Client::builder().https_only(true).build()?;
@@ -220,6 +248,10 @@ async fn upload_from_project(
 
     let rockspec_content = rockspec.to_lua_rockspec_string();
 
+    #[cfg(target_env = "msvc")]
+    let signed: Option<String> = None;
+
+    #[cfg(not(target_env = "msvc"))]
     let signed = if let SignatureProtocol::None = protocol {
         None
     } else {
