@@ -77,10 +77,10 @@ async fn exec(run: Exec<'_>) -> Result<(), ExecError> {
         .unwrap_or(LuaVersion::from(run.config)?);
 
     let user_tree = run.config.tree(lua_version)?;
-    let mut paths = Paths::new(user_tree)?;
+    let mut paths = Paths::new(&user_tree)?;
 
     if let Some(project) = run.project {
-        paths.prepend(&Paths::new(project.tree(run.config)?)?);
+        paths.prepend(&Paths::new(&project.tree(run.config)?)?);
     }
 
     let status = match Command::new(run.command)

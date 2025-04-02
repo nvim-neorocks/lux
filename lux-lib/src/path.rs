@@ -33,7 +33,7 @@ impl Paths {
         }
     }
 
-    pub fn new(tree: Tree) -> io::Result<Self> {
+    pub fn new(tree: &Tree) -> io::Result<Self> {
         let mut paths = tree
             .list()?
             .into_iter()
@@ -43,7 +43,7 @@ impl Paths {
                     .map(|package| tree.installed_rock_layout(&package))
                     .collect_vec()
             })
-            .try_fold(Self::default(&tree), |mut paths, package| {
+            .try_fold(Self::default(tree), |mut paths, package| {
                 let package = package?;
                 paths.src.0.push(package.src.join("?.lua"));
                 paths.src.0.push(package.src.join("?").join("init.lua"));

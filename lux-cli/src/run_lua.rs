@@ -38,12 +38,20 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
     }
 
     let project = Project::current()?;
-    let (lua_version, root) = match &project {
+    let (lua_version, root, tree) = match &project {
         Some(prj) => (
             prj.toml().lua_version_matches(&config)?,
             prj.root().to_path_buf(),
+            prj.tree(&config)?,
         ),
-        None => (LuaVersion::from(&config)?, std::env::current_dir()?),
+        None => {
+            let version = LuaVersion::from(&config)?;
+            (
+                version.clone(),
+                std::env::current_dir()?,
+                config.tree(version)?,
+            )
+        }
     };
 
     if project.is_some() {
@@ -52,6 +60,7 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
 
     operations::run_lua(
         &root,
+        &tree,
         lua_version,
         lua_cmd,
         &run_lua.args.unwrap_or_default(),

@@ -133,8 +133,8 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
             .await?;
     }
     let test_tree_root = &test_tree.root().clone();
-    let mut paths = Paths::new(project_tree)?;
-    let test_tree_paths = Paths::new(test_tree)?;
+    let mut paths = Paths::new(&project_tree)?;
+    let test_tree_paths = Paths::new(&test_tree)?;
     paths.prepend(&test_tree_paths);
     let mut command = Command::new("busted");
     let mut command = command

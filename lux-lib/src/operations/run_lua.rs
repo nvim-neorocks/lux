@@ -7,7 +7,7 @@ use std::{fmt, io, path::Path};
 use thiserror::Error;
 use tokio::process::Command;
 
-use crate::{config::LuaVersion, lua_installation};
+use crate::{config::LuaVersion, lua_installation, path::Paths, tree::Tree};
 
 pub enum LuaBinary {
     /// The regular Lua interpreter.
@@ -51,15 +51,19 @@ pub enum RunLuaError {
         lua_cmd: String,
         exit_code: Option<i32>,
     },
+    #[error(transparent)]
+    Io(#[from] io::Error),
 }
 
 pub async fn run_lua(
     root: &Path,
+    tree: &Tree,
     expected_version: LuaVersion,
     binary_name: LuaBinary,
     args: &Vec<String>,
 ) -> Result<(), RunLuaError> {
     let lua_cmd = binary_name.to_string();
+    let paths = Paths::new(tree)?;
 
     match lua_installation::get_installed_lua_version(&lua_cmd)
         .and_then(|ver| Ok(LuaVersion::from_version(ver)?))
@@ -78,6 +82,9 @@ pub async fn run_lua(
     let status = match Command::new(&lua_cmd)
         .current_dir(root)
         .args(args)
+        .env("PATH", paths.path_prepended().joined())
+        .env("LUA_PATH", paths.package_path().joined())
+        .env("LUA_CPATH", paths.package_cpath().joined())
         .status()
         .await
     {

@@ -79,6 +79,7 @@ async fn run_with_local_lua(
 
     operations::run_lua(
         project.root(),
+        &project.tree(config)?,
         version,
         LuaBinary::Lua,
         &args.into_iter().cloned().collect(),
@@ -95,7 +96,7 @@ async fn run_with_command(
     config: &Config,
 ) -> Result<(), RunError> {
     let tree = project.tree(config)?;
-    let paths = Paths::new(tree)?;
+    let paths = Paths::new(&tree)?;
 
     match Command::new(command.deref())
         .args(args.into_iter().cloned().collect_vec())
