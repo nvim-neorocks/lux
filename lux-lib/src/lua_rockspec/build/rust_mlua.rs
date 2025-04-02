@@ -2,6 +2,8 @@ use std::{collections::HashMap, path::PathBuf};
 
 use mlua::UserData;
 
+use crate::merge::Merge;
+
 #[derive(Debug, PartialEq, Default, Clone)]
 pub struct RustMluaBuildSpec {
     /// Keys are module names in the format normally used by the `require()` function.
@@ -16,6 +18,18 @@ pub struct RustMluaBuildSpec {
     pub include: HashMap<PathBuf, PathBuf>,
     /// Pass additional features
     pub features: Vec<String>,
+}
+
+impl Merge for RustMluaBuildSpec {
+    fn merge(self, other: Self) -> Self {
+        Self {
+            modules: self.modules.into_iter().chain(other.modules).collect(),
+            target_path: other.target_path,
+            default_features: other.default_features,
+            include: self.include.into_iter().chain(other.include).collect(),
+            features: self.features.merge(other.features),
+        }
+    }
 }
 
 impl UserData for RustMluaBuildSpec {

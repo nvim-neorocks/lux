@@ -2,6 +2,8 @@ use std::{collections::HashMap, path::PathBuf};
 
 use mlua::UserData;
 
+use crate::merge::Merge;
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct MakeBuildSpec {
     /// Makefile to be used.
@@ -22,6 +24,29 @@ pub struct MakeBuildSpec {
     pub install_variables: HashMap<String, String>,
     /// Assignments to be passed to make during both passes
     pub variables: HashMap<String, String>,
+}
+
+impl Merge for MakeBuildSpec {
+    fn merge(self, other: Self) -> Self {
+        Self {
+            makefile: other.makefile,
+            build_target: other.build_target,
+            build_pass: other.build_pass,
+            install_target: other.install_target,
+            install_pass: other.install_pass,
+            build_variables: self
+                .build_variables
+                .into_iter()
+                .chain(other.build_variables)
+                .collect(),
+            install_variables: self
+                .install_variables
+                .into_iter()
+                .chain(other.install_variables)
+                .collect(),
+            variables: self.variables.into_iter().chain(other.variables).collect(),
+        }
+    }
 }
 
 impl UserData for MakeBuildSpec {

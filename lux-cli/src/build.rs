@@ -33,7 +33,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
 
     let dependencies = project_toml
         .dependencies()
-        .current_platform()
+        .for_target_platform(&config)
         .iter()
         .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
         .cloned()
@@ -41,7 +41,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
 
     let build_dependencies = project_toml
         .build_dependencies()
-        .current_platform()
+        .for_target_platform(&config)
         .iter()
         .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
         .cloned()

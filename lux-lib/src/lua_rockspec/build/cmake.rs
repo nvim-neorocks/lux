@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use mlua::UserData;
 
+use crate::merge::Merge;
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct CMakeBuildSpec {
     pub cmake_lists_content: Option<String>,
@@ -12,6 +14,17 @@ pub struct CMakeBuildSpec {
     /// Default is true.
     pub install_pass: bool,
     pub variables: HashMap<String, String>,
+}
+
+impl Merge for CMakeBuildSpec {
+    fn merge(self, other: Self) -> Self {
+        Self {
+            cmake_lists_content: other.cmake_lists_content.or(self.cmake_lists_content),
+            build_pass: other.build_pass,
+            install_pass: other.install_pass,
+            variables: self.variables.into_iter().chain(other.variables).collect(),
+        }
+    }
 }
 
 impl Default for CMakeBuildSpec {

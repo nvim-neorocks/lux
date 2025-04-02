@@ -666,6 +666,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        config::ConfigBuilder,
         lua_rockspec::RockSourceSpec,
         manifest::{Manifest, ManifestMetadata},
         package::PackageReq,
@@ -719,7 +720,7 @@ mod tests {
             .await
             .unwrap();
 
-        let strip_lua = |deps: &Vec<LuaDependencySpec>| -> Vec<LuaDependencySpec> {
+        let strip_lua = |deps: Vec<LuaDependencySpec>| -> Vec<LuaDependencySpec> {
             deps.iter()
                 .filter(|dep| dep.name() != &"lua".into())
                 .cloned()
@@ -730,22 +731,32 @@ mod tests {
         // written correctly)
         let project = Project::from(&project_root).unwrap().unwrap();
         let validated_toml = project.toml().into_remote().unwrap();
+
+        let config = ConfigBuilder::new().unwrap().build().unwrap();
         assert_eq!(
-            strip_lua(validated_toml.dependencies().current_platform()),
+            strip_lua(validated_toml.dependencies().for_target_platform(&config)),
             expected_dependencies
         );
         assert_eq!(
-            strip_lua(validated_toml.build_dependencies().current_platform()),
+            strip_lua(
+                validated_toml
+                    .build_dependencies()
+                    .for_target_platform(&config)
+            ),
             expected_dependencies
         );
         assert_eq!(
-            strip_lua(validated_toml.test_dependencies().current_platform()),
+            strip_lua(
+                validated_toml
+                    .test_dependencies()
+                    .for_target_platform(&config)
+            ),
             expected_dependencies
         );
         assert_eq!(
             validated_toml
                 .external_dependencies()
-                .current_platform()
+                .for_target_platform(&config)
                 .get("lib")
                 .unwrap(),
             &ExternalDependencySpec::Library("path.so".into())
@@ -797,8 +808,9 @@ mod tests {
 
         assert_eq!(rocks.package().to_string(), "custom-package");
         assert_eq!(rocks.version().to_string(), "2.0.0-1");
+        let config = ConfigBuilder::new().unwrap().build().unwrap();
         assert!(
-            matches!(&rocks.source().current_platform().source_spec, RockSourceSpec::Url(url) if url == &Url::parse("https://github.com/custom/url").unwrap())
+            matches!(&rocks.source().for_target_platform(&config).source_spec, RockSourceSpec::Url(url) if url == &Url::parse("https://github.com/custom/url").unwrap())
         );
     }
 

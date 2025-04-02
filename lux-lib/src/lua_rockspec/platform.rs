@@ -11,6 +11,8 @@ use serde::{
 };
 use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
 
+use crate::{config::Config, merge::Merge};
+
 use super::{DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue};
 
 /// Identifier by a platform.
@@ -60,25 +62,58 @@ impl FromLua for PlatformIdentifier {
     }
 }
 
-/// Retrieves the target compilation platform and returns it as an identifier.
-pub fn get_platform() -> PlatformIdentifier {
-    if cfg!(target_os = "linux") {
-        PlatformIdentifier::Linux
-    } else if cfg!(target_os = "macos") {
-        PlatformIdentifier::MacOSX
-    } else if cfg!(target_os = "freebsd") {
-        PlatformIdentifier::FreeBSD
-    } else if which::which("cygpath").is_ok() {
-        PlatformIdentifier::Cygwin
-    } else if cfg!(unix) {
-        PlatformIdentifier::Unix
-    } else if cfg!(all(target_os = "windows", target_arch = "x86")) {
-        PlatformIdentifier::Win32
-    } else if cfg!(windows) {
-        PlatformIdentifier::Windows
+/// Maps a compiler tool to a list of compatible platform identifiers.
+///
+/// This function analyzes the properties of the provided compiler tool
+/// and returns a vector of `PlatformIdentifier` values that match the tool's characteristics.
+pub(crate) fn target_identifiers(tool: &cc::Tool) -> Vec<PlatformIdentifier> {
+    let mut identifiers = Vec::new();
+
+    if tool.is_like_msvc() {
+        // There's no 32 bit version of Windows 11, so let's assume 64 bit support for Windows.
+        // If someone wants to use 32 bit Windows, they'll have to use luarocks.
+        identifiers.push(PlatformIdentifier::Win32);
+        identifiers.push(PlatformIdentifier::Windows);
     } else {
-        panic!("Could not determine the platform.")
+        identifiers.push(PlatformIdentifier::Unix);
     }
+
+    // NOTE: We currently don't support cross-compilation, so we deduce more specific
+    // platorm identifiers from the host platform.
+    if cfg!(target_os = "linux") {
+        identifiers.push(PlatformIdentifier::Linux);
+    } else if cfg!(target_os = "macos") || cfg!(target_vendor = "apple") {
+        identifiers.push(PlatformIdentifier::MacOSX);
+    } else if cfg!(target_os = "freebsd") {
+        identifiers.push(PlatformIdentifier::FreeBSD);
+    } else if which::which("cygpath").is_ok() {
+        identifiers.push(PlatformIdentifier::Cygwin);
+    }
+
+    identifiers
+}
+
+/// Retrieves the platform identifiers and for the platform lux was built with.
+/// WARNING: This is only to be used as a fallback in case no `cc::Tool` is available
+/// for use with `target_identifiers`.
+pub(crate) fn lux_fallback_identifiers() -> Vec<PlatformIdentifier> {
+    let mut identifiers = Vec::new();
+    if cfg!(target_os = "windows") && which::which("cygpath").is_err() {
+        identifiers.push(PlatformIdentifier::Win32);
+        identifiers.push(PlatformIdentifier::Windows);
+    } else {
+        identifiers.push(PlatformIdentifier::Unix);
+    }
+    if cfg!(target_os = "linux") {
+        identifiers.push(PlatformIdentifier::Linux);
+    } else if cfg!(target_os = "macos") || cfg!(target_vendor = "apple") {
+        identifiers.push(PlatformIdentifier::MacOSX);
+    } else if cfg!(target_os = "freebsd") {
+        identifiers.push(PlatformIdentifier::FreeBSD);
+    } else if which::which("cygpath").is_ok() {
+        identifiers.push(PlatformIdentifier::Cygwin);
+    }
+    identifiers
 }
 
 impl PlatformIdentifier {
@@ -130,9 +165,6 @@ impl UserData for PlatformSupport {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("is_supported", |_, this, platform: PlatformIdentifier| {
             Ok(this.is_supported(&platform))
-        });
-        methods.add_method("is_current_platform_supported", |_, this, _: ()| {
-            Ok(this.is_current_platform_supported())
         });
     }
 }
@@ -261,10 +293,6 @@ impl PlatformSupport {
         self.platform_map.get(platform).cloned().unwrap_or(false)
     }
 
-    pub fn is_current_platform_supported(&self) -> bool {
-        self.is_supported(&get_platform())
-    }
-
     pub(crate) fn platforms(&self) -> &HashMap<PlatformIdentifier, bool> {
         &self.platform_map
     }
@@ -295,9 +323,9 @@ pub trait FromPlatformOverridable<T: PlatformOverridable, G: FromPlatformOverrid
 #[derive(Clone, Debug, PartialEq)]
 pub struct PerPlatform<T> {
     /// The base data, applicable if no platform is specified
-    pub default: T,
+    pub(crate) default: T,
     /// The per-platform override, if present.
-    pub per_platform: HashMap<PlatformIdentifier, T>,
+    pub(crate) per_platform: HashMap<PlatformIdentifier, T>,
 }
 
 impl<T> PerPlatform<T> {
@@ -321,10 +349,6 @@ impl<T> PerPlatform<T> {
                 .and_then(|identifier| self.per_platform.get(&identifier))
                 .unwrap_or(&self.default),
         )
-    }
-
-    pub fn current_platform(&self) -> &T {
-        self.get(&get_platform())
     }
 
     pub fn map<U, F>(self, cb: F) -> PerPlatform<U>
@@ -354,6 +378,29 @@ impl<T> PerPlatform<T> {
                 .map(|(identifier, value)| Ok((identifier, cb(value)?)))
                 .try_collect()?,
         })
+    }
+}
+
+impl<T> PerPlatform<T>
+where
+    T: Merge + Clone,
+{
+    /// Merge per-platform overrides for the configured build target platform,
+    /// with more specific platform overrides having higher priority.
+    pub fn for_target_platform(&self, config: &Config) -> T {
+        self.for_platform_identifiers(config.target_platforms())
+    }
+
+    fn for_platform_identifiers(&self, identifiers: &[PlatformIdentifier]) -> T {
+        let mut merged = self.default.clone();
+        for platform_value in identifiers
+            .iter()
+            .sorted_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+            .filter_map(|key| self.per_platform.get(key))
+        {
+            merged = merged.merge(platform_value.clone());
+        }
+        merged
     }
 }
 
@@ -456,9 +503,10 @@ where
     T: IntoLuaMulti + Clone,
 {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("current_platform", |_, this, _: ()| {
-            Ok(this.current_platform().clone())
-        });
+        // TODO(mrcjkb): YAGNI?
+        // methods.add_method("current_platform", |_, this, _: ()| {
+        //     Ok(this.for_target_platform().clone())
+        // });
         methods.add_method("get", |_, this, platform: PlatformIdentifier| {
             Ok(this.get(&platform).clone())
         });
@@ -572,6 +620,7 @@ mod tests {
 
     use super::*;
     use proptest::prelude::*;
+    use target_lexicon::Triple;
 
     fn platform_identifier_strategy() -> impl Strategy<Value = PlatformIdentifier> {
         prop_oneof![
@@ -643,6 +692,40 @@ mod tests {
         assert_eq!(*foo.get(&PlatformIdentifier::Windows), "default");
     }
 
+    #[tokio::test]
+    async fn test_target_identifiers() {
+        #[cfg(target_os = "linux")]
+        let expected = vec![PlatformIdentifier::Unix, PlatformIdentifier::Linux];
+        #[cfg(target_os = "macos")]
+        let expected = vec![PlatformIdentifier::Unix, PlatformIdentifier::MacOSX];
+        #[cfg(target_env = "msvc")]
+        let expected = vec![PlatformIdentifier::Win32, PlatformIdentifier::Windows];
+
+        let host = Triple::host();
+        let tool = cc::Build::new()
+            .cargo_output(false)
+            .cargo_metadata(false)
+            .cargo_debug(false)
+            .cargo_warnings(false)
+            .debug(false)
+            .opt_level(3)
+            .host(std::env::consts::OS)
+            .target(&host.to_string())
+            .try_get_compiler()
+            .unwrap();
+        assert_eq!(expected, target_identifiers(&tool));
+    }
+
+    #[tokio::test]
+    async fn test_lux_fallback_identifiers() {
+        #[cfg(target_os = "linux")]
+        let expected = vec![PlatformIdentifier::Unix, PlatformIdentifier::Linux];
+        #[cfg(target_os = "macos")]
+        let expected = vec![PlatformIdentifier::Unix, PlatformIdentifier::MacOSX];
+        #[cfg(target_env = "msvc")]
+        let expected = vec![PlatformIdentifier::Win32, PlatformIdentifier::Windows];
+        assert_eq!(expected, lux_fallback_identifiers());
+    }
     proptest! {
         #[test]
         fn supported_platforms(identifier in platform_identifier_strategy()) {

@@ -47,8 +47,8 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
     // Ensure all dependencies are installed first
     let dependencies = rockspec
         .dependencies()
-        .current_platform()
-        .iter()
+        .for_target_platform(&config)
+        .into_iter()
         .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
         .collect_vec();
 

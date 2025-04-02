@@ -8,6 +8,7 @@ use crate::lua_rockspec::LocalRockSource;
 use crate::lua_rockspec::LuaRockspecError;
 use crate::lua_rockspec::RemoteLuaRockspec;
 use crate::lua_rockspec::RockSourceSpec;
+use crate::merge::Merge;
 use crate::operations::RunCommand;
 use crate::package::PackageNameList;
 use crate::rockspec::lua_dependency::LuaDependencySpec;
@@ -458,6 +459,15 @@ pub struct RunSpec {
     pub(crate) args: Option<NonEmpty<String>>,
 }
 
+impl Merge for RunSpec {
+    fn merge(self, other: Self) -> Self {
+        Self {
+            command: other.command.or(self.command),
+            args: self.args.merge(other.args),
+        }
+    }
+}
+
 /// The `lux.toml` file, after being properly deserialized.
 /// This struct may be used to build a local version of a project.
 /// To build a rockspec, use `RemoteProjectToml`.
@@ -871,6 +881,7 @@ mod tests {
     use itertools::Itertools;
 
     use crate::{
+        config::ConfigBuilder,
         lua_rockspec::{PartialLuaRockspec, PerPlatform, RemoteLuaRockspec},
         project::ProjectRoot,
         rockspec::{lua_dependency::LuaDependencySpec, Rockspec},
@@ -1072,8 +1083,9 @@ mod tests {
             .to_lua_rockspec()
             .unwrap();
 
+        let config = ConfigBuilder::new().unwrap().build().unwrap();
         let sorted_package_reqs = |v: &PerPlatform<Vec<LuaDependencySpec>>| {
-            let mut v = v.current_platform().clone();
+            let mut v = v.for_target_platform(&config).clone();
             v.sort_by(|a, b| a.name().cmp(b.name()));
             v
         };
@@ -1223,8 +1235,9 @@ mod tests {
 
         let merged = project_toml.merge(partial_rockspec).into_remote().unwrap();
 
+        let config = ConfigBuilder::new().unwrap().build().unwrap();
         let sorted_package_reqs = |v: &PerPlatform<Vec<LuaDependencySpec>>| {
-            let mut v = v.current_platform().clone();
+            let mut v = v.for_target_platform(&config).clone();
             v.sort_by(|a, b| a.name().cmp(b.name()));
             v
         };

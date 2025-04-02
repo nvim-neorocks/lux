@@ -6,6 +6,8 @@ use ssri::Integrity;
 use std::{convert::Infallible, fs, io, ops::Deref, path::PathBuf, str::FromStr};
 use thiserror::Error;
 
+use crate::merge::Merge;
+
 use super::{
     DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue, FromPlatformOverridable, PartialOverride,
     PerPlatform, PerPlatformWrapper, PlatformOverridable,
@@ -18,10 +20,29 @@ pub struct LocalRockSource {
     pub unpack_dir: Option<PathBuf>,
 }
 
+impl Merge for LocalRockSource {
+    fn merge(self, other: Self) -> Self {
+        Self {
+            integrity: other.integrity.or(self.integrity),
+            archive_name: other.archive_name.or(self.archive_name),
+            unpack_dir: other.unpack_dir.or(self.unpack_dir),
+        }
+    }
+}
+
 #[derive(Deserialize, Clone, Debug, PartialEq)]
 pub struct RemoteRockSource {
     pub(crate) local: LocalRockSource,
     pub source_spec: RockSourceSpec,
+}
+
+impl Merge for RemoteRockSource {
+    fn merge(self, other: Self) -> Self {
+        Self {
+            local: self.local.merge(other.local),
+            source_spec: other.source_spec,
+        }
+    }
 }
 
 impl UserData for RemoteRockSource {

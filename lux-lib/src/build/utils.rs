@@ -116,7 +116,7 @@ pub(crate) fn compile_c_files(
 
     let objects = build.try_compile_intermediates()?;
     let output = build
-        .get_compiler()
+        .try_get_compiler()?
         .to_command()
         .args(["-shared", "-o"])
         .arg(parent.join(file))
@@ -245,7 +245,7 @@ pub(crate) fn compile_c_modules(
         .map(|library| format!("-l{}", library.to_str().unwrap()));
 
     let output = build
-        .get_compiler()
+        .try_get_compiler()?
         .to_command()
         .args(["-shared", "-o"])
         .arg(parent.join(file))

@@ -6,6 +6,8 @@ use thiserror::Error;
 
 use serde::{Deserialize, Deserializer};
 
+use crate::merge::Merge;
+
 use super::{
     DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue, FromPlatformOverridable, PartialOverride,
     PerPlatform, PerPlatformWrapper, PlatformOverridable,
@@ -17,6 +19,17 @@ pub enum TestSpec {
     Busted(BustedTestSpec),
     Command(CommandTestSpec),
     Script(ScriptTestSpec),
+}
+
+impl Merge for TestSpec {
+    fn merge(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Busted(a), Self::Busted(b)) => Self::Busted(a.merge(b)),
+            (Self::Command(a), Self::Command(b)) => Self::Command(a.merge(b)),
+            (Self::Script(a), Self::Script(b)) => Self::Script(a.merge(b)),
+            (_, b) => b,
+        }
+    }
 }
 
 impl Default for TestSpec {
@@ -99,6 +112,14 @@ pub struct BustedTestSpec {
     flags: Vec<String>,
 }
 
+impl Merge for BustedTestSpec {
+    fn merge(self, other: Self) -> Self {
+        Self {
+            flags: self.flags.merge(other.flags),
+        }
+    }
+}
+
 impl UserData for BustedTestSpec {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("flags", |_, this, _: ()| Ok(this.flags.clone()));
@@ -109,6 +130,15 @@ impl UserData for BustedTestSpec {
 pub struct CommandTestSpec {
     command: String,
     flags: Vec<String>,
+}
+
+impl Merge for CommandTestSpec {
+    fn merge(self, other: Self) -> Self {
+        Self {
+            command: other.command,
+            flags: self.flags.merge(other.flags),
+        }
+    }
 }
 
 impl UserData for CommandTestSpec {
@@ -122,6 +152,15 @@ impl UserData for CommandTestSpec {
 pub struct ScriptTestSpec {
     script: PathBuf,
     flags: Vec<String>,
+}
+
+impl Merge for ScriptTestSpec {
+    fn merge(self, other: Self) -> Self {
+        Self {
+            script: other.script,
+            flags: self.flags.merge(other.flags),
+        }
+    }
 }
 
 impl UserData for ScriptTestSpec {

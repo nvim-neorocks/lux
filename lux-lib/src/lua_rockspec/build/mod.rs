@@ -33,6 +33,7 @@ use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 use crate::{
     config::Config,
     lua_installation::LuaInstallation,
+    merge::Merge,
     progress::{Progress, ProgressBar},
     tree::RockLayout,
 };
@@ -60,6 +61,17 @@ pub struct BuildSpec {
     // NOTE: This cannot be a diffy::Patch<'a, str>
     // because Lua::from_value requires a DeserializeOwned
     pub patches: HashMap<PathBuf, String>,
+}
+
+impl Merge for BuildSpec {
+    fn merge(self, other: Self) -> Self {
+        Self {
+            build_backend: self.build_backend.merge(other.build_backend),
+            install: self.install.merge(other.install),
+            copy_directories: self.copy_directories.merge(other.copy_directories),
+            patches: self.patches.into_iter().chain(other.patches).collect(),
+        }
+    }
 }
 
 impl UserData for BuildSpec {
@@ -264,6 +276,22 @@ pub enum BuildBackendSpec {
     TreesitterParser(TreesitterParserBuildSpec),
 }
 
+impl Merge for BuildBackendSpec {
+    fn merge(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Builtin(a), Self::Builtin(b)) => Self::Builtin(a.merge(b)),
+            (Self::Make(a), Self::Make(b)) => Self::Make(a.merge(b)),
+            (Self::CMake(a), Self::CMake(b)) => Self::CMake(a.merge(b)),
+            (Self::RustMlua(a), Self::RustMlua(b)) => Self::RustMlua(a.merge(b)),
+            (Self::TreesitterParser(a), Self::TreesitterParser(b)) => {
+                Self::TreesitterParser(a.merge(b))
+            }
+            // CommandBuildSpec and String don't implement Merge
+            (_, other) => other,
+        }
+    }
+}
+
 impl IntoLua for BuildBackendSpec {
     fn into_lua(self, lua: &Lua) -> mlua::Result<Value> {
         match self {
@@ -319,6 +347,17 @@ pub struct InstallSpec {
     // path component, such that targets like `my.binary` are not allowed.
     #[serde(default)]
     pub bin: HashMap<String, PathBuf>,
+}
+
+impl Merge for InstallSpec {
+    fn merge(self, other: Self) -> Self {
+        Self {
+            lua: self.lua.into_iter().chain(other.lua).collect(),
+            lib: self.lib.into_iter().chain(other.lib).collect(),
+            conf: self.conf.into_iter().chain(other.conf).collect(),
+            bin: self.bin.into_iter().chain(other.bin).collect(),
+        }
+    }
 }
 
 impl UserData for InstallSpec {

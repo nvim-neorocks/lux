@@ -105,8 +105,11 @@ impl<'a> BinaryRockInstall<'a> {
                 rockspec.version()
             ))
         });
-        for (name, dep) in rockspec.external_dependencies().current_platform() {
-            let _ = ExternalDependencyInfo::detect(name, dep, self.config.external_deps())?;
+        for (name, dep) in rockspec
+            .external_dependencies()
+            .for_target_platform(self.config)
+        {
+            let _ = ExternalDependencyInfo::detect(&name, &dep, self.config.external_deps())?;
         }
 
         let lua_version = rockspec.lua_version_matches(self.config)?;
@@ -126,7 +129,7 @@ impl<'a> BinaryRockInstall<'a> {
         let mut package = LocalPackage::from(
             &PackageSpec::new(rockspec.package().clone(), rockspec.version().clone()),
             self.constraint,
-            rockspec.binaries(),
+            rockspec.binaries(self.config),
             self.source,
             source_url,
             hashes,
