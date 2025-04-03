@@ -2,8 +2,6 @@ use std::{collections::HashMap, path::PathBuf};
 
 use mlua::UserData;
 
-use crate::merge::Merge;
-
 #[derive(Debug, PartialEq, Default, Clone)]
 pub struct TreesitterParserBuildSpec {
     /// Name of the parser language, e.g. "haskell"
@@ -21,18 +19,6 @@ pub struct TreesitterParserBuildSpec {
 
     /// Embedded queries to be installed in the `etc/queries` directory
     pub queries: HashMap<PathBuf, String>,
-}
-
-impl Merge for TreesitterParserBuildSpec {
-    fn merge(self, other: Self) -> Self {
-        Self {
-            lang: other.lang,
-            parser: other.parser,
-            generate: other.generate,
-            location: other.location.or(self.location),
-            queries: self.queries.into_iter().chain(other.queries).collect(),
-        }
-    }
 }
 
 impl UserData for TreesitterParserBuildSpec {

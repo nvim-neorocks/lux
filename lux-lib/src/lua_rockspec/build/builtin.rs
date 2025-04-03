@@ -10,7 +10,6 @@ use crate::{
         deserialize_vec_from_lua, DisplayAsLuaValue, FromPlatformOverridable, PartialOverride,
         PerPlatform, PlatformOverridable,
     },
-    merge::Merge,
 };
 
 use super::{DisplayLuaKV, DisplayLuaValue};
@@ -19,14 +18,6 @@ use super::{DisplayLuaKV, DisplayLuaValue};
 pub struct BuiltinBuildSpec {
     /// Keys are module names in the format normally used by the `require()` function
     pub modules: HashMap<LuaModule, ModuleSpec>,
-}
-
-impl Merge for BuiltinBuildSpec {
-    fn merge(self, other: Self) -> Self {
-        Self {
-            modules: self.modules.into_iter().chain(other.modules).collect(),
-        }
-    }
 }
 
 impl IntoLua for BuiltinBuildSpec {

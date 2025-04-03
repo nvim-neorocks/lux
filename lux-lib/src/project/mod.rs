@@ -720,7 +720,7 @@ mod tests {
             .await
             .unwrap();
 
-        let strip_lua = |deps: Vec<LuaDependencySpec>| -> Vec<LuaDependencySpec> {
+        let strip_lua = |deps: &Vec<LuaDependencySpec>| -> Vec<LuaDependencySpec> {
             deps.iter()
                 .filter(|dep| dep.name() != &"lua".into())
                 .cloned()

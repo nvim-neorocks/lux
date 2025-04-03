@@ -6,12 +6,11 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::{
     collections::HashMap, env, fmt::Display, io, path::PathBuf, str::FromStr, time::Duration,
 };
-use target_lexicon::Triple;
 use thiserror::Error;
 use tree::RockLayoutConfig;
 use url::Url;
 
-use crate::lua_rockspec::{self, PlatformIdentifier};
+use crate::lua_rockspec::PlatformIdentifier;
 use crate::rockspec::LuaVersionCompatibility;
 use crate::tree::Tree;
 use crate::{
@@ -189,8 +188,8 @@ pub struct Config {
     cache_dir: PathBuf,
     data_dir: PathBuf,
 
-    /// The identifiers for the target platforms, auto-detected.
-    target_platforms: Vec<PlatformIdentifier>,
+    /// The identifier for the target platform, auto-detected.
+    target_platform: PlatformIdentifier,
 }
 
 impl Config {
@@ -315,8 +314,8 @@ impl Config {
         &self.data_dir
     }
 
-    pub fn target_platforms(&self) -> &Vec<PlatformIdentifier> {
-        &self.target_platforms
+    pub fn target_platform(&self) -> &PlatformIdentifier {
+        &self.target_platform
     }
 }
 
@@ -377,9 +376,9 @@ pub struct ConfigBuilder {
     entrypoint_layout: RockLayoutConfig,
 
     /// The identifiers for the target platforms, auto-detected.
-    #[serde(skip)]
+    #[serde(skip, default)]
     // We may want to make this configurable someday, so users can add esoteric platform identifiers
-    target_platforms: Vec<PlatformIdentifier>,
+    target_platform: PlatformIdentifier,
 }
 
 impl ConfigBuilder {
@@ -387,27 +386,11 @@ impl ConfigBuilder {
     /// if present, or otherwise by instantiating the default config.
     pub fn new() -> Result<Self, ConfigError> {
         let config_file = Self::config_file()?;
-        let mut builder = if config_file.is_file() {
-            toml::from_str(&std::fs::read_to_string(&config_file)?)?
+        if config_file.is_file() {
+            Ok(toml::from_str(&std::fs::read_to_string(&config_file)?)?)
         } else {
-            Self::default()
-        };
-        let host = Triple::host();
-        builder.target_platforms = match cc::Build::new()
-            .cargo_output(false)
-            .cargo_metadata(false)
-            .cargo_debug(false)
-            .cargo_warnings(false)
-            .debug(false)
-            .opt_level(3)
-            .host(std::env::consts::OS)
-            .target(&host.to_string())
-            .try_get_compiler()
-        {
-            Ok(tool) => lua_rockspec::target_identifiers(&tool),
-            Err(_) => lua_rockspec::lux_fallback_identifiers(),
-        };
-        Ok(builder)
+            Ok(Self::default())
+        }
     }
 
     /// Get the path to the lux config file.
@@ -541,7 +524,7 @@ impl ConfigBuilder {
             entrypoint_layout: self.entrypoint_layout,
             cache_dir,
             data_dir,
-            target_platforms: self.target_platforms,
+            target_platform: self.target_platform,
         })
     }
 }
@@ -567,7 +550,7 @@ impl From<Config> for ConfigBuilder {
             data_dir: Some(value.data_dir),
             external_deps: value.external_deps,
             entrypoint_layout: value.entrypoint_layout,
-            target_platforms: value.target_platforms,
+            target_platform: value.target_platform,
         }
     }
 }

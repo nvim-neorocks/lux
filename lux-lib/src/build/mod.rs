@@ -296,7 +296,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
         .external_dependencies()
         .for_target_platform(build.config)
     {
-        let _ = ExternalDependencyInfo::detect(&name, &dep, build.config.external_deps())?;
+        let _ = ExternalDependencyInfo::detect(name, dep, build.config.external_deps())?;
     }
 
     let lua_version = rockspec.lua_version_matches(build.config)?;

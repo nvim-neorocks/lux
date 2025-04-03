@@ -109,7 +109,7 @@ impl<'a> BinaryRockInstall<'a> {
             .external_dependencies()
             .for_target_platform(self.config)
         {
-            let _ = ExternalDependencyInfo::detect(&name, &dep, self.config.external_deps())?;
+            let _ = ExternalDependencyInfo::detect(name, dep, self.config.external_deps())?;
         }
 
         let lua_version = rockspec.lua_version_matches(self.config)?;

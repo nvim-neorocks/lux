@@ -4,8 +4,6 @@ use mlua::IntoLua;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::merge::Merge;
-
 use super::{
     DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue, PartialOverride, PerPlatform,
     PlatformOverridable,
@@ -18,12 +16,6 @@ pub enum ExternalDependencySpec {
     Header(PathBuf),
     /// A library file, e.g. "libfoo.so"
     Library(PathBuf),
-}
-
-impl Merge for ExternalDependencySpec {
-    fn merge(self, other: Self) -> Self {
-        other
-    }
 }
 
 impl IntoLua for ExternalDependencySpec {

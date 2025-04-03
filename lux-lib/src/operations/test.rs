@@ -220,7 +220,7 @@ async fn ensure_dependencies(
     let test_dependencies = rockspec
         .test_dependencies()
         .for_target_platform(config)
-        .into_iter()
+        .iter()
         .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
         .filter_map(|dep| {
             let build_behaviour = if test_tree
@@ -251,7 +251,7 @@ async fn ensure_dependencies(
     let dependencies = rockspec
         .dependencies()
         .for_target_platform(config)
-        .into_iter()
+        .iter()
         .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
         .filter_map(|dep| {
             let build_behaviour = if project_tree

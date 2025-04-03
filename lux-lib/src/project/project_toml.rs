@@ -8,7 +8,6 @@ use crate::lua_rockspec::LocalRockSource;
 use crate::lua_rockspec::LuaRockspecError;
 use crate::lua_rockspec::RemoteLuaRockspec;
 use crate::lua_rockspec::RockSourceSpec;
-use crate::merge::Merge;
 use crate::operations::RunCommand;
 use crate::package::PackageNameList;
 use crate::rockspec::lua_dependency::LuaDependencySpec;
@@ -457,15 +456,6 @@ pub struct RunSpec {
     pub(crate) command: Option<RunCommand>,
     /// Arguments to pass to the command
     pub(crate) args: Option<NonEmpty<String>>,
-}
-
-impl Merge for RunSpec {
-    fn merge(self, other: Self) -> Self {
-        Self {
-            command: other.command.or(self.command),
-            args: self.args.merge(other.args),
-        }
-    }
 }
 
 /// The `lux.toml` file, after being properly deserialized.
