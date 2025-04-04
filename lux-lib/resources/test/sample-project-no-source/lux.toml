@@ -6,7 +6,7 @@ lua = ">=5.1"
 summary = "A luxurious package manager for Lua"
 maintainer = "vhyrro"
 license = "MIT"
-labels = [ "luarocks", "package-manager" ]
+labels = ["luarocks", "package-manager"]
 
 [dependencies]
 # Add your dependencies here

@@ -127,7 +127,7 @@ pub async fn run(
     let run_spec = toml
         .run()
         .ok_or(RunError::NoRunField)?
-        .current_platform()
+        .for_target_platform(config)
         .clone();
 
     let mut args = run_spec.args.unwrap_or_default();

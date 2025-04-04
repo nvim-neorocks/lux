@@ -4,30 +4,37 @@ on:
     branches:
       - master
 
-name: Integration tests
+name: Integration tests (Linux/MacOS)
 
 jobs:
   test:
     strategy:
       matrix:
-        os: ["ubuntu-24.04", "macos-14"] # TODO: add windows-2019?
-        lua-version: ["lua51", "lua52", "lua53", "lua54", "luajit"]
+        os: ["ubuntu-24.04", "macos-14"]
+        lua: [
+          { version: "5.1", feature: "lua51" },
+          { version: "5.2", feature: "lua52" },
+          { version: "5.3", feature: "lua53" },
+          { version: "5.4", feature: "lua54" },
+          { version: "luajit-2.1", feature: "luajit" }
+        ]
       fail-fast: false
           
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: cachix/cachix-action@v16
-        with:
-          name: neorocks
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: Install neovim
         uses: rhysd/action-setup-vim@v1 # Used by the 'run' integration test
         with:
           neovim: true
-          version: v0.10.3
-      - name: Integration tests
-        run: | 
-          nix develop .#${{ matrix.lua-version }} --command cargo nextest run --test "*"
-        shell: bash
+          version: v0.11.0
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+      - name: Setup cachix
+        uses: cachix/cachix-action@v16
+        with:
+          name: neorocks
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      - name: Run tests (Linux/macOS)
+        run: nix develop .#${{ matrix.lua.feature }} --command cargo nextest run --test "*"

@@ -555,6 +555,7 @@ mod tests {
 
     use std::path::PathBuf;
 
+    use crate::config::ConfigBuilder;
     use crate::lua_rockspec::PlatformIdentifier;
     use crate::package::PackageSpec;
 
@@ -1381,7 +1382,8 @@ build = {
 }
 ";
         let rockspec = RemoteLuaRockspec::new(rockspec_content).unwrap();
-        let build_spec = rockspec.local.build.current_platform();
+        let config = ConfigBuilder::new().unwrap().build().unwrap();
+        let build_spec = rockspec.local.build.for_target_platform(&config);
         assert!(matches!(
             build_spec.build_backend,
             Some(BuildBackendSpec::Builtin { .. })
@@ -1413,6 +1415,32 @@ build = {
                 }))
             );
         }
+        if let Some(BuildBackendSpec::Builtin(BuiltinBuildSpec { modules })) = &rockspec
+            .local
+            .build
+            .get(&PlatformIdentifier::Windows)
+            .build_backend
+        {
+            if let ModuleSpec::ModulePaths(paths) = modules
+                .get(&LuaModule::from_str("system.core").unwrap())
+                .unwrap()
+            {
+                assert_eq!(paths.libraries, luasystem_expected_windows_libraries());
+            };
+        }
+        if let Some(BuildBackendSpec::Builtin(BuiltinBuildSpec { modules })) = &rockspec
+            .local
+            .build
+            .get(&PlatformIdentifier::Win32)
+            .build_backend
+        {
+            if let ModuleSpec::ModulePaths(paths) = modules
+                .get(&LuaModule::from_str("system.core").unwrap())
+                .unwrap()
+            {
+                assert_eq!(paths.libraries, luasystem_expected_windows_libraries());
+            };
+        }
     }
 
     fn luasystem_expected_defines() -> Vec<(String, Option<String>)> {
@@ -1426,11 +1454,14 @@ build = {
         }
     }
 
+    fn luasystem_expected_windows_libraries() -> Vec<PathBuf> {
+        vec!["advapi32".into(), "winmm".into()]
+    }
     fn luasystem_expected_libraries() -> Vec<PathBuf> {
         if cfg!(target_os = "linux") {
             vec!["rt".into()]
         } else if cfg!(target_os = "windows") {
-            vec!["advapi32".into(), "winmm".into()]
+            luasystem_expected_windows_libraries()
         } else {
             Vec::default()
         }
@@ -1468,7 +1499,8 @@ build = {
     }
             ";
         let rockspec = RemoteLuaRockspec::new(rockspec_content).unwrap();
-        let build_spec = rockspec.local.build.current_platform();
+        let config = ConfigBuilder::new().unwrap().build().unwrap();
+        let build_spec = rockspec.local.build.for_target_platform(&config);
         if let Some(BuildBackendSpec::RustMlua(build_spec)) = build_spec.build_backend.to_owned() {
             assert_eq!(
                 build_spec.modules.get("foo").unwrap(),

@@ -40,10 +40,10 @@ pub trait Rockspec {
     fn format(&self) -> &Option<RockspecFormat>;
 
     /// Shorthand to extract the binaries that are part of the rockspec.
-    fn binaries(&self) -> RockBinaries {
+    fn binaries(&self, config: &Config) -> RockBinaries {
         RockBinaries(
             self.build()
-                .current_platform()
+                .for_target_platform(config)
                 .install
                 .bin
                 .keys()
@@ -97,7 +97,7 @@ impl<T: Rockspec> LuaVersionCompatibility for T {
     fn supports_lua_version(&self, lua_version: &LuaVersion) -> bool {
         let lua_version_reqs = self
             .dependencies()
-            .current_platform()
+            .default
             .iter()
             .filter(|val| *val.name() == "lua".into())
             .collect_vec();
@@ -121,7 +121,7 @@ pub(crate) fn latest_lua_version(
     dependencies: &PerPlatform<Vec<LuaDependencySpec>>,
 ) -> Option<LuaVersion> {
     dependencies
-        .current_platform()
+        .default
         .iter()
         .find(|val| *val.name() == "lua".into())
         .and_then(|lua| {

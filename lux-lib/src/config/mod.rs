@@ -10,6 +10,7 @@ use thiserror::Error;
 use tree::RockLayoutConfig;
 use url::Url;
 
+use crate::lua_rockspec::PlatformIdentifier;
 use crate::rockspec::LuaVersionCompatibility;
 use crate::tree::Tree;
 use crate::{
@@ -186,6 +187,9 @@ pub struct Config {
 
     cache_dir: PathBuf,
     data_dir: PathBuf,
+
+    /// The identifier for the target platform, auto-detected.
+    target_platform: PlatformIdentifier,
 }
 
 impl Config {
@@ -213,9 +217,7 @@ impl Config {
     pub fn with_tree(self, tree: PathBuf) -> Self {
         Self { tree, ..self }
     }
-}
 
-impl Config {
     pub fn server(&self) -> &Url {
         &self.server
     }
@@ -311,6 +313,10 @@ impl Config {
     pub fn data_dir(&self) -> &PathBuf {
         &self.data_dir
     }
+
+    pub fn target_platform(&self) -> &PlatformIdentifier {
+        &self.target_platform
+    }
 }
 
 impl HasVariables for Config {
@@ -331,6 +337,8 @@ pub enum ConfigError {
     Deserialize(#[from] toml::de::Error),
     #[error("error parsing URL: {0}")]
     UrlParseError(#[from] url::ParseError),
+    #[error("error initializing compiler toolchain: {0}")]
+    CompilerToolchain(#[from] cc::Error),
 }
 
 #[derive(Default, Deserialize, Serialize)]
@@ -366,6 +374,11 @@ pub struct ConfigBuilder {
     /// Does not affect existing install trees.
     #[serde(default)]
     entrypoint_layout: RockLayoutConfig,
+
+    /// The identifiers for the target platforms, auto-detected.
+    #[serde(skip, default)]
+    // We may want to make this configurable someday, so users can add esoteric platform identifiers
+    target_platform: PlatformIdentifier,
 }
 
 impl ConfigBuilder {
@@ -511,6 +524,7 @@ impl ConfigBuilder {
             entrypoint_layout: self.entrypoint_layout,
             cache_dir,
             data_dir,
+            target_platform: self.target_platform,
         })
     }
 }
@@ -536,6 +550,7 @@ impl From<Config> for ConfigBuilder {
             data_dir: Some(value.data_dir),
             external_deps: value.external_deps,
             entrypoint_layout: value.entrypoint_layout,
+            target_platform: value.target_platform,
         }
     }
 }

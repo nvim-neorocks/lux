@@ -230,7 +230,7 @@ async fn install_impl(
         tokio::spawn(async move {
             let rockspec = downloaded_rock.rockspec();
             if let Some(BuildBackendSpec::LuaRock(build_backend)) =
-                &rockspec.build().current_platform().build_backend
+                &rockspec.build().for_target_platform(&config).build_backend
             {
                 let luarocks = LuaRocksInstallation::new(&config)?;
                 luarocks
@@ -342,7 +342,7 @@ async fn install_rockspec(
     let bar = progress.map(|p| p.add(ProgressBar::from(format!("💻 Installing {}", &package,))));
 
     if let Some(BuildBackendSpec::LuaRock(build_backend)) =
-        &rockspec.build().current_platform().build_backend
+        &rockspec.build().for_target_platform(config).build_backend
     {
         let luarocks = LuaRocksInstallation::new(config)?;
         luarocks.ensure_installed(&bar).await?;

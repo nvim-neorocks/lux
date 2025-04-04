@@ -1,0 +1,47 @@
+on: 
+  pull_request:
+  push:
+    branches:
+      - master
+
+name: Integration tests (Windows)
+
+jobs:
+  test:
+    runs-on: windows-2019
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install neovim
+        uses: rhysd/action-setup-vim@v1 # Used by the 'run' integration test
+        with:
+          neovim: true
+          version: v0.11.0
+
+      - name: Install C/C++ Compiler (Windows)
+        uses: rlalik/setup-cpp-compiler@master
+        with:
+          compiler: clang-latest
+      - name: Install MSVC Compiler Toolchain (Windows)
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install Build dependencies (Windows)
+        run: |
+          $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\ProgramData\chocolatey\bin"
+          [Environment]::SetEnvironmentVariable("Path", $env:PATH, "Machine")
+          choco install -y --no-progress openssl libgit2
+      - name: Install Rust Toolchain (Windows)
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install cargo-nextest (Windows)
+        uses: taiki-e/install-action@nextest
+
+      - name: Install Lua
+        uses: luarocks/gh-actions-lua@master
+        with:
+          luaVersion: "5.1"
+
+      - name: Run tests (Windows)
+        env:
+          OPENSSL_DIR: C:\Program Files\OpenSSL
+          OPENSSL_LIB_DIR: C:\Program Files\OpenSSL\lib\VC\x64\MD
+        run: |
+          cargo nextest run --test "*" --no-fail-fast --no-default-features --features vendored-lua test ${{ matrix.lua.feature }}
