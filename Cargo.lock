@@ -2278,7 +2278,7 @@ dependencies = [
 
 [[package]]
 name = "lux-workspace-hack"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "aho-corasick",
  "bitflags 2.9.0",
