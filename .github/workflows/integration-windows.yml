@@ -17,21 +17,21 @@ jobs:
           neovim: true
           version: v0.11.0
 
-      - name: Install C/C++ Compiler (Windows)
+      - name: Install C/C++ Compiler
         uses: rlalik/setup-cpp-compiler@master
         with:
           compiler: clang-latest
-      - name: Install MSVC Compiler Toolchain (Windows)
+      - name: Install MSVC Compiler Toolchain
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install Build dependencies (Windows)
+      - name: Install Build+Test dependencies
         run: |
           $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\ProgramData\chocolatey\bin"
           [Environment]::SetEnvironmentVariable("Path", $env:PATH, "Machine")
-          choco install -y --no-progress openssl libgit2
-      - name: Install Rust Toolchain (Windows)
+          choco install -y --no-progress openssl libgit2 make cmake
+      - name: Install Rust Toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
-      - name: Install cargo-nextest (Windows)
+      - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
 
       - name: Install Lua
@@ -39,9 +39,9 @@ jobs:
         with:
           luaVersion: "5.1"
 
-      - name: Run tests (Windows)
+      - name: Run tests
         env:
           OPENSSL_DIR: C:\Program Files\OpenSSL
           OPENSSL_LIB_DIR: C:\Program Files\OpenSSL\lib\VC\x64\MD
         run: |
-          cargo nextest run --test "*" --no-fail-fast --no-default-features --features vendored-lua test ${{ matrix.lua.feature }}
+          cargo nextest run --test "*" --no-fail-fast --features vendored-lua
