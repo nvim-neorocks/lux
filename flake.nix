@@ -53,6 +53,7 @@
               inherit (git-hooks-check) shellHook;
               buildInputs =
                 (with pkgs; [
+                  release-plz
                   rust-analyzer
                   ra-multiplex
                   cargo-nextest
