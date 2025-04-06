@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## `lux-workspace-hack` - [0.1.1](https://github.com/nvim-neorocks/lux/compare/lux-workspace-hack-v0.1.0...lux-workspace-hack-v0.1.1) - 2025-04-06
+
+### Fixed
+- workspace hack disallowing publishing
+
 ## `lux-cli` - [0.2.0](https://github.com/nvim-neorocks/lux/compare/lux-cli-v0.1.0...lux-cli-v0.2.0) - 2025-04-06
 
 ### Added

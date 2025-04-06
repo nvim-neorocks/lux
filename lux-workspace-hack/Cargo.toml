@@ -4,7 +4,7 @@
 
 [package]
 name = "lux-workspace-hack"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "workspace-hack package, managed by hakari"
 # You can choose to publish this crate: see https://docs.rs/cargo-hakari/latest/cargo_hakari/publishing.
