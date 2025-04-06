@@ -1,8 +1,13 @@
+#[cfg(not(target_env = "msvc"))]
 use std::path::PathBuf;
 
+#[cfg(not(target_env = "msvc"))]
 use assert_fs::prelude::PathCopy;
+
+#[cfg(not(target_env = "msvc"))]
 use lux_lib::{config::ConfigBuilder, operations::Test, project::Project};
 
+#[cfg(not(target_env = "msvc"))]
 #[tokio::test]
 async fn run_busted_test() {
     let project_root =
@@ -21,6 +26,7 @@ async fn run_busted_test() {
     Test::new(project, &config).run().await.unwrap();
 }
 
+#[cfg(not(target_env = "msvc"))]
 #[tokio::test]
 async fn run_busted_test_no_lock() {
     let project_root =
