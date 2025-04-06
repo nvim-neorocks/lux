@@ -3,7 +3,7 @@ use itertools::Itertools;
 use std::{
     collections::HashMap,
     io,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, ExitStatus},
     sync::Arc,
 };
@@ -66,6 +66,8 @@ pub enum ExecLuaRocksError {
     WriteLuarocksConfigError(io::Error),
     #[error("failed to run luarocks: {0}")]
     Io(#[from] io::Error),
+    #[error("luarocks binary not found at {0}")]
+    LuarocksBinNotFound(PathBuf),
     #[error("executing luarocks compatibility layer failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
     CommandFailure {
         status: ExitStatus,
@@ -296,6 +298,9 @@ variables = {{
         std::fs::write(luarocks_config.clone(), luarocks_config_content)
             .map_err(ExecLuaRocksError::WriteLuarocksConfigError)?;
         let luarocks_bin = self.tree().bin().join(LUAROCKS_EXE);
+        if !luarocks_bin.is_file() {
+            return Err(ExecLuaRocksError::LuarocksBinNotFound(luarocks_bin));
+        }
         let output = Command::new(luarocks_bin)
             .current_dir(cwd)
             .args(args)
