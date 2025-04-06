@@ -60,13 +60,14 @@ impl Default for MakeBuildSpec {
     }
 }
 
+#[cfg(unix)]
 fn default_makefile_name() -> PathBuf {
-    let makefile = if is_win32() {
-        "Makefile.win"
-    } else {
-        "Makefile"
-    };
-    PathBuf::from(makefile)
+    PathBuf::from("Makefile")
+}
+
+#[cfg(windows)]
+fn default_makefile_name() -> PathBuf {
+    PathBuf::from("Makefile.win")
 }
 
 fn default_pass() -> bool {
@@ -75,8 +76,4 @@ fn default_pass() -> bool {
 
 fn default_install_target() -> String {
     "install".into()
-}
-
-fn is_win32() -> bool {
-    cfg!(target_os = "windows") && cfg!(target_arch = "x86")
 }

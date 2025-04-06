@@ -5,7 +5,7 @@ use ssri::Integrity;
 use std::{
     collections::HashMap,
     io,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, ExitStatus},
     sync::Arc,
 };
@@ -30,6 +30,22 @@ use crate::{
 const LUAROCKS_EXE: &str = "luarocks";
 #[cfg(target_family = "windows")]
 const LUAROCKS_EXE: &str = "luarocks.exe";
+
+pub(crate) const LUAROCKS_VERSION: &str = "3.11.1-1";
+
+#[cfg(target_family = "unix")]
+const LUAROCKS_ROCKSPEC: &str = "
+rockspec_format = '3.0'
+package = 'luarocks'
+version = '3.11.1-1'
+source = {
+    url = 'git+https://github.com/luarocks/luarocks',
+    tag = 'v3.11.1',
+}
+build = {
+    type = 'builtin',
+}
+";
 
 #[derive(Error, Debug)]
 pub enum LuaRocksError {
@@ -73,6 +89,8 @@ pub enum ExecLuaRocksError {
     WriteLuarocksConfigError(io::Error),
     #[error("failed to run luarocks: {0}")]
     Io(#[from] io::Error),
+    #[error("luarocks binary not found at {0}")]
+    LuarocksBinNotFound(PathBuf),
     #[error("executing luarocks compatibility layer failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
     CommandFailure {
         status: ExitStatus,
@@ -85,22 +103,6 @@ pub struct LuaRocksInstallation {
     tree: Tree,
     config: Config,
 }
-
-pub(crate) const LUAROCKS_VERSION: &str = "3.11.1-1";
-
-#[cfg(target_family = "unix")]
-const LUAROCKS_ROCKSPEC: &str = "
-rockspec_format = '3.0'
-package = 'luarocks'
-version = '3.11.1-1'
-source = {
-    url = 'git+https://github.com/luarocks/luarocks',
-    tag = 'v3.11.1',
-}
-build = {
-    type = 'builtin',
-}
-";
 
 impl LuaRocksInstallation {
     pub fn new(config: &Config) -> Result<Self, LuaRocksError> {
@@ -351,6 +353,9 @@ variables = {{
         std::fs::write(luarocks_config.clone(), luarocks_config_content)
             .map_err(ExecLuaRocksError::WriteLuarocksConfigError)?;
         let luarocks_bin = self.tree().bin().join(LUAROCKS_EXE);
+        if !luarocks_bin.is_file() {
+            return Err(ExecLuaRocksError::LuarocksBinNotFound(luarocks_bin));
+        }
         let output = Command::new(luarocks_bin)
             .current_dir(cwd)
             .args(args)

@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use assert_fs::prelude::PathCopy;
+use assert_fs::TempDir;
 use lux_lib::{
     build::{Build, BuildBehaviour::Force},
     config::{ConfigBuilder, LuaVersion},
@@ -9,12 +10,12 @@ use lux_lib::{
     project::Project,
     tree,
 };
-use tempdir::TempDir;
 use tokio::runtime::Builder;
 
+#[cfg(not(target_env = "msvc"))] // lua-cjson is not cross platform
 #[tokio::test]
 async fn builtin_build() {
-    let dir = TempDir::new("lux-test").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let content =
         String::from_utf8(std::fs::read("resources/test/lua-cjson-2.1.0-1.rockspec").unwrap())
@@ -23,7 +24,7 @@ async fn builtin_build() {
 
     let config = ConfigBuilder::new()
         .unwrap()
-        .tree(Some(dir.into_path()))
+        .tree(Some(dir.to_path_buf()))
         .build()
         .unwrap();
 
@@ -47,7 +48,7 @@ async fn builtin_build() {
 
 #[tokio::test]
 async fn make_build() {
-    let dir = TempDir::new("lux-test").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let content = String::from_utf8(
         std::fs::read("resources/test/make-project/make-project-scm-1.rockspec").unwrap(),
@@ -57,7 +58,7 @@ async fn make_build() {
 
     let config = ConfigBuilder::new()
         .unwrap()
-        .tree(Some(dir.into_path()))
+        .tree(Some(dir.to_path_buf()))
         .build()
         .unwrap();
 
@@ -84,6 +85,7 @@ async fn cmake_build() {
     test_build_rockspec("resources/test/luv-1.48.0-2.rockspec".into()).await
 }
 
+#[cfg(not(target_env = "msvc"))] // luaposix does not build on msvc
 #[tokio::test]
 async fn command_build() {
     // The rockspec appears to be broken when using luajit headers on macos
@@ -96,14 +98,14 @@ async fn command_build() {
 }
 
 async fn test_build_rockspec(rockspec_path: PathBuf) {
-    let dir = TempDir::new("lux-test").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let content = String::from_utf8(std::fs::read(rockspec_path).unwrap()).unwrap();
     let rockspec = RemoteLuaRockspec::new(&content).unwrap();
 
     let config = ConfigBuilder::new()
         .unwrap()
-        .tree(Some(dir.into_path()))
+        .tree(Some(dir.to_path_buf()))
         .build()
         .unwrap();
 
@@ -127,7 +129,7 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
 
 #[tokio::test]
 async fn treesitter_parser_build() {
-    let dir = TempDir::new("lux-test").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let content = String::from_utf8(
         std::fs::read("resources/test/tree-sitter-rust-0.0.43.rockspec").unwrap(),
@@ -137,7 +139,7 @@ async fn treesitter_parser_build() {
 
     let config = ConfigBuilder::new()
         .unwrap()
-        .tree(Some(dir.into_path()))
+        .tree(Some(dir.to_path_buf()))
         .build()
         .unwrap();
 
@@ -162,7 +164,7 @@ async fn treesitter_parser_build() {
 #[tokio::test]
 async fn test_build_local_project_no_source() {
     let sample_project: PathBuf = "resources/test/sample-project-no-source/".into();
-    let project_root = assert_fs::TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
     project_root.copy_from(&sample_project, &["**"]).unwrap();
 
     let project = Project::from(&project_root).unwrap().unwrap();
@@ -218,7 +220,7 @@ async fn test_build_local_project_only_src() {
 
 #[test]
 fn test_build_multiple_treesitter_parsers() {
-    let dir = TempDir::new("lux-test").unwrap();
+    let dir = TempDir::new().unwrap();
 
     let content = String::from_utf8(
         std::fs::read("resources/test/tree-sitter-rust-0.0.43.rockspec").unwrap(),
@@ -228,7 +230,7 @@ fn test_build_multiple_treesitter_parsers() {
 
     let config = ConfigBuilder::new()
         .unwrap()
-        .tree(Some(dir.into_path()))
+        .tree(Some(dir.to_path_buf()))
         .build()
         .unwrap();
 
