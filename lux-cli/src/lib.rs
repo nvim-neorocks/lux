@@ -140,7 +140,7 @@ pub enum Commands {
     /// Various debugging utilities.
     #[command(subcommand, arg_required_else_help = true)]
     Debug(Debug),
-    /// [UNIMPLEMENTED] Show documentation for an installed rock.
+    /// Show documentation for an installed rock.
     Doc(Doc),
     /// Download a specific rock file from a luarocks server.
     #[command(arg_required_else_help = true)]
