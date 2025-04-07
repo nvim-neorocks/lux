@@ -21,6 +21,10 @@ pub struct Build {
     /// Ignore the project's lockfile and don't create one.
     #[arg(long)]
     no_lock: bool,
+
+    /// Build only the dependencies
+    #[arg(long)]
+    only_deps: bool,
 }
 
 pub async fn build(data: Build, config: Config) -> Result<()> {
@@ -130,28 +134,30 @@ Use --ignore-lockfile to force a new build.
             )?;
     }
 
-    let package = build::Build::new(
-        &project_toml,
-        &tree,
-        tree::EntryType::Entrypoint,
-        &config,
-        &progress.map(|p| p.new_bar()),
-    )
-    .behaviour(BuildBehaviour::Force)
-    .build()
-    .await?;
+    if !data.only_deps {
+        let package = build::Build::new(
+            &project_toml,
+            &tree,
+            tree::EntryType::Entrypoint,
+            &config,
+            &progress.map(|p| p.new_bar()),
+        )
+        .behaviour(BuildBehaviour::Force)
+        .build()
+        .await?;
 
-    let lockfile = tree.lockfile()?;
-    let dependencies = lockfile
-        .rocks()
-        .iter()
-        .map(|(_, value)| value)
-        .cloned()
-        .collect_vec();
-    let mut lockfile = lockfile.write_guard();
-    lockfile.add_entrypoint(&package);
-    for dep in dependencies {
-        lockfile.add_dependency(&package, &dep);
+        let lockfile = tree.lockfile()?;
+        let dependencies = lockfile
+            .rocks()
+            .iter()
+            .map(|(_, value)| value)
+            .cloned()
+            .collect_vec();
+        let mut lockfile = lockfile.write_guard();
+        lockfile.add_entrypoint(&package);
+        for dep in dependencies {
+            lockfile.add_dependency(&package, &dep);
+        }
     }
 
     Ok(())
