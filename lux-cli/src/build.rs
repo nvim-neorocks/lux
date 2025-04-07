@@ -128,7 +128,7 @@ Use --ignore-lockfile to force a new build.
             )?;
     }
 
-    build::Build::new(
+    let package = build::Build::new(
         &project_toml,
         &tree,
         tree::EntryType::Entrypoint,
@@ -138,6 +138,19 @@ Use --ignore-lockfile to force a new build.
     .behaviour(BuildBehaviour::Force)
     .build()
     .await?;
+
+    let lockfile = tree.lockfile()?;
+    let dependencies = lockfile
+        .rocks()
+        .iter()
+        .map(|(_, value)| value)
+        .cloned()
+        .collect_vec();
+    let mut lockfile = lockfile.write_guard();
+    lockfile.add_entrypoint(&package);
+    for dep in dependencies {
+        lockfile.add_dependency(&package, &dep);
+    }
 
     Ok(())
 }
