@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## `lux-cli` - [0.2.3](https://github.com/nvim-neorocks/lux/compare/v0.2.2...v0.2.3) - 2025-04-07
+
+### Added
+- *(build)* flag to build only dependencies
+
+### Fixed
+- fix!(sync): lock constraint changes when syncing with project lockfile
+- *(build)* project not added to lockfile
+
+## `lux-lib` - [0.2.2](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.2.1...lux-lib-v0.2.2) - 2025-04-07
+
+### Fixed
+- fix!(sync): lock constraint changes when syncing with project lockfile
+
 ## `lux-cli` - [0.2.2](https://github.com/nvim-neorocks/lux/compare/v0.2.1...v0.2.2) - 2025-04-07
 
 ### Other
