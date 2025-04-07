@@ -1,13 +1,12 @@
 <h1 align="center">
-  <!-- <a href="http://www.amitmerchant.com/electron-markdownify"><img src="https://raw.githubusercontent.com/amitmerchant1990/electron-markdownify/master/app/img/markdownify.png" alt="Markdownify" width="200"></a> -->
+  <a href="https://nvim-neorocks.github.io/tutorial/getting-started"><img src="./lux-logo.svg" alt="Lux" width="200"></a>
   <!-- <br> -->
-  <!-- <img src="https://github.com/user-attachments/assets/08bdc23a-a841-4be8-bd8e-fab90da9f110" alt="Lux" width="200"> -->
+  <!-- <img src="./lux-logo.svg" alt="Lux" width="200"> -->
   <!-- <br> -->
-  Lux
   <br>
 </h1>
 
-<h4 align="center">A luxurious package manager for <a href="https://www.lua.org/" target="_blank">Lua</a>.</h4>
+<h4 align="center">Lux - A luxurious package manager for <a href="https://www.lua.org/" target="_blank">Lua</a>.</h4>
 
 <p align="center">
   <img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/nvim-neorocks/lux/integration-tests.yml?style=for-the-badge">
@@ -22,8 +21,6 @@
   <a href="#bulb-you-may-also-like">Related Projects</a> •
   <a href="#green_heart-contributing">Contributing</a>
 </p>
-
-<!-- ![screenshot](https://raw.githubusercontent.com/amitmerchant1990/electron-markdownify/master/app/img/markdownify.gif) -->
 
 ## :star2: Key Features
 
@@ -119,4 +116,5 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for a guide.
 
 ## :book: License
 
-Lux is licensed under [MIT](./LICENSE).
+- Lux is licensed under [MIT](./LICENSE).
+- The Lux logo © 2025 by Kai Jakobi is licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
