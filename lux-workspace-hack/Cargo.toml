@@ -30,7 +30,7 @@ futures-util = { version = "0.3", features = ["channel", "io", "sink"] }
 getrandom = { version = "0.2", default-features = false, features = ["std"] }
 hyper = { version = "1", features = ["client", "http1", "http2", "server"] }
 hyper-util = { version = "0.1", features = ["client-legacy", "http1", "http2", "server"] }
-indexmap = { version = "1", default-features = false, features = ["std"] }
+indexmap = { version = "2", default-features = false, features = ["std"] }
 lock_api = { version = "0.4", features = ["arc_lock"] }
 log = { version = "0.4", default-features = false, features = ["std"] }
 memchr = { version = "2" }
@@ -50,7 +50,7 @@ toml_edit = { version = "0.22", features = ["serde"] }
 tracing = { version = "0.1", features = ["log"] }
 
 [build-dependencies]
-indexmap = { version = "1", default-features = false, features = ["std"] }
+indexmap = { version = "2", default-features = false, features = ["std"] }
 memchr = { version = "2" }
 proc-macro2 = { version = "1" }
 quote = { version = "1" }
