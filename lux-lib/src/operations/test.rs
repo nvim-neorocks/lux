@@ -196,6 +196,7 @@ pub async fn ensure_busted(
             PinnedState::default(),
             OptState::default(),
             tree::EntryType::Entrypoint,
+            None,
         );
         Install::new(tree, config)
             .package(install_spec)
@@ -238,6 +239,7 @@ async fn ensure_dependencies(
                     *dep.pin(),
                     *dep.opt(),
                     tree::EntryType::Entrypoint,
+                    None,
                 )
             })
         });
@@ -269,6 +271,7 @@ async fn ensure_dependencies(
                     *dep.pin(),
                     *dep.opt(),
                     tree::EntryType::Entrypoint,
+                    None,
                 )
             })
         });

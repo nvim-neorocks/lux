@@ -167,6 +167,7 @@ impl LuaRocksInstallation {
                 PinnedState::default(),
                 OptState::default(),
                 tree::EntryType::Entrypoint,
+                None,
             )
         })
         .collect_vec();

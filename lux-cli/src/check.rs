@@ -18,6 +18,7 @@ pub async fn check(config: Config) -> Result<()> {
         PinnedState::default(),
         OptState::default(),
         tree::EntryType::Entrypoint,
+        None,
     );
 
     Install::new(&project.tree(&config)?, &config)

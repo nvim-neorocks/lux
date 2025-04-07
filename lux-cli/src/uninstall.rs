@@ -134,6 +134,7 @@ Reinstall?
                         package.pinned(),
                         package.opt(),
                         tree::EntryType::DependencyOnly,
+                        Some(package.constraint()),
                     )
                 })
                 .collect_vec();

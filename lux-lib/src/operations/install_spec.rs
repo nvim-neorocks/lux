@@ -1,17 +1,21 @@
 use crate::{
     build::BuildBehaviour,
-    lockfile::{OptState, PinnedState},
+    lockfile::{LockConstraint, OptState, PinnedState},
     package::PackageReq,
     tree,
 };
 
 /// Specifies how to install a package
+#[derive(Debug)]
 pub struct PackageInstallSpec {
     pub(crate) package: PackageReq,
     pub(crate) build_behaviour: BuildBehaviour,
     pub(crate) pin: PinnedState,
     pub(crate) opt: OptState,
     pub(crate) entry_type: tree::EntryType,
+    /// Optional constraint, carried over from a previous install,
+    /// e.g. defined in a lockfile.
+    pub(crate) constraint: Option<LockConstraint>,
 }
 
 impl PackageInstallSpec {
@@ -21,6 +25,7 @@ impl PackageInstallSpec {
         pin: PinnedState,
         opt: OptState,
         entry_type: tree::EntryType,
+        constraint: Option<LockConstraint>,
     ) -> Self {
         Self {
             package,
@@ -28,6 +33,7 @@ impl PackageInstallSpec {
             pin,
             opt,
             entry_type,
+            constraint,
         }
     }
 }

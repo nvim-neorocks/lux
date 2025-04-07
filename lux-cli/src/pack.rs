@@ -80,6 +80,7 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
                             PinnedState::default(),
                             OptState::default(),
                             tree::EntryType::Entrypoint,
+                            None,
                         ))
                         .progress(progress)
                         .install()

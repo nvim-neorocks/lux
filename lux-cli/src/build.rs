@@ -63,6 +63,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                     *dep.pin(),
                     *dep.opt(),
                     tree::EntryType::Entrypoint,
+                    None,
                 )
             });
 
@@ -86,6 +87,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                     *dep.pin(),
                     *dep.opt(),
                     tree::EntryType::Entrypoint,
+                    None,
                 )
             })
             .collect_vec();

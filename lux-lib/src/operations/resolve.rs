@@ -63,6 +63,7 @@ where
                      pin,
                      opt,
                      entry_type,
+                     constraint,
                  }| {
                     let config = config.clone();
                     let tx = tx.clone();
@@ -78,7 +79,7 @@ where
                             .download_remote_rock()
                             .await?;
 
-                        let constraint = package.version_req().clone().into();
+                        let constraint = constraint.unwrap_or(package.version_req().clone().into());
 
                         let dependencies = downloaded_rock
                             .rockspec()
@@ -106,6 +107,7 @@ where
                                     pin,
                                     opt,
                                     entry_type,
+                                    None,
                                 )
                             })
                             .collect_vec();

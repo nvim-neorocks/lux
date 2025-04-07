@@ -333,5 +333,6 @@ fn mk_install_spec(
         PinnedState::Unpinned,
         package.opt(),
         entry_type,
+        None,
     )
 }
