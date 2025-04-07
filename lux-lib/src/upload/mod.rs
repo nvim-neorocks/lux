@@ -195,13 +195,13 @@ async fn upload_from_project(
     helpers::ensure_tool_version(&client, config.server()).await?;
     helpers::ensure_user_exists(&client, api_key, config.server()).await?;
 
-    let rocks = project.toml().into_remote()?;
+    let rockspec = project.toml().into_remote()?;
 
     if helpers::rock_exists(
         &client,
         api_key,
-        rocks.package(),
-        rocks.version(),
+        rockspec.package(),
+        rockspec.version(),
         config.server(),
     )
     .await?
@@ -209,7 +209,7 @@ async fn upload_from_project(
         return Err(UploadError::RockExists(config.server().clone()));
     }
 
-    let rockspec_content = std::fs::read_to_string(project.root().join("project.rockspec"))?;
+    let rockspec_content = rockspec.to_lua_rockspec_string();
 
     let signed = if let SignatureProtocol::None = protocol {
         None
@@ -227,7 +227,11 @@ async fn upload_from_project(
     };
 
     let rockspec = Part::text(rockspec_content)
-        .file_name(format!("{}-{}.rockspec", rocks.package(), rocks.version()))
+        .file_name(format!(
+            "{}-{}.rockspec",
+            rockspec.package(),
+            rockspec.version()
+        ))
         .mime_str("application/octet-stream")?;
 
     let multipart = {
