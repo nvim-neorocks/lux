@@ -19,5 +19,9 @@ body = """
 """
 
 [[package]]
+name = "lux-cli"
+git_tag_name = "v{{ version }}"
+
+[[package]]
 name = "lux-workspace-hack"
 release = false
