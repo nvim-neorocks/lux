@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## `lux-cli` - [0.2.2](https://github.com/nvim-neorocks/lux/compare/v0.2.1...v0.2.2) - 2025-04-07
+
+### Other
+- updated the following local packages: lux-lib
+
 ## `lux-cli` - [0.2.1](https://github.com/nvim-neorocks/lux/compare/lux-cli-v0.2.0...lux-cli-v0.2.1) - 2025-04-06
 
 ### Other

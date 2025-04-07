@@ -1,6 +1,6 @@
 [package]
 name = "lux-cli"
-version = "0.2.1"
+version = "0.2.2"
 description = "A luxurious package manager for Lua"
 authors = ["vhyrro <vhyrro@gmail.com>", "mrcjkb <marc@jakobi.dev>"]
 homepage = "https://github.com/nvim-neorocks/lux"
@@ -50,6 +50,6 @@ lux-workspace-hack = { version = "0.1", path = "../lux-workspace-hack" }
 assert_fs = "1.1.2"
 
 [dependencies.lux-lib]
-version = "0.2.0"
+version = "0.2.1"
 path = "../lux-lib/"
 features = ["clap"]
