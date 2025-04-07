@@ -306,7 +306,15 @@ impl PackageVersionReq {
 impl Display for PackageVersionReq {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PackageVersionReq::SemVer(version_req) => version_req.fmt(f),
+            PackageVersionReq::SemVer(version_req) => {
+                let mut str = version_req.to_string();
+                if str.starts_with("=") {
+                    str = str.replacen("=", "==", 1);
+                } else if str.starts_with("^") {
+                    str = str.replacen("^", "==", 1);
+                }
+                str.fmt(f)
+            }
             PackageVersionReq::Dev(name_req) => f.write_str(name_req.as_str()),
             PackageVersionReq::Any => f.write_str("any"),
         }
@@ -625,4 +633,35 @@ mod tests {
             PackageVersionReq::SemVer("> 2.1.0-10, < 2.1.1".parse().unwrap())
         );
     }
+
+    #[tokio::test]
+    async fn package_version_req_semver_roundtrips() {
+        let req = PackageVersionReq::parse("==0.7.1").unwrap();
+        assert_eq!(req.to_string(), "==0.7.1");
+
+        let req = PackageVersionReq::parse("0.7.1").unwrap();
+        assert_eq!(req.to_string(), "==0.7.1");
+
+        let req = PackageVersionReq::parse(">=0.7.1").unwrap();
+        assert_eq!(req.to_string(), ">=0.7.1");
+
+        let req = PackageVersionReq::parse(">0.7.1").unwrap();
+        assert_eq!(req.to_string(), ">0.7.1");
+
+        let req = PackageVersionReq::parse("<0.7.1").unwrap();
+        assert_eq!(req.to_string(), "<0.7.1");
+
+        let req = PackageVersionReq::parse("~> 0.7.1").unwrap();
+        assert_eq!(req.to_string(), ">=0.7.1, <0.7.2");
+    }
+
+    // FIXME(#502):
+    // #[tokio::test]
+    // async fn package_version_req_devver_roundtrips() {
+    //     let req = PackageVersionReq::parse("== scm").unwrap();
+    //     assert_eq!(req.to_string(), "==scm");
+    //
+    //     let req = PackageVersionReq::parse("scm").unwrap();
+    //     assert_eq!(req.to_string(), "==scm");
+    // }
 }

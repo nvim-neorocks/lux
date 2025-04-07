@@ -2177,6 +2177,7 @@ dependencies = [
  "open",
  "path-absolutize",
  "serde_json",
+ "serial_test",
  "spdx",
  "spinners",
  "strum 0.27.0",

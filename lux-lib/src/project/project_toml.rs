@@ -1028,13 +1028,13 @@ mod tests {
             supported_platforms = {"linux", "!windows"}
 
             dependencies = {
-                "lua 5.1",
-                "foo 1.0",
+                "lua ==5.1",
+                "foo ==1.0",
                 "bar >=2.0",
             }
 
             build_dependencies = {
-                "baz 1.0",
+                "baz ==1.0",
             }
 
             external_dependencies = {
@@ -1043,7 +1043,7 @@ mod tests {
             }
 
             test_dependencies = {
-                "busted 1.0",
+                "busted ==1.0",
             }
 
             source = {

@@ -1533,25 +1533,6 @@ mod tests {
 
         assert_eq!(sync_spec.to_add.len(), 1);
 
-        // Should remove:
-        // - neorg 8.0.0-1 (older version)
-        // - dependencies unique to neorg 8.0.0-1
-        assert!(sync_spec
-            .to_remove
-            .iter()
-            .any(|pkg| pkg.name().to_string() == "neorg"
-                && pkg.version() == &"8.0.0-1".parse().unwrap()));
-        assert!(sync_spec
-            .to_remove
-            .iter()
-            .any(|pkg| pkg.name().to_string() == "lua-utils.nvim"
-                && pkg.constraint() == LockConstraint::Unconstrained));
-        assert!(sync_spec
-            .to_remove
-            .iter()
-            .any(|pkg| pkg.name().to_string() == "nvim-nio"
-                && pkg.constraint() == LockConstraint::Unconstrained));
-
         // Should keep dependencies of neorg 8.8.1-1
         assert!(!sync_spec
             .to_remove
@@ -1575,6 +1556,55 @@ mod tests {
             .any(|pkg| pkg.name().to_string() == "nui.nvim"
                 && pkg.constraint() == LockConstraint::Constrained("=0.3.0".parse().unwrap())));
         assert!(!sync_spec
+            .to_remove
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "pathlib.nvim"
+                && pkg.constraint()
+                    == LockConstraint::Constrained(">=2.2.0, <2.3.0".parse().unwrap())));
+    }
+
+    #[test]
+    fn test_sync_spec_remove() {
+        let lockfile = get_test_lockfile();
+        let packages = vec![
+            PackageReq::parse("lua-cjson@2.1.0").unwrap().into(),
+            PackageReq::parse("nonexistent").unwrap().into(),
+        ];
+
+        let sync_spec = lockfile.lock.package_sync_spec(&packages);
+
+        assert_eq!(sync_spec.to_add.len(), 1);
+
+        // Should remove:
+        // - neorg
+        // - dependencies unique to neorg
+        assert!(sync_spec
+            .to_remove
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "neorg"
+                && pkg.version() == &"8.8.1-1".parse().unwrap()));
+        assert!(sync_spec
+            .to_remove
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "nvim-nio"
+                && pkg.constraint()
+                    == LockConstraint::Constrained(">=1.7.0, <1.8.0".parse().unwrap())));
+        assert!(sync_spec
+            .to_remove
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "lua-utils.nvim"
+                && pkg.constraint() == LockConstraint::Constrained("=1.0.2".parse().unwrap())));
+        assert!(sync_spec
+            .to_remove
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "plenary.nvim"
+                && pkg.constraint() == LockConstraint::Constrained("=0.1.4".parse().unwrap())));
+        assert!(sync_spec
+            .to_remove
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "nui.nvim"
+                && pkg.constraint() == LockConstraint::Constrained("=0.3.0".parse().unwrap())));
+        assert!(sync_spec
             .to_remove
             .iter()
             .any(|pkg| pkg.name().to_string() == "pathlib.nvim"

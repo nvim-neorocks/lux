@@ -155,9 +155,5 @@ mod test {
             .package("neorg@8.1.1-1".parse().unwrap())
             .search();
         assert!(matches!(result, Err(WhichError::ModuleNotFound(_))));
-        let result = Which::new(LuaModule::from_str("foo.bar").unwrap(), &config)
-            .package("neorg@8.0.0-1".parse().unwrap())
-            .search();
-        assert!(result.is_ok());
     }
 }

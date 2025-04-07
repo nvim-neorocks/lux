@@ -108,9 +108,12 @@ mod test {
     use std::path::PathBuf;
 
     use lux_lib::config::ConfigBuilder;
+    use serial_test::serial;
 
     use super::*;
 
+    // FIXME: This can fail locally if there's a lux project in the lux root
+    #[serial]
     #[tokio::test]
     async fn test_run_lua() {
         let args = RunLua {

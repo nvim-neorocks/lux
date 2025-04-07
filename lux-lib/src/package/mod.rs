@@ -216,7 +216,7 @@ impl Display for PackageReq {
         if self.version_req.is_any() {
             self.name.fmt(f)
         } else {
-            f.write_str(format!("{} {}", self.name, self.version_req).as_str())
+            f.write_str(format!("{}{}", self.name, self.version_req).as_str())
         }
     }
 }
