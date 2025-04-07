@@ -34,18 +34,19 @@
 * Automatic generation of rockspecs
   - Say goodbye to managing 10 different rockspec files in your source code :tada:
 * Integrated code formatting via `lx fmt`
-  - Powered by [stylua](https://github.com/JohnnyMorganz/StyLua)
+  - Powered by [stylua](https://github.com/JohnnyMorganz/StyLua).
 * Easily specify compatible Lua versions
   - Lux will take care of Lua header installation automatically
   - Forget about users complaining they have the wrong Lua headers installed on their system
 * Automatic code linting via `lx check`
-  - Powered by `luacheck`
+  - Powered by `luacheck`.
 * Powerful lockfile support
-  - Makes for fully reproducible developer environments
+  - Makes for fully reproducible developer environments.
   - Makes Lux easy to integrate with Nix!
 * Fully compatible
+  - Works with existing luarocks packages.
   - Have a complex rockspec that you don't want to rewrite to TOML? No problem!
-    Lux allows the creation of an `extra.rockspec` file, so everything just works
+    Lux allows the creation of an `extra.rockspec` file, everything just works.
   - Have a very complex build script? Lux can shell out to `luarocks` if it knows it has
     to preserve maximum compatibility.
 
