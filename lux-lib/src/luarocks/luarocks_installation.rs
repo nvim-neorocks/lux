@@ -25,6 +25,11 @@ use crate::{
     tree::{self, Tree},
 };
 
+#[cfg(unix)]
+const LUAROCKS_EXE: &str = "luarocks";
+#[cfg(windows)]
+const LUAROCKS_EXE: &str = "luarocks";
+
 #[derive(Error, Debug)]
 pub enum LuaRocksError {
     #[error(transparent)]
@@ -290,7 +295,8 @@ variables = {{
         let luarocks_config = temp_dir.path().join("luarocks-config.lua");
         std::fs::write(luarocks_config.clone(), luarocks_config_content)
             .map_err(ExecLuaRocksError::WriteLuarocksConfigError)?;
-        let output = Command::new("luarocks")
+        let luarocks_bin = self.tree().bin().join(LUAROCKS_EXE);
+        let output = Command::new(luarocks_bin)
             .current_dir(cwd)
             .args(args)
             .env("PATH", luarocks_paths.path_prepended().joined())
