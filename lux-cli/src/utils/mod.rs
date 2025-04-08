@@ -1,2 +1,3 @@
-pub mod github_metadata;
-pub mod install;
+pub(crate) mod file_tree;
+pub(crate) mod github_metadata;
+pub(crate) mod install;

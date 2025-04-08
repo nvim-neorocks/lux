@@ -1,4 +1,7 @@
-use crate::unpack::{Unpack, UnpackRemote};
+use crate::{
+    project::DebugProject,
+    unpack::{Unpack, UnpackRemote},
+};
 use clap::Subcommand;
 
 #[derive(Subcommand)]
@@ -10,5 +13,5 @@ pub enum Debug {
     /// Download a .src.rock from luarocks.org and unpack it.
     UnpackRemote(UnpackRemote),
     /// View information about the current project.
-    Project,
+    Project(DebugProject),
 }

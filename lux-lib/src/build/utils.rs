@@ -32,25 +32,30 @@ pub(crate) fn copy_lua_to_module_path(
     Ok(())
 }
 
+/// Get the files that Lux treats as project files
+/// This respects ignore files and excludes hidden files and directories.
+pub(crate) fn project_files(src: &PathBuf) -> Vec<PathBuf> {
+    ignore::WalkBuilder::new(src)
+        .follow_links(false)
+        .build()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_some_and(|ft| ft.is_file()))
+        .map(|entry| entry.into_path())
+        .collect_vec()
+}
+
 /// Recursively copy a directory.
 /// This respects ignore files and excludes hidden files and directories.
 pub(crate) fn recursive_copy_dir(src: &PathBuf, dest: &Path) -> Result<(), io::Error> {
     if src.exists() {
-        for file in ignore::WalkBuilder::new(src)
-            .follow_links(false)
-            .build()
-            .filter_map(Result::ok)
-            .filter(|entry| entry.file_type().is_some_and(|ft| ft.is_file()))
-        {
+        for file in project_files(src) {
             let relative_src_path: PathBuf =
-                pathdiff::diff_paths(src.join(file.clone().into_path()), src)
-                    .expect("failed to copy directories!");
-            let filepath = file.path();
+                pathdiff::diff_paths(src.join(&file), src).expect("failed to copy directories!");
             let target = dest.join(relative_src_path);
             if let Some(parent) = target.parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            std::fs::copy(filepath, target)?;
+            std::fs::copy(&file, target)?;
         }
     }
     Ok(())

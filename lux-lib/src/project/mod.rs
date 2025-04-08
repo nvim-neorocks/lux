@@ -14,6 +14,7 @@ use thiserror::Error;
 use toml_edit::{DocumentMut, Item};
 
 use crate::{
+    build,
     config::{Config, LuaVersion},
     lockfile::{ProjectLockfile, ReadOnly},
     lua_rockspec::{
@@ -626,6 +627,10 @@ impl Project {
         tokio::fs::write(self.toml_path(), project_toml.to_string()).await?;
 
         Ok(())
+    }
+
+    pub fn project_files(&self) -> Vec<PathBuf> {
+        build::utils::project_files(&self.root().0)
     }
 }
 
