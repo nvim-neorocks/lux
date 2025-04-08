@@ -357,14 +357,21 @@ async fn do_build<R: Rockspec + HasIntegrity>(
                 Some(unpack_dir) => temp_dir.path().join(unpack_dir),
                 None => {
                     // Some older rockspecs don't specify a source.dir.
-                    // If there exists a single directory after unpacking,
-                    // we assume it's the source directory.
-                    let entries = std::fs::read_dir(temp_dir.path())?
+                    // If there exists a single directory and a rockspec
+                    // after unpacking, we assume it's the source directory.
+                    let dir_entries = std::fs::read_dir(temp_dir.path())?
                         .filter_map(Result::ok)
                         .filter(|f| f.path().is_dir())
                         .collect_vec();
-                    if entries.len() == 1 {
-                        temp_dir.path().join(entries.first().unwrap().path())
+                    let rockspec_entries = std::fs::read_dir(temp_dir.path())?
+                        .filter_map(Result::ok)
+                        .filter(|f| {
+                            let path = f.path();
+                            path.is_file() && path.extension().is_some_and(|ext| ext == "rockspec")
+                        })
+                        .collect_vec();
+                    if dir_entries.len() == 1 && rockspec_entries.len() == 1 {
+                        temp_dir.path().join(dir_entries.first().unwrap().path())
                     } else {
                         temp_dir.path().into()
                     }

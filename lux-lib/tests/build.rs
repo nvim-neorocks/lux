@@ -183,3 +183,34 @@ async fn test_build_local_project_no_source() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn test_build_local_project_only_src() {
+    let sample_project: PathBuf = "resources/test/sample-project-only-src/".into();
+    let project_root = assert_fs::TempDir::new().unwrap();
+    project_root.copy_from(&sample_project, &["**"]).unwrap();
+
+    let project = Project::from(&project_root).unwrap().unwrap();
+    let project_toml = project.toml().into_local().unwrap();
+    let config = ConfigBuilder::new().unwrap().build().unwrap();
+    let tree = project.tree(&config).unwrap();
+    let progress = MultiProgress::new();
+    let bar = progress.new_bar();
+
+    let pkg = Build::new(
+        &project_toml,
+        &tree,
+        tree::EntryType::Entrypoint,
+        &config,
+        &Progress::Progress(bar),
+    )
+    .behaviour(Force)
+    .build()
+    .await
+    .unwrap();
+
+    let layout = tree.installed_rock_layout(&pkg).unwrap();
+    assert!(layout.src.is_dir());
+    assert!(layout.src.join("main.lua").is_file());
+    assert!(layout.src.join("foo.lua").is_file());
+}

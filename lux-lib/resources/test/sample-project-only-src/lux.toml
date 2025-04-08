@@ -1,0 +1,15 @@
+package = "sample-project"
+version = "0.1.0"
+lua = ">=5.1"
+
+[description]
+summary = ""
+maintainer = "nvim-neorocks"
+labels = [ "" ]
+
+[run]
+args = [ "src/main.lua" ]
+
+[build]
+type = "builtin"
+
