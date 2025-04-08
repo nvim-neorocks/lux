@@ -137,7 +137,7 @@ pub enum Commands {
     /// Interact with the lux configuration.
     #[command(subcommand, arg_required_else_help = true)]
     Config(ConfigCmd),
-    /// Various debugging utilities.
+    /// Internal commands for debugging Lux itself.
     #[command(subcommand, arg_required_else_help = true)]
     Debug(Debug),
     /// Show documentation for an installed rock.
