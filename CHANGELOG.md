@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## `lux-cli` - [0.2.4](https://github.com/nvim-neorocks/lux/compare/v0.2.3...v0.2.4) - 2025-04-08
+
+### Fixed
+- *(help)* remove [UNIMPLEMENTED] from `lx doc` help
+
+## `lux-lib` - [0.2.3](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.2.2...lux-lib-v0.2.3) - 2025-04-08
+
+### Fixed
+- *(rockspec)* support undocumented string/array duality
+
 ## `lux-cli` - [0.2.3](https://github.com/nvim-neorocks/lux/compare/v0.2.2...v0.2.3) - 2025-04-07
 
 ### Added
