@@ -25,6 +25,11 @@ use crate::{
     tree::{self, Tree},
 };
 
+#[cfg(unix)]
+const LUAROCKS_EXE: &str = "luarocks";
+#[cfg(windows)]
+const LUAROCKS_EXE: &str = "luarocks.bat";
+
 #[derive(Error, Debug)]
 pub enum LuaRocksError {
     #[error(transparent)]
@@ -76,6 +81,7 @@ pub struct LuaRocksInstallation {
 
 pub(crate) const LUAROCKS_VERSION: &str = "3.11.1-1";
 
+#[cfg(target_family = "unix")]
 const LUAROCKS_ROCKSPEC: &str = "
 rockspec_format = '3.0'
 package = 'luarocks'
@@ -83,6 +89,23 @@ version = '3.11.1-1'
 source = {
     url = 'git+https://github.com/luarocks/luarocks',
     tag = 'v3.11.1',
+}
+build = {
+    type = 'builtin',
+}
+";
+
+#[cfg(target_family = "windows")]
+const LUAROCKS_ROCKSPEC: &str = "
+rockspec_format = '3.0'
+package = 'luarocks'
+version = '3.11.1-1'
+source = {
+    url = 'git+https://github.com/luarocks/luarocks',
+    tag = 'v3.11.1',
+}
+dependencies = {
+    'luafilesystem == 1.8.0',
 }
 build = {
     type = 'builtin',
@@ -251,6 +274,7 @@ impl LuaRocksInstallation {
         dest_dir: &Path,
         lua: &LuaInstallation,
     ) -> Result<(), ExecLuaRocksError> {
+        std::fs::create_dir_all(dest_dir)?;
         let dest_dir_str = dest_dir.to_string_lossy().to_string();
         let rockspec_path_str = rockspec_path.to_string_lossy().to_string();
         let args = vec![
@@ -290,7 +314,8 @@ variables = {{
         let luarocks_config = temp_dir.path().join("luarocks-config.lua");
         std::fs::write(luarocks_config.clone(), luarocks_config_content)
             .map_err(ExecLuaRocksError::WriteLuarocksConfigError)?;
-        let output = Command::new("luarocks")
+        let luarocks_bin = self.tree().bin().join(LUAROCKS_EXE);
+        let output = Command::new(luarocks_bin)
             .current_dir(cwd)
             .args(args)
             .env("PATH", luarocks_paths.path_prepended().joined())
