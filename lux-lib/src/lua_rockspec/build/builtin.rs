@@ -7,8 +7,8 @@ use thiserror::Error;
 use crate::{
     build::utils::lua_lib_extension,
     lua_rockspec::{
-        deserialize_vec_from_lua, DisplayAsLuaValue, FromPlatformOverridable, PartialOverride,
-        PerPlatform, PlatformOverridable,
+        deserialize_vec_from_lua_array_or_string, DisplayAsLuaValue, FromPlatformOverridable,
+        PartialOverride, PerPlatform, PlatformOverridable,
     },
 };
 
@@ -202,7 +202,7 @@ fn deserialize_definitions<'de, D>(
 where
     D: Deserializer<'de>,
 {
-    let values: Vec<String> = deserialize_vec_from_lua(deserializer)?;
+    let values: Vec<String> = deserialize_vec_from_lua_array_or_string(deserializer)?;
     values
         .iter()
         .map(|val| {
@@ -317,15 +317,15 @@ impl<'de> Deserialize<'de> for ModulePaths {
 
 #[derive(Debug, PartialEq, Deserialize, Clone, Default)]
 pub struct ModulePathsInternal {
-    #[serde(default, deserialize_with = "deserialize_vec_from_lua")]
+    #[serde(default, deserialize_with = "deserialize_vec_from_lua_array_or_string")]
     pub sources: Vec<PathBuf>,
-    #[serde(default, deserialize_with = "deserialize_vec_from_lua")]
+    #[serde(default, deserialize_with = "deserialize_vec_from_lua_array_or_string")]
     pub libraries: Vec<PathBuf>,
     #[serde(default, deserialize_with = "deserialize_definitions")]
     pub defines: Vec<(String, Option<String>)>,
-    #[serde(default, deserialize_with = "deserialize_vec_from_lua")]
+    #[serde(default, deserialize_with = "deserialize_vec_from_lua_array_or_string")]
     pub incdirs: Vec<PathBuf>,
-    #[serde(default, deserialize_with = "deserialize_vec_from_lua")]
+    #[serde(default, deserialize_with = "deserialize_vec_from_lua_array_or_string")]
     pub libdirs: Vec<PathBuf>,
 }
 

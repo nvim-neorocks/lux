@@ -30,14 +30,23 @@ impl<'de> Deserialize<'de> for LuaTableKey {
 }
 
 /// Deserialize a json value into a Vec<T>, treating empty json objects as empty lists
-/// This is needed to be able to deserialise Lua tables.
-pub fn deserialize_vec_from_lua<'de, D, T>(deserializer: D) -> std::result::Result<Vec<T>, D::Error>
+/// If the json value is a string, this returns a singleton vector containing that value.
+/// This is needed to be able to deserialise RockSpec tables that luarocks
+/// also allows to be strings.
+pub fn deserialize_vec_from_lua_array_or_string<'de, D, T>(
+    deserializer: D,
+) -> std::result::Result<Vec<T>, D::Error>
 where
     D: Deserializer<'de>,
     T: From<String>,
 {
     let values = serde_json::Value::deserialize(deserializer)?;
-    mlua_json_value_to_vec(values).map_err(de::Error::custom)
+    if values.is_string() {
+        let value = T::from(values.as_str().unwrap().into());
+        Ok(vec![value])
+    } else {
+        mlua_json_value_to_vec(values).map_err(de::Error::custom)
+    }
 }
 
 #[derive(Error, Debug)]
