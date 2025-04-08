@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## `lux-cli` - [0.3.0](https://github.com/nvim-neorocks/lux/compare/v0.2.4...v0.3.0) - 2025-04-08
+
+### Added
+- *(debug project)* flag to list included files ([#556](https://github.com/nvim-neorocks/lux/pull/556))
+
+### Fixed
+- [**breaking**] incompatible generated rockspec dependencies
+
+### Other
+- make `lx debug`'s description more obvious
+
+## `lux-lib` - [0.3.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.2.3...lux-lib-v0.3.0) - 2025-04-08
+
+### Added
+- *(debug project)* flag to list included files ([#556](https://github.com/nvim-neorocks/lux/pull/556))
+
+### Fixed
+- *(build)* properly handle legacy rockspecs ([#557](https://github.com/nvim-neorocks/lux/pull/557))
+- [**breaking**] incompatible generated rockspec dependencies
+
 ## `lux-cli` - [0.2.4](https://github.com/nvim-neorocks/lux/compare/v0.2.3...v0.2.4) - 2025-04-08
 
 ### Fixed
