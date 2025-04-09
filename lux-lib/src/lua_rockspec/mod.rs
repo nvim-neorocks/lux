@@ -1448,4 +1448,36 @@ mod tests {
                 .unwrap();
         RemoteLuaRockspec::new(&content).unwrap();
     }
+
+    // Luarocks allows the `install.bin` field to be a list, even though it
+    // should only allow a table.
+    #[tokio::test]
+    pub async fn regression_off_spec_install_binaries() {
+        let rockspec_content = r#"
+            package = "WSAPI"
+            version = "1.7-1"
+
+            source = {
+              url = "git://github.com/keplerproject/wsapi",
+              tag = "v1.7",
+            }
+
+            build = {
+              type = "builtin",
+              modules = {
+                ["wsapi"] = "src/wsapi.lua",
+              },
+              -- Offending Line
+              install = { bin = { "src/launcher/wsapi.cgi" } }
+            }
+        "#;
+
+        let rockspec = RemoteLuaRockspec::new(rockspec_content).unwrap();
+        let config = ConfigBuilder::default().build().unwrap();
+
+        assert_eq!(
+            rockspec.build().for_target_platform(&config).install.bin,
+            HashMap::from([("wsapi".into(), PathBuf::from("src/launcher/wsapi.cgi"))])
+        );
+    }
 }

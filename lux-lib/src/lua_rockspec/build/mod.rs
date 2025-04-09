@@ -38,8 +38,8 @@ use crate::{
 };
 
 use super::{
-    mlua_json_value_to_vec, DisplayAsLuaKV, DisplayAsLuaValue, DisplayLuaKV, DisplayLuaValue,
-    LuaTableKey, PartialOverride, PerPlatform, PlatformIdentifier,
+    mlua_json_value_to_map, mlua_json_value_to_vec, DisplayAsLuaKV, DisplayAsLuaValue,
+    DisplayLuaKV, DisplayLuaValue, LuaTableKey, PartialOverride, PerPlatform, PlatformIdentifier,
 };
 
 /// The build specification for a given rock, serialized from `rockspec.build = { ... }`.
@@ -295,6 +295,46 @@ impl UserData for CommandBuildSpec {
     }
 }
 
+#[derive(Clone, Debug)]
+pub(crate) enum InstallBinaries {
+    Array(Vec<PathBuf>),
+    Table(HashMap<String, PathBuf>),
+}
+
+impl<'de> Deserialize<'de> for InstallBinaries {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value: serde_json::Value = Deserialize::deserialize(deserializer)?;
+        if value.is_array() {
+            let array = mlua_json_value_to_vec(value).map_err(de::Error::custom)?;
+            Ok(InstallBinaries::Array(array))
+        } else {
+            let table: HashMap<String, PathBuf> =
+                mlua_json_value_to_map(value).map_err(de::Error::custom)?;
+            Ok(InstallBinaries::Table(table))
+        }
+    }
+}
+
+impl InstallBinaries {
+    pub(crate) fn coerce(self) -> HashMap<String, PathBuf> {
+        match self {
+            InstallBinaries::Array(array) => array
+                .into_iter()
+                .map(|path| {
+                    (
+                        path.file_stem().unwrap().to_str().unwrap().to_string(),
+                        path,
+                    )
+                })
+                .collect(),
+            InstallBinaries::Table(table) => table,
+        }
+    }
+}
+
 /// For packages which don't provide means to install modules
 /// and expect the user to copy the .lua or library files by hand to the proper locations.
 /// This struct contains categories of files. Each category is itself a table,
@@ -317,7 +357,7 @@ pub struct InstallSpec {
     /// Lua command-line scripts.
     // TODO(vhyrro): The String component should be checked to ensure that it consists of a single
     // path component, such that targets like `my.binary` are not allowed.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_binaries")]
     pub bin: HashMap<String, PathBuf>,
 }
 
@@ -328,6 +368,14 @@ impl UserData for InstallSpec {
         methods.add_method("conf", |_, this, _: ()| Ok(this.conf.clone()));
         methods.add_method("bin", |_, this, _: ()| Ok(this.bin.clone()));
     }
+}
+
+fn deserialize_binaries<'de, D>(deserializer: D) -> Result<HashMap<String, PathBuf>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let binaries = InstallBinaries::deserialize(deserializer)?;
+    Ok(binaries.coerce())
 }
 
 fn deserialize_copy_directories<'de, D>(deserializer: D) -> Result<Option<Vec<PathBuf>>, D::Error>
