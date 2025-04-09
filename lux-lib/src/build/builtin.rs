@@ -1,8 +1,6 @@
-use clean_path::Clean;
 use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
-    io,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -12,7 +10,7 @@ use crate::{
     build::utils,
     config::Config,
     lua_installation::LuaInstallation,
-    lua_rockspec::{Build, BuildInfo, BuiltinBuildSpec, LuaModule, ModuleSpec},
+    lua_rockspec::{Build, BuildInfo, BuiltinBuildSpec, DeploySpec, LuaModule, ModuleSpec},
     progress::{Progress, ProgressBar},
     tree::RockLayout,
 };
@@ -27,7 +25,7 @@ impl Build for BuiltinBuildSpec {
         output_paths: &RockLayout,
         _no_install: bool,
         lua: &LuaInstallation,
-        _config: &Config,
+        config: &Config,
         build_dir: &Path,
         progress: &Progress<ProgressBar>,
     ) -> Result<BuildInfo, Self::Err> {
@@ -97,16 +95,26 @@ impl Build for BuiltinBuildSpec {
             }
         }
 
-        let binaries = autodetect_bin_scripts(build_dir)
-            .iter()
-            .map(|relative_path| {
-                let source = build_dir.join("src").join("bin").join(relative_path);
-                let target = output_paths.bin.join(relative_path);
-                std::fs::create_dir_all(target.parent().unwrap())?;
-                std::fs::copy(source, target)?;
-                Ok(relative_path.clean())
-            })
-            .try_collect::<_, Vec<_>, io::Error>()?;
+        let tree = config.tree(lua.version.clone())?;
+        let mut binaries = Vec::new();
+        for target in autodetect_src_bin_scripts(build_dir) {
+            std::fs::create_dir_all(target.parent().unwrap())?;
+            let target = target.to_string_lossy().to_string();
+            let source = build_dir.join("src").join("bin").join(&target);
+            // Let's not care about the rockspec's deploy field for auto-detected bin scripts
+            // If package maintainers want to disable wrapping via the rockspec, they should
+            // specify binaries in the rockspec.
+            let installed_bin_script =
+                utils::install_binary(&source, &target, &tree, lua, &DeploySpec::default(), config)
+                    .await
+                    .map_err(|err| BuildError::InstallBinary(target.clone(), err))?;
+            binaries.push(
+                installed_bin_script
+                    .file_name()
+                    .expect("no file name")
+                    .into(),
+            );
+        }
 
         Ok(BuildInfo { binaries })
     }
@@ -170,7 +178,7 @@ fn autodetect_modules(
         .collect()
 }
 
-fn autodetect_bin_scripts(build_dir: &Path) -> Vec<PathBuf> {
+fn autodetect_src_bin_scripts(build_dir: &Path) -> Vec<PathBuf> {
     WalkDir::new(build_dir.join("src").join("bin"))
         .into_iter()
         .filter_map(|file| file.ok())

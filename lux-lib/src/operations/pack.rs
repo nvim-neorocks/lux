@@ -178,11 +178,11 @@ fn add_rock_entry(
     f.read_to_end(&mut buffer)?;
     let digest = md5::compute(&buffer);
 
-    #[cfg(unix)]
+    #[cfg(target_family = "unix")]
     let options = SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Stored)
         .unix_permissions(f.metadata()?.permissions().mode());
-    #[cfg(windows)]
+    #[cfg(target_family = "windows")]
     let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
 
     zip.start_file(zip_dir.join(&relative_path).to_string_lossy(), options)?;

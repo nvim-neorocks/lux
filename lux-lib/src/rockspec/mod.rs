@@ -13,8 +13,8 @@ pub mod lua_dependency;
 use crate::{
     config::{Config, LuaVersion},
     lua_rockspec::{
-        BuildSpec, ExternalDependencySpec, LuaVersionError, PerPlatform, PlatformSupport,
-        RemoteRockSource, RockDescription, RockspecFormat, TestSpec,
+        BuildSpec, DeploySpec, ExternalDependencySpec, LuaVersionError, PerPlatform,
+        PlatformSupport, RemoteRockSource, RockDescription, RockspecFormat, TestSpec,
     },
     package::{PackageName, PackageVersion},
 };
@@ -32,10 +32,12 @@ pub trait Rockspec {
     fn build(&self) -> &PerPlatform<BuildSpec>;
     fn test(&self) -> &PerPlatform<TestSpec>;
     fn source(&self) -> &PerPlatform<RemoteRockSource>;
+    fn deploy(&self) -> &PerPlatform<DeploySpec>;
 
     fn build_mut(&mut self) -> &mut PerPlatform<BuildSpec>;
     fn test_mut(&mut self) -> &mut PerPlatform<TestSpec>;
     fn source_mut(&mut self) -> &mut PerPlatform<RemoteRockSource>;
+    fn deploy_mut(&mut self) -> &mut PerPlatform<DeploySpec>;
 
     fn format(&self) -> &Option<RockspecFormat>;
 

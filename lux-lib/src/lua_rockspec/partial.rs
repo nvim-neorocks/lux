@@ -9,8 +9,8 @@ use crate::{
 };
 
 use super::{
-    parse_lua_tbl_or_default, BuildSpecInternal, ExternalDependencySpec, PlatformSupport,
-    RockDescription, RockSourceInternal, TestSpecInternal,
+    parse_lua_tbl_or_default, BuildSpecInternal, DeploySpec, ExternalDependencySpec,
+    PlatformSupport, RockDescription, RockSourceInternal, TestSpecInternal,
 };
 
 pub struct PartialLuaRockspec {
@@ -18,6 +18,7 @@ pub struct PartialLuaRockspec {
     pub(crate) package: Option<PackageName>,
     pub(crate) version: Option<PackageVersion>,
     pub(crate) build: Option<BuildSpecInternal>,
+    pub(crate) deploy: Option<DeploySpec>,
     pub(crate) description: Option<RockDescription>,
     pub(crate) supported_platforms: Option<PlatformSupport>,
     pub(crate) dependencies: Option<Vec<LuaDependencySpec>>,
@@ -64,6 +65,9 @@ impl PartialLuaRockspec {
                 .unwrap_or_default(),
             test: lua
                 .from_value(globals.get("test").unwrap_or(Value::Nil))
+                .unwrap_or_default(),
+            deploy: lua
+                .from_value(globals.get("deploy").unwrap_or(Value::Nil))
                 .unwrap_or_default(),
         };
 

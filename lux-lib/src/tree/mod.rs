@@ -155,6 +155,12 @@ impl Tree {
         self.root.join("bin")
     }
 
+    /// Directory containing unwrapped Lua scripts
+    /// The wrapped scripts are in `Self::bin()`
+    pub(crate) fn unwrapped_bin(&self) -> PathBuf {
+        self.bin().join("unwrapped")
+    }
+
     pub fn match_rocks(&self, req: &PackageReq) -> io::Result<RockMatches> {
         let mut found_packages = self.lockfile()?.find_rocks(req);
         Ok(match found_packages.len() {

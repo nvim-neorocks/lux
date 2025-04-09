@@ -1,5 +1,6 @@
 mod build;
 mod dependency;
+mod deploy;
 mod partial;
 mod platform;
 mod rock_source;
@@ -13,6 +14,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 pub use build::*;
 pub use dependency::*;
+pub use deploy::*;
 pub use partial::*;
 pub use platform::*;
 pub use rock_source::*;
@@ -58,6 +60,7 @@ pub struct LocalLuaRockspec {
     build: PerPlatform<BuildSpec>,
     source: PerPlatform<RemoteRockSource>,
     test: PerPlatform<TestSpec>,
+    deploy: PerPlatform<DeploySpec>,
     /// The original content of this rockspec, needed by luarocks
     raw_content: String,
 }
@@ -114,6 +117,7 @@ impl LocalLuaRockspec {
             external_dependencies: globals.get("external_dependencies")?,
             build: globals.get("build")?,
             test: globals.get("test")?,
+            deploy: globals.get("deploy")?,
             raw_content: rockspec_content.into(),
 
             source: globals
@@ -195,6 +199,10 @@ impl Rockspec for LocalLuaRockspec {
         &self.source
     }
 
+    fn deploy(&self) -> &PerPlatform<DeploySpec> {
+        &self.deploy
+    }
+
     fn build_mut(&mut self) -> &mut PerPlatform<BuildSpec> {
         &mut self.build
     }
@@ -205,6 +213,10 @@ impl Rockspec for LocalLuaRockspec {
 
     fn source_mut(&mut self) -> &mut PerPlatform<RemoteRockSource> {
         &mut self.source
+    }
+
+    fn deploy_mut(&mut self) -> &mut PerPlatform<DeploySpec> {
+        &mut self.deploy
     }
 
     fn format(&self) -> &Option<RockspecFormat> {
@@ -326,6 +338,10 @@ impl Rockspec for RemoteLuaRockspec {
         &self.source
     }
 
+    fn deploy(&self) -> &PerPlatform<DeploySpec> {
+        self.local.deploy()
+    }
+
     fn build_mut(&mut self) -> &mut PerPlatform<BuildSpec> {
         self.local.build_mut()
     }
@@ -336,6 +352,10 @@ impl Rockspec for RemoteLuaRockspec {
 
     fn source_mut(&mut self) -> &mut PerPlatform<RemoteRockSource> {
         &mut self.source
+    }
+
+    fn deploy_mut(&mut self) -> &mut PerPlatform<DeploySpec> {
+        self.local.deploy_mut()
     }
 
     fn format(&self) -> &Option<RockspecFormat> {

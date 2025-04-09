@@ -5,7 +5,6 @@ use crate::config::{LuaVersion, LuaVersionUnset};
 use crate::lockfile::{LocalPackage, LocalPackageId};
 use crate::progress::{MultiProgress, Progress, ProgressBar};
 use crate::{config::Config, tree::Tree};
-use clean_path::Clean;
 use futures::future::join_all;
 use itertools::Itertools;
 use thiserror::Error;
@@ -123,15 +122,18 @@ async fn remove_package(
 
     // Delete the corresponding binaries attached to the current package (located under `{LUX_TREE}/bin/`)
     for relative_binary_path in package.spec.binaries() {
-        let binary_path = tree.bin().join(
-            relative_binary_path
-                .clean()
-                .file_name()
-                .expect("malformed lockfile"),
-        );
+        let binary_file_name = relative_binary_path
+            .file_name()
+            .expect("malformed lockfile");
 
+        let binary_path = tree.bin().join(binary_file_name);
         if binary_path.is_file() {
             tokio::fs::remove_file(binary_path).await?;
+        }
+
+        let unwrapped_binary_path = tree.unwrapped_bin().join(binary_file_name);
+        if unwrapped_binary_path.is_file() {
+            tokio::fs::remove_file(unwrapped_binary_path).await?;
         }
     }
 

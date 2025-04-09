@@ -1,7 +1,7 @@
 use crate::lockfile::{OptState, RemotePackageSourceUrl};
 use crate::lua_rockspec::LuaVersionError;
 use crate::rockspec::{LuaVersionCompatibility, Rockspec};
-use crate::tree;
+use crate::tree::{self, EntryType};
 use std::{io, path::Path, process::ExitStatus};
 
 use crate::{
@@ -31,7 +31,7 @@ use rust_mlua::RustError;
 use ssri::Integrity;
 use thiserror::Error;
 use treesitter_parser::TreesitterBuildError;
-use utils::recursive_copy_dir;
+use utils::{recursive_copy_dir, InstallBinaryError};
 
 mod builtin;
 mod cmake;
@@ -138,6 +138,8 @@ pub enum BuildError {
     },
     #[error("failed to fetch rock source: {0}")]
     FetchSrcError(#[from] FetchSrcError),
+    #[error("failed to install binary {0}: {1}")]
+    InstallBinary(String, InstallBinaryError),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -225,12 +227,14 @@ async fn run_build<R: Rockspec + HasIntegrity>(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn install<R: Rockspec + HasIntegrity>(
     rockspec: &R,
     tree: &Tree,
     output_paths: &RockLayout,
     lua: &LuaInstallation,
     build_dir: &Path,
+    entry_type: &EntryType,
     progress: &Progress<ProgressBar>,
     config: &Config,
 ) -> Result<(), BuildError> {
@@ -272,9 +276,21 @@ async fn install<R: Rockspec + HasIntegrity>(
     if lib_len > 0 {
         progress.map(|p| p.set_message("Copying binaries..."));
     }
-    for (target, source) in &install_spec.bin {
-        std::fs::copy(build_dir.join(source), tree.bin().join(target))?;
-        progress.map(|p| p.set_position(p.position() + 1));
+    if *entry_type == EntryType::Entrypoint {
+        let deploy_spec = rockspec.deploy().for_target_platform(config);
+        for (target, source) in &install_spec.bin {
+            utils::install_binary(
+                &build_dir.join(source),
+                target,
+                tree,
+                lua,
+                deploy_spec,
+                config,
+            )
+            .await
+            .map_err(|err| BuildError::InstallBinary(target.clone(), err))?;
+            progress.map(|p| p.set_position(p.position() + 1));
+        }
     }
     Ok(())
 }
@@ -403,6 +419,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
                 &output_paths,
                 &lua,
                 &build_dir,
+                &build.entry_type,
                 build.progress,
                 build.config,
             )
@@ -465,16 +482,22 @@ mod tests {
     async fn test_builtin_build() {
         let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("resources/test/sample-project-no-build-spec");
+        let tree_dir = assert_fs::TempDir::new().unwrap();
+        let config = ConfigBuilder::new()
+            .unwrap()
+            .tree(Some(tree_dir.to_path_buf()))
+            .build()
+            .unwrap();
         let build_dir = assert_fs::TempDir::new().unwrap();
         build_dir.copy_from(&project_root, &["**"]).unwrap();
+        let tree = config.tree(config.lua_version().cloned().unwrap()).unwrap();
         let dest_dir = assert_fs::TempDir::new().unwrap();
-        let config = ConfigBuilder::new().unwrap().build().unwrap();
         let rock_layout = RockLayout {
             rock_path: dest_dir.to_path_buf(),
             etc: dest_dir.join("etc"),
             lib: dest_dir.join("lib"),
             src: dest_dir.join("src"),
-            bin: dest_dir.join("bin"),
+            bin: tree.bin(),
             conf: dest_dir.join("conf"),
             doc: dest_dir.join("doc"),
         };
@@ -505,7 +528,7 @@ mod tests {
         let foo_bar_baz = foo_bar_dir.child("baz.lua");
         foo_bar_baz.assert(predicate::path::is_file());
         foo_bar_baz.assert(predicate::str::contains("return true"));
-        let bin_file = dest_dir.child("bin").child("hello");
+        let bin_file = tree_dir.child("bin").child("hello");
         bin_file.assert(predicate::path::is_file());
         bin_file.assert(predicate::str::contains("#!/usr/bin/env bash"));
         bin_file.assert(predicate::str::contains("echo \"Hello\""));

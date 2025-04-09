@@ -75,6 +75,8 @@ tree-sitter-config = "0.25.2"
 lux-workspace-hack = { version = "0.1", path = "../lux-workspace-hack" }
 ignore = "0.4.23"
 nonempty = { version = "0.11.0", features = ["serialize"] }
+is_executable = "1.0.4"
+path-slash = "0.2.1"
 
 [dev-dependencies]
 httptest = { version = "0.16.1" }
