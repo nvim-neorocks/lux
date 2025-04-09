@@ -2224,6 +2224,7 @@ dependencies = [
  "indicatif",
  "infer",
  "insta",
+ "is_executable",
  "itertools 0.14.0",
  "lets_find_up",
  "lua-src",

@@ -81,8 +81,11 @@ rockspec_format = '3.0'
 package = 'luarocks'
 version = '3.11.1-1'
 source = {
-   url = 'git+https://github.com/luarocks/luarocks',
-   tag = 'v3.11.1'
+    url = 'git+https://github.com/luarocks/luarocks',
+    tag = 'v3.11.1',
+}
+build = {
+    type = 'builtin',
 }
 ";
 

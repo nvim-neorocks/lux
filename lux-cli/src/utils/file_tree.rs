@@ -153,7 +153,7 @@ mod tests {
     fn test_nested_single_path() {
         let paths: Vec<PathBuf> = vec![PathBuf::from("a/b/c/d/file.txt")];
         let tree = term_tree_from_paths(&paths);
-        let tree_string = dbg!(tree.to_string());
+        let tree_string = tree.to_string();
 
         assert!(tree_string.contains("a"));
         assert!(tree_string.contains("b"));
@@ -213,7 +213,7 @@ mod tests {
         ];
 
         let tree = term_tree_from_paths(&paths);
-        let tree_string = dbg!(tree.to_string());
+        let tree_string = tree.to_string();
 
         assert!(tree_string.contains("deep.txt"));
         assert!(tree_string.contains("shallow.txt"));
