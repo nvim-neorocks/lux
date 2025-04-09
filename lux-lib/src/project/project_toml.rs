@@ -351,7 +351,7 @@ impl PartialProjectToml {
                 })
                 .or(self.lua),
             build: other.build.unwrap_or(self.build),
-            run: None,
+            run: self.run,
             description: other.description.or(self.description),
             supported_platforms: other
                 .supported_platforms
@@ -895,6 +895,9 @@ mod tests {
         foo = "1.0"
         bar = ">=2.0"
 
+        [run]
+        args = ["--foo", "--bar"]
+
         [build]
         type = "builtin"
         "#;
@@ -946,6 +949,10 @@ mod tests {
         type = "command"
         script = "test.lua"
         flags = [ "foo", "bar" ]
+
+        [run]
+        command = "my-command"
+        args = ["--foo", "--bar"]
 
         [build]
         type = "builtin"
@@ -1005,6 +1012,10 @@ mod tests {
         type = "command"
         script = "test.lua"
         flags = [ "foo", "bar" ]
+
+        [run]
+        command = "my-command"
+        args = ["--foo", "--bar"]
 
         [build]
         type = "builtin"
@@ -1160,6 +1171,10 @@ mod tests {
         script = "test.lua"
         flags = [ "foo", "bar" ]
 
+        [run]
+        command = "my-command"
+        args = [ "--foo", "--bar" ]
+
         [build]
         type = "builtin"
         "#;
@@ -1264,6 +1279,8 @@ mod tests {
         assert_eq!(merged.test(), expected_rockspec.test());
         assert_eq!(merged.build(), expected_rockspec.build());
         assert_eq!(merged.format(), expected_rockspec.format());
+        // Ensure that the run command is retained after merge.
+        assert!(merged.local.run().is_some());
     }
 
     #[test]
