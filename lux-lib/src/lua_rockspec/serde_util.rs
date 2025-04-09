@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 use itertools::Itertools;
 use serde::{de, Deserialize, Deserializer};
@@ -52,6 +52,34 @@ where
 #[derive(Error, Debug)]
 #[error("expected list of strings")]
 pub struct ExpectedListOfStrings;
+
+#[derive(Error, Debug)]
+#[error("expected table with strings as keys")]
+pub struct ExpectedTableOfStrings;
+
+/// Convert a json value into a HashMap<String, T>.
+/// This is needed to be able to deserialise Lua tables.
+pub fn mlua_json_value_to_map<T>(
+    values: serde_json::Value,
+) -> Result<HashMap<String, T>, ExpectedTableOfStrings>
+where
+    T: From<String>,
+{
+    values
+        .as_object()
+        .ok_or(ExpectedTableOfStrings)?
+        .clone()
+        .into_iter()
+        .map(|(key, value)| {
+            let value: String = value
+                .as_str()
+                .map(|s| s.into())
+                .ok_or(ExpectedTableOfStrings)?;
+
+            Ok((key, value.into()))
+        })
+        .try_collect()
+}
 
 /// Convert a json value into a Vec<T>, treating empty json objects as empty lists
 /// This is needed to be able to deserialise Lua tables.
