@@ -1,6 +1,6 @@
 [package]
 name = "lux-cli"
-version = "0.3.0"
+version = "0.3.1"
 description = "A luxurious package manager for Lua"
 authors = ["vhyrro <vhyrro@gmail.com>", "mrcjkb <marc@jakobi.dev>"]
 homepage = "https://github.com/nvim-neorocks/lux"
@@ -53,6 +53,6 @@ serial_test = { version = "3.2.0" }
 assert_fs = "1.1.2"
 
 [dependencies.lux-lib]
-version = "0.3.0"
+version = "0.3.1"
 path = "../lux-lib/"
 features = ["clap"]
