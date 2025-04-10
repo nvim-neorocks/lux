@@ -190,8 +190,8 @@ impl Project {
                 cwd: start.as_ref(),
                 kind: FindUpKind::File,
             },
-        )? {
-            Some(path) => {
+        ) {
+            Ok(Some(path)) => {
                 let toml_content = std::fs::read_to_string(&path)?;
                 let root = path.parent().unwrap();
 
@@ -208,7 +208,10 @@ impl Project {
 
                 Ok(Some(project))
             }
-            None => Ok(None),
+            // NOTE: If we hit a read error, it could be because we haven't found a PROJECT_TOML
+            // and have started searching too far upwards.
+            // See for example https://github.com/nvim-neorocks/lux/issues/532
+            _ => Ok(None),
         }
     }
 
