@@ -1,6 +1,7 @@
 use std::env;
 use std::io::Read;
 
+use crate::lua_rockspec::{GitSource, LocalRockSource, RemoteRockSource, RockSourceSpec};
 use crate::project::project_toml::RemoteProjectTomlValidationError;
 use crate::rockspec::Rockspec;
 use crate::TOOL_VERSION;
@@ -110,7 +111,12 @@ pub enum UploadError {
     UserCheck(#[from] UserCheckError),
     ApiKeyUnspecified(#[from] ApiKeyUnspecified),
     ValidationError(#[from] RemoteProjectTomlValidationError),
+    NonDeterministicGitSource(#[from] NonDeterministicGitSourceError),
 }
+
+#[derive(Clone, Debug, Error)]
+#[error("refusing to upload nondeterministic rockspec with git source. Supply a `tag` parameter or an integrity hash.")]
+pub struct NonDeterministicGitSourceError;
 
 pub struct ApiKey(String);
 
@@ -192,10 +198,13 @@ async fn upload_from_project(
 ) -> Result<(), UploadError> {
     let client = Client::builder().https_only(true).build()?;
 
+    let rockspec = project.toml().into_remote()?;
+
+    // Disallow uploading non-deterministic rockspecs
+    helpers::verify_rockspec_determinism(rockspec.source().for_target_platform(config))?;
+
     helpers::ensure_tool_version(&client, config.server()).await?;
     helpers::ensure_user_exists(&client, api_key, config.server()).await?;
-
-    let rockspec = project.toml().into_remote()?;
 
     if helpers::rock_exists(
         &client,
@@ -331,5 +340,112 @@ mod helpers {
             .text()
             .await?
             != "{}")
+    }
+
+    pub(crate) fn verify_rockspec_determinism(
+        source: &RemoteRockSource,
+    ) -> Result<(), NonDeterministicGitSourceError> {
+        match source {
+            RemoteRockSource {
+                local:
+                    LocalRockSource {
+                        integrity: Some(_), ..
+                    },
+                source_spec: RockSourceSpec::Git(_),
+            } => {}
+            RemoteRockSource {
+                source_spec:
+                    RockSourceSpec::Git(GitSource {
+                        checkout_ref: Some(_),
+                        ..
+                    }),
+                ..
+            } => {}
+            RemoteRockSource {
+                source_spec: RockSourceSpec::Git(_),
+                ..
+            } => return Err(NonDeterministicGitSourceError),
+            _ => {}
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        config::ConfigBuilder,
+        project::{project_toml::PartialProjectToml, ProjectRoot},
+        rockspec::Rockspec,
+    };
+
+    use super::helpers;
+
+    #[test]
+    fn upload_check_deterministic_rockspecs() {
+        let config = ConfigBuilder::new().unwrap().build().unwrap();
+
+        let rockspec_content = r#"
+            package = "test-package"
+            version = "1.0.0"
+            lua = ">=5.1"
+
+            [source]
+            url = "git+https://exaple.com/repo.git"
+
+            [build]
+            type = "builtin"
+        "#;
+
+        let rockspec = PartialProjectToml::new(rockspec_content, ProjectRoot::default())
+            .unwrap()
+            .into_remote()
+            .unwrap();
+
+        helpers::verify_rockspec_determinism(rockspec.source().for_target_platform(&config))
+            .unwrap_err();
+
+        let rockspec_content = r#"
+            package = "test-package"
+            version = "1.0.0"
+            lua = ">=5.1"
+
+            [source]
+            url = "git+https://exaple.com/repo.git"
+            hash = "sha256-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+
+            [build]
+            type = "builtin"
+        "#;
+
+        let rockspec = PartialProjectToml::new(rockspec_content, ProjectRoot::default())
+            .unwrap()
+            .into_remote()
+            .unwrap();
+
+        helpers::verify_rockspec_determinism(rockspec.source().for_target_platform(&config))
+            .unwrap();
+
+        let rockspec_content = r#"
+            package = "test-package"
+            version = "1.0.0"
+            lua = ">=5.1"
+
+            [source]
+            url = "git+https://exaple.com/repo.git"
+            tag = "v0.1.0"
+
+            [build]
+            type = "builtin"
+        "#;
+
+        let rockspec = PartialProjectToml::new(rockspec_content, ProjectRoot::default())
+            .unwrap()
+            .into_remote()
+            .unwrap();
+
+        helpers::verify_rockspec_determinism(rockspec.source().for_target_platform(&config))
+            .unwrap();
     }
 }
