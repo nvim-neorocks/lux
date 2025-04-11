@@ -558,7 +558,6 @@ impl From<Config> for ConfigBuilder {
 fn default_variables() -> impl Iterator<Item = (String, String)> {
     let cflags = env::var("CFLAGS").unwrap_or(utils::default_cflags().into());
     vec![
-        ("LUA".into(), "lua".into()),
         ("MAKE".into(), "make".into()),
         ("CMAKE".into(), "cmake".into()),
         ("LIB_EXTENSION".into(), utils::lua_lib_extension().into()),

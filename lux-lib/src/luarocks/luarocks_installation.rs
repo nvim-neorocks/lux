@@ -3,7 +3,7 @@ use itertools::Itertools;
 use std::{
     collections::HashMap,
     io,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, ExitStatus},
     sync::Arc,
 };
@@ -24,6 +24,11 @@ use crate::{
     rockspec::Rockspec,
     tree::{self, Tree},
 };
+
+#[cfg(unix)]
+const LUAROCKS_EXE: &str = "luarocks";
+#[cfg(windows)]
+const LUAROCKS_EXE: &str = "luarocks";
 
 #[derive(Error, Debug)]
 pub enum LuaRocksError {
@@ -61,6 +66,8 @@ pub enum ExecLuaRocksError {
     WriteLuarocksConfigError(io::Error),
     #[error("failed to run luarocks: {0}")]
     Io(#[from] io::Error),
+    #[error("luarocks binary not found at {0}")]
+    LuarocksBinNotFound(PathBuf),
     #[error("executing luarocks compatibility layer failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
     CommandFailure {
         status: ExitStatus,
@@ -81,8 +88,11 @@ rockspec_format = '3.0'
 package = 'luarocks'
 version = '3.11.1-1'
 source = {
-   url = 'git+https://github.com/luarocks/luarocks',
-   tag = 'v3.11.1'
+    url = 'git+https://github.com/luarocks/luarocks',
+    tag = 'v3.11.1',
+}
+build = {
+    type = 'builtin',
 }
 ";
 
@@ -287,7 +297,11 @@ variables = {{
         let luarocks_config = temp_dir.path().join("luarocks-config.lua");
         std::fs::write(luarocks_config.clone(), luarocks_config_content)
             .map_err(ExecLuaRocksError::WriteLuarocksConfigError)?;
-        let output = Command::new("luarocks")
+        let luarocks_bin = self.tree().bin().join(LUAROCKS_EXE);
+        if !luarocks_bin.is_file() {
+            return Err(ExecLuaRocksError::LuarocksBinNotFound(luarocks_bin));
+        }
+        let output = Command::new(luarocks_bin)
             .current_dir(cwd)
             .args(args)
             .env("PATH", luarocks_paths.path_prepended().joined())

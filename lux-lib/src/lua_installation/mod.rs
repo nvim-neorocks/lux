@@ -1,6 +1,8 @@
+use is_executable::IsExecutable;
 use itertools::Itertools;
 use pkg_config::{Config as PkgConfig, Library};
 use std::io;
+use std::path::Path;
 use std::{path::PathBuf, process::Command};
 use target_lexicon::Triple;
 use thiserror::Error;
@@ -15,7 +17,9 @@ use crate::{
 pub struct LuaInstallation {
     pub include_dir: PathBuf,
     pub lib_dir: PathBuf,
-    version: LuaVersion,
+    pub version: LuaVersion,
+    /// Binary to the Lua executable, if present
+    bin: Option<PathBuf>,
     /// pkg-config library information if available
     lib_info: Option<Library>,
 }
@@ -38,22 +42,36 @@ impl LuaInstallation {
 
         if let Some(info) = lib_info {
             if !&info.include_paths.is_empty() && !&info.link_paths.is_empty() {
+                let lib_dir = PathBuf::from(&info.link_paths[0]);
+                let bin = lib_dir
+                    .parent()
+                    .map(|parent| parent.join("bin"))
+                    .filter(|dir| dir.is_dir())
+                    .and_then(|bin_path| find_lua_executable(&bin_path));
                 return Self {
                     include_dir: PathBuf::from(&info.include_paths[0]),
-                    lib_dir: PathBuf::from(&info.link_paths[0]),
+                    lib_dir,
                     version: version.clone(),
                     lib_info: Some(info),
+                    bin,
                 };
             }
         }
 
         let output = Self::path(version, config);
         if output.exists() {
+            let bin_path = output.join("bin");
+            let bin = if bin_path.is_dir() {
+                find_lua_executable(&bin_path)
+            } else {
+                None
+            };
             LuaInstallation {
                 include_dir: output.join("include"),
                 lib_dir: output.join("lib"),
                 version: version.clone(),
                 lib_info: None,
+                bin,
             }
         } else {
             let host = Triple::host();
@@ -69,7 +87,7 @@ impl LuaInstallation {
                     let build = luajit_src::Build::new()
                         .target(target)
                         .host(host_operating_system)
-                        .out_dir(output)
+                        .out_dir(&output)
                         .lua52compat(matches!(version, LuaVersion::LuaJIT52))
                         .build();
 
@@ -82,7 +100,7 @@ impl LuaInstallation {
                     let build = lua_src::Build::new()
                         .target(target)
                         .host(host_operating_system)
-                        .out_dir(output)
+                        .out_dir(&output)
                         .build(match version {
                             LuaVersion::Lua51 => lua_src::Version::Lua51,
                             LuaVersion::Lua52 => lua_src::Version::Lua52,
@@ -98,11 +116,18 @@ impl LuaInstallation {
                 }
             };
 
+            let bin_path = output.join("bin");
+            let bin = if bin_path.is_dir() {
+                find_lua_executable(&bin_path)
+            } else {
+                None
+            };
             LuaInstallation {
                 include_dir,
                 lib_dir,
                 version: version.clone(),
                 lib_info: None,
+                bin,
             }
         }
     }
@@ -111,46 +136,96 @@ impl LuaInstallation {
         config.lua_dir().join(version.to_string())
     }
 
-    pub(crate) fn compile_args(&self) -> Vec<String> {
+    pub(crate) fn compile_args(&self, compiler: &cc::Tool) -> Vec<String> {
+        let prefix = if compiler.is_like_msvc() { "/" } else { "-" };
         if let Some(info) = &self.lib_info {
             info.include_paths
                 .iter()
-                .map(|p| format!("-I{}", p.display()))
+                .map(|p| format!("{}I{}", prefix, p.display()))
                 .chain(info.defines.iter().map(|(k, v)| match v {
-                    Some(val) => format!("-D{}={}", k, val),
-                    None => format!("-D{}", k),
+                    Some(val) => {
+                        format!("{}D{}={}", prefix, k, val)
+                    }
+                    None => format!("{}D{}", prefix, k),
                 }))
                 .collect_vec()
         } else {
-            vec![format!("-I{}", self.include_dir.display())]
+            vec![format!("{}I{}", prefix, self.include_dir.display())]
         }
     }
 
-    pub(crate) fn link_args(&self) -> Vec<String> {
+    pub(crate) fn link_args(&self, compiler: &cc::Tool) -> Vec<String> {
         if let Some(info) = &self.lib_info {
             info.link_paths
                 .iter()
-                .map(|p| format!("-L{}", p.display()))
-                .chain(info.libs.iter().map(|lib| format!("-l{}", lib)))
+                .map(|p| format_dir_link_arg(p, compiler))
+                .chain(
+                    info.libs
+                        .iter()
+                        .map(|lib| format_lib_link_arg(lib, compiler)),
+                )
                 .chain(info.ld_args.iter().map(|ld_arg_group| {
                     ld_arg_group
                         .iter()
-                        .map(|arg| format!("-Wl,{}", arg))
+                        .map(|arg| format_linker_arg(arg, compiler))
                         .collect::<Vec<_>>()
                         .join(" ")
                 }))
                 .collect_vec()
         } else {
-            let link_lua_arg = match self.version {
-                LuaVersion::LuaJIT => "-lluajit-5.1",
-                LuaVersion::LuaJIT52 => "-lluajit-5.2",
-                _ => "-llua",
+            let link_lua_arg = if compiler.is_like_msvc() {
+                match self.version {
+                    LuaVersion::LuaJIT | LuaVersion::LuaJIT52 => "luajit.lib",
+                    LuaVersion::Lua51 => "lua5.1.lib",
+                    LuaVersion::Lua52 => "lua5.2.lib",
+                    LuaVersion::Lua53 => "lua5.3.lib",
+                    LuaVersion::Lua54 => "lua5.4.lib",
+                }
+            } else {
+                match self.version {
+                    LuaVersion::LuaJIT => "-lluajit-5.1",
+                    LuaVersion::LuaJIT52 => "-lluajit-5.2",
+                    _ => "-llua",
+                }
             };
             vec![
-                format!("-L{}", self.lib_dir.display()),
+                format_dir_link_arg(&self.lib_dir, compiler),
                 link_lua_arg.to_string(),
             ]
         }
+    }
+
+    /// Get the Lua binary (if present), prioritising
+    /// a potentially overridden value in the config.
+    pub(crate) fn lua_binary(&self, config: &Config) -> Option<String> {
+        config.variables().get("LUA").cloned().or(self
+            .bin
+            .as_ref()
+            .map(|bin| bin.clone().to_string_lossy().to_string()))
+    }
+}
+
+fn format_dir_link_arg(dir: &Path, compiler: &cc::Tool) -> String {
+    if compiler.is_like_msvc() {
+        format!("/LIBPATH:{}", dir.display())
+    } else {
+        format!("-L{}", dir.display())
+    }
+}
+
+fn format_lib_link_arg(lib: &str, compiler: &cc::Tool) -> String {
+    if compiler.is_like_msvc() {
+        format!("{}.lib", lib)
+    } else {
+        format!("-l{}", lib)
+    }
+}
+
+fn format_linker_arg(arg: &str, compiler: &cc::Tool) -> String {
+    if compiler.is_like_msvc() {
+        format!("-Wl,{}", arg)
+    } else {
+        format!("/link {}", arg)
     }
 }
 
@@ -158,12 +233,13 @@ impl HasVariables for LuaInstallation {
     fn substitute_variables(&self, input: &str) -> String {
         variables::substitute(
             |var_name| {
-                let dir = match var_name {
+                let result = match var_name {
                     "LUA_INCDIR" => Some(escape_path(&self.include_dir)),
                     "LUA_LIBDIR" => Some(escape_path(&self.lib_dir)),
+                    "LUA" => Some(escape_path(&self.bin.clone().unwrap_or("lua".into()))),
                     _ => None,
                 }?;
-                Some(dir)
+                Some(result)
             },
             input,
         )
@@ -210,8 +286,30 @@ fn parse_lua_version_from_output(lua_output: &str) -> Result<PackageVersion, Get
     Ok(PackageVersion::parse(&lua_version_str)?)
 }
 
+fn find_lua_executable(bin_path: &Path) -> Option<PathBuf> {
+    std::fs::read_dir(bin_path).ok().and_then(|entries| {
+        entries
+            .filter_map(Result::ok)
+            .map(|entry| entry.path().to_path_buf())
+            .filter(|file| {
+                file.is_executable()
+                    && file.file_name().is_some_and(|name| {
+                        matches!(
+                            name.to_string_lossy().to_string().as_str(),
+                            "lua" | "luajit"
+                        )
+                    })
+            })
+            .collect_vec()
+            .first()
+            .cloned()
+    })
+}
+
 #[cfg(test)]
 mod test {
+    use crate::config::ConfigBuilder;
+
     use super::*;
 
     #[tokio::test]
@@ -225,5 +323,21 @@ mod test {
     async fn parse_lua_51_version() {
         let lua_output = "Lua 5.1.5  Copyright (C) 1994-2012 Lua.org, PUC-Rio";
         parse_lua_version_from_output(lua_output).unwrap();
+    }
+
+    #[tokio::test]
+    async fn lua_installation_bin() {
+        if std::env::var("LUX_SKIP_IMPURE_TESTS").unwrap_or("0".into()) == "1" {
+            println!("Skipping impure test");
+            return;
+        }
+        let config = ConfigBuilder::new().unwrap().build().unwrap();
+        let lua_version = config.lua_version().unwrap();
+        let lua_installation = LuaInstallation::new(lua_version, &config);
+        // FIXME: This fails when run in the nix checkPhase
+        assert!(lua_installation.bin.is_some());
+        let pkg_version =
+            get_installed_lua_version(&lua_installation.bin.unwrap().to_string_lossy()).unwrap();
+        assert_eq!(&LuaVersion::from_version(pkg_version).unwrap(), lua_version);
     }
 }

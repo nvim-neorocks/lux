@@ -2,17 +2,23 @@ use crate::{
     build::BuildError,
     config::Config,
     lua_installation::LuaInstallation,
-    lua_rockspec::{LuaModule, ModulePaths},
-    tree::RockLayout,
+    lua_rockspec::{DeploySpec, LuaModule, ModulePaths},
+    tree::{RockLayout, Tree},
 };
 use itertools::Itertools;
 use shlex::try_quote;
 use std::{
     io,
     path::{Path, PathBuf},
-    process::Output,
+    process::{Output, Stdio},
+    string::FromUtf8Error,
 };
 use target_lexicon::Triple;
+use thiserror::Error;
+use tokio::process::Command;
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 use super::variables::HasVariables;
 
@@ -106,29 +112,66 @@ pub(crate) fn compile_c_files(
     let build = build
         .cargo_output(false)
         .cargo_metadata(false)
-        .cargo_debug(false)
         .cargo_warnings(false)
-        .debug(false)
+        .warnings(false)
+        .flag("-w") // Suppress all warnings
         .files(files)
         .host(std::env::consts::OS)
-        .opt_level(3)
+        .opt_level(2)
         .out_dir(intermediate_dir)
         .target(&host.to_string());
 
-    for arg in lua.compile_args() {
+    let is_msvc = build.try_get_compiler()?.is_like_msvc();
+    if is_msvc {
+        build.flag("/DLL");
+    } else {
+        build.shared_flag(true);
+    }
+
+    for arg in lua.compile_args(&build.try_get_compiler()?) {
         build.flag(&arg);
     }
 
-    let objects = build.try_compile_intermediates()?;
-    let output = build
-        .try_get_compiler()?
-        .to_command()
-        .args(["-shared", "-o"])
-        .arg(parent.join(file))
-        .arg(format!("-L{}", lua.lib_dir.to_string_lossy())) // TODO: In luarocks, this is behind a link_lua_explicitly config option Library directory
-        .args(lua.link_args())
-        .args(&objects)
-        .output()?;
+    let objects = build
+        .try_compile_intermediates()
+        .map_err(BuildError::CompileIntermediatesError)?;
+
+    let output_file = format!("{}", parent.join(file).display());
+    let (out_args, lib_args) = if is_msvc {
+        (
+            vec![
+                "/link".into(),
+                format!("/OUT:{}", output_file),
+                "/DLL".into(),
+            ],
+            format!("/LIBPATH:{}", lua.lib_dir.display()),
+        )
+    } else {
+        (
+            vec!["-shared".into(), "-o".into(), output_file],
+            format!("-L{}", lua.lib_dir.display()),
+        )
+    };
+
+    let output = if is_msvc {
+        build
+            .try_get_compiler()?
+            .to_command()
+            .args(&objects) // MSVC wants the objects first
+            .args(out_args)
+            .arg(lib_args)
+            .args(lua.link_args(&build.try_get_compiler()?))
+            .output()?
+    } else {
+        build
+            .try_get_compiler()?
+            .to_command()
+            .args(out_args)
+            .arg(lib_args)
+            .args(lua.link_args(&build.try_get_compiler()?)) // NOTE: In luarocks, this is behind a link_lua_explicitly config option Library directory
+            .args(&objects)
+            .output()?
+    };
     validate_output(output)?;
     Ok(())
 }
@@ -137,7 +180,7 @@ pub(crate) fn compile_c_files(
 
 /// the extension for Lua libraries.
 pub(crate) fn lua_lib_extension() -> &'static str {
-    if cfg!(target_os = "windows") {
+    if cfg!(target_env = "msvc") {
         "dll"
     } else {
         "so"
@@ -146,7 +189,7 @@ pub(crate) fn lua_lib_extension() -> &'static str {
 
 /// the extension for Lua objects.
 pub(crate) fn lua_obj_extension() -> &'static str {
-    if cfg!(target_os = "windows") {
+    if cfg!(target_env = "msvc") {
         "obj"
     } else {
         "o"
@@ -154,8 +197,8 @@ pub(crate) fn lua_obj_extension() -> &'static str {
 }
 
 pub(crate) fn default_cflags() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "/nologo /MD /O2"
+    if cfg!(target_env = "msvc") {
+        "/NOLOGO /MD /O2"
     } else {
         "-O2"
     }
@@ -164,8 +207,8 @@ pub(crate) fn default_cflags() -> &'static str {
 pub(crate) fn default_libflag() -> &'static str {
     if cfg!(target_os = "macos") {
         "-bundle -undefined dynamic_lookup -all_load"
-    } else if cfg!(target_os = "windows") {
-        "/nologo /dll"
+    } else if cfg!(target_env = "msvc") {
+        "/NOLOGO /DLL"
     } else {
         "-shared"
     }
@@ -209,18 +252,24 @@ pub(crate) fn compile_c_modules(
     let build = build
         .cargo_output(false)
         .cargo_metadata(false)
-        .cargo_debug(false)
         .cargo_warnings(false)
-        .debug(false)
+        .warnings(false)
+        .flag("-w") // Suppress all warnings
         .files(source_files)
         .host(std::env::consts::OS)
         .includes(&include_dirs)
-        .opt_level(3)
+        .opt_level(2)
         .out_dir(intermediate_dir)
-        .shared_flag(true)
         .target(&host.to_string());
 
-    for arg in lua.compile_args() {
+    let is_msvc = build.try_get_compiler()?.is_like_msvc();
+    if is_msvc {
+        build.flag("/DLL");
+    } else {
+        build.shared_flag(true);
+    }
+
+    for arg in lua.compile_args(&build.try_get_compiler()?) {
         build.flag(&arg);
     }
 
@@ -237,32 +286,193 @@ pub(crate) fn compile_c_modules(
         )
     });
     // See https://github.com/rust-lang/cc-rs/issues/594#issuecomment-2110551057
-    let objects = build.try_compile_intermediates()?;
+    let objects = build
+        .try_compile_intermediates()
+        .map_err(BuildError::CompileIntermediatesError)?;
 
-    let libdir_args = data
-        .libdirs
-        .iter()
-        .map(|libdir| format!("-L{}", source_dir.join(libdir).to_str().unwrap()));
+    let libdir_args = data.libdirs.iter().map(|libdir| {
+        if is_msvc {
+            format!("/LIBPATH:{}", source_dir.join(libdir).display())
+        } else {
+            format!("-L{}", source_dir.join(libdir).display())
+        }
+    });
 
-    let library_args = data
-        .libraries
-        .iter()
-        .map(|library| format!("-l{}", library.to_str().unwrap()));
+    let library_args = data.libraries.iter().map(|library| {
+        if is_msvc {
+            format!("{}.lib", library.to_str().unwrap())
+        } else {
+            format!("-l{}", library.to_str().unwrap())
+        }
+    });
 
-    let output = build
-        .try_get_compiler()?
-        .to_command()
-        .args(["-shared", "-o"])
-        .arg(parent.join(file))
-        .arg(format!("-L{}", lua.lib_dir.to_string_lossy())) // TODO: In luarocks, this is behind a link_lua_explicitly config option Library directory
-        .args(lua.link_args())
-        .args(&objects)
-        .args(libdir_args)
-        .args(library_args)
-        .output()?;
+    let output_file = format!("{}", parent.join(file).display());
+    let (out_args, lib_args) = if is_msvc {
+        (
+            vec![
+                "/link".into(),
+                format!("/OUT:{}", output_file),
+                "/DLL".into(),
+            ],
+            format!("/LIBPATH:{}", lua.lib_dir.display()),
+        )
+    } else {
+        (
+            vec!["-shared".into(), "-o".into(), output_file],
+            format!("-L{}", lua.lib_dir.display()),
+        )
+    };
+
+    let output = if is_msvc {
+        build
+            .try_get_compiler()?
+            .to_command()
+            .args(&objects) // MSVC wants the objects first
+            .args(out_args)
+            .arg(lib_args)
+            .args(lua.link_args(&build.try_get_compiler()?))
+            .args(libdir_args)
+            .args(library_args)
+            .output()?
+    } else {
+        build
+            .try_get_compiler()?
+            .to_command()
+            .args(out_args)
+            .arg(lib_args)
+            .args(lua.link_args(&build.try_get_compiler()?)) // NOTE: In luarocks, this is behind a link_lua_explicitly config option Library directory
+            .args(&objects)
+            .args(libdir_args)
+            .args(library_args)
+            .output()?
+    };
     validate_output(output)?;
 
     Ok(())
+}
+
+#[derive(Debug, Error)]
+pub enum InstallBinaryError {
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error("error wrapping binary: {0}")]
+    Wrap(#[from] WrapBinaryError),
+}
+
+#[derive(Debug, Error)]
+pub enum WrapBinaryError {
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    Utf8(#[from] FromUtf8Error),
+}
+
+pub(crate) async fn install_binary(
+    source: &Path,
+    target: &str,
+    tree: &Tree,
+    lua: &LuaInstallation,
+    deploy: &DeploySpec,
+    config: &Config,
+) -> Result<PathBuf, InstallBinaryError> {
+    tokio::fs::create_dir_all(&tree.bin()).await?;
+    let script = if deploy.wrap_bin_scripts
+        && needs_wrapper(source).await?
+        && is_compatible_lua_script(source, lua, config).await
+    {
+        install_wrapped_binary(source, target, tree, lua, config).await?
+    } else {
+        let target = tree.bin().join(target);
+        tokio::fs::copy(source, &target).await?;
+        target
+    };
+
+    #[cfg(unix)]
+    set_executable_permissions(&script).await?;
+
+    Ok(script)
+}
+
+async fn install_wrapped_binary(
+    source: &Path,
+    target: &str,
+    tree: &Tree,
+    lua: &LuaInstallation,
+    config: &Config,
+) -> Result<PathBuf, WrapBinaryError> {
+    let unwrapped_bin_dir = tree.unwrapped_bin();
+    tokio::fs::create_dir_all(&unwrapped_bin_dir).await?;
+    let unwrapped_bin = unwrapped_bin_dir.join(target);
+    tokio::fs::copy(source, &unwrapped_bin).await?;
+
+    #[cfg(target_family = "unix")]
+    let target = tree.bin().join(target);
+    #[cfg(target_family = "windows")]
+    let target = tree.bin().join(format!("{}.bat", target));
+
+    let lua_bin = lua.lua_binary(config).unwrap_or("lua".into());
+
+    #[cfg(target_family = "unix")]
+    let content = format!(
+        r#"#!/bin/sh
+
+exec {0} "{1}" "$@"
+"#,
+        lua_bin,
+        unwrapped_bin.display(),
+    );
+
+    #[cfg(target_family = "windows")]
+    let content = format!(
+        r#"@echo off
+setlocal
+
+{0} "{1}" %*
+
+exit /b %ERRORLEVEL%
+"#,
+        lua_bin,
+        unwrapped_bin.display(),
+    );
+
+    tokio::fs::write(&target, content).await?;
+    Ok(target)
+}
+
+#[cfg(unix)]
+async fn set_executable_permissions(script: &Path) -> std::io::Result<()> {
+    let mut perms = tokio::fs::metadata(&script).await?.permissions();
+    perms.set_mode(0o744);
+    tokio::fs::set_permissions(&script, perms).await?;
+    Ok(())
+}
+
+/// Tries to load the file with Lua. If the file can be loaded,
+/// we treat it as a valid Lua script.
+async fn is_compatible_lua_script(file: &Path, lua: &LuaInstallation, config: &Config) -> bool {
+    let lua_bin = lua.lua_binary(config).unwrap_or("lua".into());
+    Command::new(lua_bin)
+        .arg("-e")
+        .arg(format!(
+            "if loadfile('{}') then os.exit(0) else os.exit(1) end",
+            file.display()
+        ))
+        .stderr(Stdio::null())
+        .stdout(Stdio::null())
+        .status()
+        .await
+        .is_ok_and(|status| status.success())
+}
+
+#[cfg(target_family = "unix")]
+async fn needs_wrapper(script: &Path) -> Result<bool, WrapBinaryError> {
+    let content = String::from_utf8(tokio::fs::read(script).await?)?;
+    Ok(!content.starts_with("#!/usr/bin/env "))
+}
+
+#[cfg(target_family = "windows")]
+async fn needs_wrapper(_script: &Path) -> io::Result<bool> {
+    Ok(true)
 }
 
 pub(crate) fn substitute_variables(
@@ -284,5 +494,52 @@ pub(crate) fn escape_path(path: &Path) -> String {
         try_quote(&path_str)
             .map(|str| str.to_string())
             .unwrap_or(format!("'{}'", path_str))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::ConfigBuilder;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_is_compatible_lua_script() {
+        let config = ConfigBuilder::new().unwrap().build().unwrap();
+        let lua_version = config.lua_version().unwrap();
+        let lua = LuaInstallation::new(lua_version, &config);
+        let valid_script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources/test/sample_lua_bin_script_valid");
+        assert!(is_compatible_lua_script(&valid_script, &lua, &config).await);
+        let invalid_script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources/test/sample_lua_bin_script_invalid");
+        assert!(!is_compatible_lua_script(&invalid_script, &lua, &config).await);
+    }
+
+    #[tokio::test]
+    async fn test_install_wrapped_binary() {
+        let temp = assert_fs::TempDir::new().unwrap();
+        let config = ConfigBuilder::new()
+            .unwrap()
+            .tree(Some(temp.to_path_buf()))
+            .build()
+            .unwrap();
+        let lua_version = config.lua_version().unwrap();
+        let lua = LuaInstallation::new(lua_version, &config);
+        let tree = config.tree(lua_version.clone()).unwrap();
+        let valid_script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources/test/sample_lua_bin_script_valid");
+        let script_name = "test_script";
+        let script_path = install_wrapped_binary(&valid_script, script_name, &tree, &lua, &config)
+            .await
+            .unwrap();
+
+        #[cfg(unix)]
+        set_executable_permissions(&script_path).await.unwrap();
+
+        assert!(Command::new(script_path.to_string_lossy().to_string())
+            .status()
+            .await
+            .is_ok_and(|status| status.success()));
     }
 }

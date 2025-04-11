@@ -190,13 +190,13 @@ mod tests {
 
         write(temp.child("target.txt").path(), "content").unwrap();
 
-        #[cfg(unix)]
+        #[cfg(target_family = "unix")]
         std::os::unix::fs::symlink(
             temp.child("target.txt").path(),
             temp.child("link.txt").path(),
         )
         .unwrap();
-        #[cfg(windows)]
+        #[cfg(target_family = "windows")]
         std::os::windows::fs::symlink_file(
             temp.child("target.txt").path(),
             temp.child("link.txt").path(),

@@ -3,6 +3,7 @@
 use crate::hash::HasIntegrity;
 use crate::lockfile::OptState;
 use crate::lockfile::PinnedState;
+use crate::lua_rockspec::DeploySpec;
 use crate::lua_rockspec::LocalLuaRockspec;
 use crate::lua_rockspec::LocalRockSource;
 use crate::lua_rockspec::LuaRockspecError;
@@ -143,6 +144,8 @@ pub struct PartialProjectToml {
     pub(crate) source: Option<RockSourceInternal>,
     #[serde(default)]
     pub(crate) test: Option<TestSpecInternal>,
+    #[serde(default)]
+    pub(crate) deploy: Option<DeploySpec>,
 
     // Used to bind the project TOML to a project root
     #[serde(skip, default = "ProjectRoot::new")]
@@ -256,6 +259,7 @@ impl PartialProjectToml {
                 project_toml.test.clone().unwrap_or_default(),
             )?),
             build: PerPlatform::new(BuildSpec::from_internal_spec(project_toml.build.clone())?),
+            deploy: PerPlatform::new(project_toml.deploy.clone().unwrap_or_default()),
             rockspec_format: project_toml.rockspec_format.clone(),
 
             source: PerPlatform::new(
@@ -370,6 +374,7 @@ impl PartialProjectToml {
             external_dependencies: other.external_dependencies.or(self.external_dependencies),
             source: other.source.or(self.source),
             test: other.test.or(self.test),
+            deploy: other.deploy.or(self.deploy),
             rockspec_format: other.rockspec_format.or(self.rockspec_format),
 
             // Keep the project root the same, as it is not part of the lua rockspec
@@ -476,6 +481,7 @@ pub struct LocalProjectToml {
     test_dependencies: PerPlatform<Vec<LuaDependencySpec>>,
     test: PerPlatform<TestSpec>,
     build: PerPlatform<BuildSpec>,
+    deploy: PerPlatform<DeploySpec>,
 
     // Used for simpler serialization
     internal: PartialProjectToml,
@@ -556,6 +562,14 @@ impl Rockspec for LocalProjectToml {
 
     fn source_mut(&mut self) -> &mut PerPlatform<RemoteRockSource> {
         &mut self.source
+    }
+
+    fn deploy(&self) -> &PerPlatform<DeploySpec> {
+        &self.deploy
+    }
+
+    fn deploy_mut(&mut self) -> &mut PerPlatform<DeploySpec> {
+        &mut self.deploy
     }
 
     fn to_lua_rockspec_string(&self) -> String {
@@ -715,6 +729,14 @@ impl Rockspec for RemoteProjectToml {
 
     fn source_mut(&mut self) -> &mut PerPlatform<RemoteRockSource> {
         &mut self.source
+    }
+
+    fn deploy(&self) -> &PerPlatform<DeploySpec> {
+        self.local.deploy()
+    }
+
+    fn deploy_mut(&mut self) -> &mut PerPlatform<DeploySpec> {
+        self.local.deploy_mut()
     }
 
     fn to_lua_rockspec_string(&self) -> String {
