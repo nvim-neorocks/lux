@@ -83,10 +83,11 @@ where
     }
 
     pub async fn sync_build_dependencies(mut self) -> Result<SyncReport, SyncError> {
-        if self
-            .packages
-            .as_ref()
-            .is_some_and(|packages| !packages.is_empty())
+        if cfg!(target_family = "unix")
+            && self
+                .packages
+                .as_ref()
+                .is_some_and(|packages| !packages.is_empty())
         {
             let luarocks = PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into()))
                 .unwrap()

@@ -1,5 +1,6 @@
 use is_executable::IsExecutable;
 use itertools::Itertools;
+use path_slash::PathBufExt;
 use pkg_config::{Config as PkgConfig, Library};
 use std::io;
 use std::path::Path;
@@ -184,7 +185,7 @@ impl LuaInstallation {
         config.variables().get("LUA").cloned().or(self
             .bin
             .as_ref()
-            .map(|bin| bin.clone().to_string_lossy().to_string()))
+            .map(|bin| bin.clone().to_slash_lossy().to_string()))
     }
 }
 

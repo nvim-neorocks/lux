@@ -1,5 +1,7 @@
 use futures::future::join_all;
 use itertools::Itertools;
+use path_slash::{PathBufExt, PathExt};
+use ssri::Integrity;
 use std::{
     collections::HashMap,
     io,
@@ -15,9 +17,8 @@ use crate::{
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{LocalPackage, LocalPackageId, OptState, PinnedState},
     lua_installation::LuaInstallation,
-    lua_rockspec::{RemoteLuaRockspec, RockspecFormat},
-    operations::{get_all_dependencies, PackageInstallSpec, SearchAndDownloadError},
-    package::PackageReq,
+    lua_rockspec::RockspecFormat,
+    operations::{get_all_dependencies, PackageInstallSpec, SearchAndDownloadError, UnpackError},
     path::Paths,
     progress::{MultiProgress, Progress, ProgressBar},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
@@ -25,10 +26,10 @@ use crate::{
     tree::{self, Tree},
 };
 
-#[cfg(unix)]
+#[cfg(target_family = "unix")]
 const LUAROCKS_EXE: &str = "luarocks";
-#[cfg(windows)]
-const LUAROCKS_EXE: &str = "luarocks.bat";
+#[cfg(target_family = "windows")]
+const LUAROCKS_EXE: &str = "luarocks.exe";
 
 #[derive(Error, Debug)]
 pub enum LuaRocksError {
@@ -44,6 +45,12 @@ pub enum LuaRocksInstallError {
     Io(#[from] io::Error),
     #[error(transparent)]
     BuildError(#[from] BuildError),
+    #[error(transparent)]
+    Request(#[from] reqwest::Error),
+    #[error(transparent)]
+    UnpackError(#[from] UnpackError),
+    #[error("luarocks integrity mismatch.\nExpected: {expected}\nBut got: {got}")]
+    IntegrityMismatch { expected: Integrity, got: Integrity },
 }
 
 #[derive(Error, Debug)]
@@ -95,23 +102,6 @@ build = {
 }
 ";
 
-#[cfg(target_family = "windows")]
-const LUAROCKS_ROCKSPEC: &str = "
-rockspec_format = '3.0'
-package = 'luarocks'
-version = '3.11.1-1'
-source = {
-    url = 'git+https://github.com/luarocks/luarocks',
-    tag = 'v3.11.1',
-}
-dependencies = {
-    'luafilesystem == 1.8.0',
-}
-build = {
-    type = 'builtin',
-}
-";
-
 impl LuaRocksInstallation {
     pub fn new(config: &Config) -> Result<Self, LuaRocksError> {
         let config = config.clone().with_tree(config.luarocks_tree().clone());
@@ -130,10 +120,13 @@ impl LuaRocksInstallation {
         &self.config
     }
 
+    #[cfg(target_family = "unix")]
     pub async fn ensure_installed(
         &self,
         progress: &Progress<ProgressBar>,
     ) -> Result<(), LuaRocksInstallError> {
+        use crate::{lua_rockspec::RemoteLuaRockspec, package::PackageReq};
+
         let mut lockfile = self.tree.lockfile()?.write_guard();
 
         let luarocks_req =
@@ -153,6 +146,44 @@ impl LuaRocksInstallation {
             .await?;
             lockfile.add_entrypoint(&pkg);
         }
+        Ok(())
+    }
+
+    #[cfg(target_family = "windows")]
+    pub async fn ensure_installed(
+        &self,
+        progress: &Progress<ProgressBar>,
+    ) -> Result<(), LuaRocksInstallError> {
+        use crate::{hash::HasIntegrity, operations};
+        use std::io::Cursor;
+        let url = "https://luarocks.github.io/luarocks/releases/luarocks-3.11.1-windows-64.zip";
+        let response = reqwest::get(url.to_owned()).await?.bytes().await?;
+        let hash = response.hash()?;
+        let expected_hash: Integrity = "sha256-xx26PQPhIwXpzNAixiHIhpq6PRJNkkniFK7VwW82gqM="
+            .parse()
+            .unwrap();
+        if expected_hash.matches(&hash).is_none() {
+            return Err(LuaRocksInstallError::IntegrityMismatch {
+                expected: expected_hash,
+                got: hash,
+            });
+        }
+        let cursor = Cursor::new(response);
+        let mime_type = infer::get(cursor.get_ref()).map(|file_type| file_type.mime_type());
+        let unpack_dir = TempDir::new("luarocks-exe")?.into_path();
+        operations::unpack(
+            mime_type,
+            cursor,
+            false,
+            "luarocks-3.11.1-windows-64.zip".into(),
+            &unpack_dir,
+            progress,
+        )
+        .await?;
+        let luarocks_exe = unpack_dir
+            .join("luarocks-3.11.1-windows-64")
+            .join(LUAROCKS_EXE);
+        tokio::fs::copy(luarocks_exe, &self.tree().bin().join(LUAROCKS_EXE)).await?;
 
         Ok(())
     }
@@ -275,8 +306,8 @@ impl LuaRocksInstallation {
         lua: &LuaInstallation,
     ) -> Result<(), ExecLuaRocksError> {
         std::fs::create_dir_all(dest_dir)?;
-        let dest_dir_str = dest_dir.to_string_lossy().to_string();
-        let rockspec_path_str = rockspec_path.to_string_lossy().to_string();
+        let dest_dir_str = dest_dir.to_slash_lossy().to_string();
+        let rockspec_path_str = rockspec_path.to_slash_lossy().to_string();
         let args = vec![
             "make",
             "--deps-mode",
@@ -297,17 +328,25 @@ impl LuaRocksInstallation {
         let luarocks_paths = Paths::new(&self.tree)?;
         // Ensure a pure environment so we can do parallel builds
         let temp_dir = TempDir::new("lux-run-luarocks").unwrap();
+        let lua_version_str = match lua.version {
+            LuaVersion::Lua51 | LuaVersion::LuaJIT => "5.1",
+            LuaVersion::Lua52 | LuaVersion::LuaJIT52 => "5.2",
+            LuaVersion::Lua53 => "5.3",
+            LuaVersion::Lua54 => "5.4",
+        };
         let luarocks_config_content = format!(
-            "
+            r#"
+lua_version = "{0}"
 variables = {{
-    LUA_LIBDIR = \"{0}\",
-    LUA_INCDIR = \"{1}\",
-    LUA_VERSION = \"{2}\",
-    MAKE = \"{3}\",
+    LUA_LIBDIR = "{1}",
+    LUA_INCDIR = "{2}",
+    LUA_VERSION = "{3}",
+    MAKE = "{4}",
 }}
-",
-            lua.lib_dir.display(),
-            lua.include_dir.display(),
+"#,
+            lua_version_str,
+            lua.lib_dir.to_slash_lossy(),
+            lua.include_dir.to_slash_lossy(),
             LuaVersion::from(&self.config)?,
             self.config.make_cmd(),
         );
@@ -321,8 +360,11 @@ variables = {{
             .env("PATH", luarocks_paths.path_prepended().joined())
             .env("LUA_PATH", luarocks_paths.package_path().joined())
             .env("LUA_CPATH", luarocks_paths.package_cpath().joined())
-            .env("HOME", temp_dir.into_path())
-            .env("LUAROCKS_CONFIG", luarocks_config)
+            .env("HOME", temp_dir.into_path().to_slash_lossy().to_string())
+            .env(
+                "LUAROCKS_CONFIG",
+                luarocks_config.to_slash_lossy().to_string(),
+            )
             .output()?;
         if output.status.success() {
             Ok(())

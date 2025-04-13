@@ -378,7 +378,7 @@ async fn is_compatible_lua_script(file: &Path, lua: &LuaInstallation, config: &C
         .arg(format!(
             "if loadfile('{}') then os.exit(0) else os.exit(1) end",
             // On Windows, Lua escapes path separators, so we ensure forward slashes
-            file.to_slash().expect("error converting file path")
+            file.to_slash_lossy()
         ))
         .stderr(Stdio::null())
         .stdout(Stdio::null())
