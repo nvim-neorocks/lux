@@ -454,6 +454,7 @@ mod tests {
                     },\n
                     defines = { 'USE_BAZ' },\n
                 },\n
+                foo = 'lua/foo/init.lua',
             },\n
         }\n
         ";

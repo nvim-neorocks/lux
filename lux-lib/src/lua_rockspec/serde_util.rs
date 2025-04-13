@@ -158,7 +158,11 @@ impl Display for DisplayLuaValue {
 
 impl Display for DisplayLuaKV {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} = {}", self.key, self.value)
+        if self.key.chars().contains(&'.') {
+            write!(f, "['{}'] = {}", self.key, self.value)
+        } else {
+            write!(f, "{} = {}", self.key, self.value)
+        }
     }
 }
 
@@ -198,7 +202,14 @@ mod tests {
                 key: "key2".to_string(),
                 value: DisplayLuaValue::Boolean(true),
             },
+            DisplayLuaKV {
+                key: "key3.key4".to_string(),
+                value: DisplayLuaValue::Boolean(true),
+            },
         ]);
-        assert_eq!(format!("{}", value), "{\nkey = \"value\",\nkey2 = true,\n}");
+        assert_eq!(
+            format!("{}", value),
+            "{\nkey = \"value\",\nkey2 = true,\n['key3.key4'] = true,\n}"
+        );
     }
 }
