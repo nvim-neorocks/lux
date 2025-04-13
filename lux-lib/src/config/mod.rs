@@ -14,10 +14,7 @@ use crate::lua_rockspec::PlatformIdentifier;
 use crate::rockspec::LuaVersionCompatibility;
 use crate::tree::Tree;
 use crate::{
-    build::{
-        utils,
-        variables::{self, HasVariables},
-    },
+    build::{utils, variables::HasVariables},
     package::{PackageVersion, PackageVersionReq},
     project::{Project, ProjectError},
 };
@@ -320,8 +317,8 @@ impl Config {
 }
 
 impl HasVariables for Config {
-    fn substitute_variables(&self, input: &str) -> String {
-        variables::substitute(|var_name| self.variables().get(var_name).cloned(), input)
+    fn get_variable(&self, input: &str) -> Option<String> {
+        self.variables.get(input).cloned()
     }
 }
 

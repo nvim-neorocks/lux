@@ -15,6 +15,8 @@ use crate::{
     tree::RockLayout,
 };
 
+use super::variables::VariableSubstitutionError;
+
 #[derive(Error, Debug)]
 pub enum MakeError {
     #[error("{name} step failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
@@ -28,6 +30,8 @@ pub enum MakeError {
     Io(io::Error),
     #[error("failed to run `make` step: `{0}` command not found!")]
     CommandNotFound(String),
+    #[error(transparent)]
+    VariableSubstitutionError(#[from] VariableSubstitutionError),
 }
 
 impl Build for MakeBuildSpec {
@@ -50,10 +54,10 @@ impl Build for MakeBuildSpec {
                 .chain(&self.build_variables)
                 .map(|(key, value)| {
                     let substituted_value =
-                        utils::substitute_variables(value, output_paths, lua, config);
-                    format!("{key}={substituted_value}")
+                        utils::substitute_variables(value, output_paths, lua, config)?;
+                    Ok(format!("{key}={substituted_value}"))
                 })
-                .collect_vec();
+                .try_collect::<_, Vec<_>, Self::Err>()?;
             match Command::new(config.make_cmd())
                 .current_dir(build_dir)
                 .arg(&self.build_target)
@@ -85,10 +89,10 @@ impl Build for MakeBuildSpec {
                 .chain(&self.install_variables)
                 .map(|(key, value)| {
                     let substituted_value =
-                        utils::substitute_variables(value, output_paths, lua, config);
-                    format!("{key}={substituted_value}")
+                        utils::substitute_variables(value, output_paths, lua, config)?;
+                    Ok(format!("{key}={substituted_value}"))
                 })
-                .collect_vec();
+                .try_collect::<_, Vec<_>, Self::Err>()?;
             match Command::new(config.make_cmd())
                 .current_dir(build_dir)
                 .arg(&self.install_target)

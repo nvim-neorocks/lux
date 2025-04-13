@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::{
     env, io,
     path::Path,
@@ -14,7 +15,7 @@ use crate::{
     tree::RockLayout,
 };
 
-use super::variables;
+use super::variables::{self, HasVariables, VariableSubstitutionError};
 
 const CMAKE_BUILD_FILE: &str = "build.lux";
 
@@ -33,6 +34,21 @@ pub enum CMakeError {
     WriteCmakeListsError(io::Error),
     #[error("failed to run `cmake` step: `{0}` command not found!")]
     CommandNotFound(String),
+    #[error(transparent)]
+    VariableSubstitutionError(#[from] VariableSubstitutionError),
+}
+
+struct CMakeVariables;
+
+impl HasVariables for CMakeVariables {
+    fn get_variable(&self, input: &str) -> Option<String> {
+        match input {
+            "CMAKE_MODULE_PATH" => Some(env::var("CMAKE_MODULE_PATH").unwrap_or("".into())),
+            "CMAKE_LIBRARY_PATH" => Some(env::var("CMAKE_LIBRARY_PATH").unwrap_or("".into())),
+            "CMAKE_INCLUDE_PATH" => Some(env::var("CMAKE_INCLUDE_PATH").unwrap_or("".into())),
+            _ => None,
+        }
+    }
 }
 
 impl Build for CMakeBuildSpec {
@@ -59,12 +75,13 @@ impl Build for CMakeBuildSpec {
         self.variables
             .into_iter()
             .map(|(key, value)| {
-                let mut substituted_value =
-                    utils::substitute_variables(&value, output_paths, lua, config);
-                substituted_value = substitute_variables(&substituted_value);
-                format!("{key}={substituted_value}")
+                let substituted_value =
+                    utils::substitute_variables(&value, output_paths, lua, config)?;
+                let substituted_value =
+                    variables::substitute(&[&CMakeVariables], &substituted_value)?;
+                Ok::<_, Self::Err>(format!("{key}={substituted_value}"))
             })
-            .for_each(|variable| args.push(format!("-D{}", variable)));
+            .fold_ok((), |(), variable| args.push(format!("-D{}", variable)))?;
 
         spawn_cmake_cmd(
             Command::new(config.cmake_cmd())
@@ -103,18 +120,6 @@ impl Build for CMakeBuildSpec {
 
         Ok(BuildInfo::default())
     }
-}
-
-fn substitute_variables(input: &str) -> String {
-    variables::substitute(
-        |var_name| match var_name {
-            "CMAKE_MODULE_PATH" => Some(env::var("CMAKE_MODULE_PATH").unwrap_or("".into())),
-            "CMAKE_LIBRARY_PATH" => Some(env::var("CMAKE_LIBRARY_PATH").unwrap_or("".into())),
-            "CMAKE_INCLUDE_PATH" => Some(env::var("CMAKE_INCLUDE_PATH").unwrap_or("".into())),
-            _ => None,
-        },
-        input,
-    )
 }
 
 fn spawn_cmake_cmd(cmd: &mut Command, config: &Config) -> Result<(), CMakeError> {

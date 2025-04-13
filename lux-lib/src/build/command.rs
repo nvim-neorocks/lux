@@ -1,4 +1,4 @@
-use shell_words::{split, ParseError};
+use shell_words::split;
 use std::{
     io,
     path::Path,
@@ -14,14 +14,17 @@ use crate::{
     tree::RockLayout,
 };
 
-use super::utils;
+use super::{utils, variables::VariableSubstitutionError};
 
 #[derive(Error, Debug)]
 pub enum CommandError {
     #[error("'build_command' and 'install_command' cannot be empty.")]
     EmptyCommand,
     #[error("error parsing command:\n{command}\n\nerror: {err}")]
-    ParseError { err: ParseError, command: String },
+    ParseError {
+        err: shell_words::ParseError,
+        command: String,
+    },
     #[error("error executing command:\n{command}\n\nerror: {err}")]
     Io { err: io::Error, command: String },
     #[error("failed to execute command:\n{command}\n\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
@@ -31,6 +34,8 @@ pub enum CommandError {
         stdout: String,
         stderr: String,
     },
+    #[error(transparent)]
+    VariableSubstitutionError(#[from] VariableSubstitutionError),
 }
 
 impl Build for CommandBuildSpec {
@@ -62,7 +67,7 @@ fn run_command(
     config: &Config,
     build_dir: &Path,
 ) -> Result<(), CommandError> {
-    let substituted_cmd = utils::substitute_variables(command, output_paths, lua, config);
+    let substituted_cmd = utils::substitute_variables(command, output_paths, lua, config)?;
     let cmd_parts = split(&substituted_cmd).map_err(|err| CommandError::ParseError {
         err,
         command: substituted_cmd.clone(),

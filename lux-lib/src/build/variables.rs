@@ -1,61 +1,133 @@
+use chumsky::{prelude::*, Parser};
+use thiserror::Error;
+
+#[derive(Error, Debug, Clone)]
+pub enum VariableSubstitutionError {
+    #[error("unable to substitute variables {0:#?}")]
+    SubstitutionError(Vec<String>),
+    #[error("variable expansion recursion limit (100) reached")]
+    RecursionLimit,
+}
+
 pub trait HasVariables {
-    /// Substitute variables of the format `$(VAR)`, where `VAR` is the variable name.
-    fn substitute_variables(&self, input: &str) -> String;
+    fn get_variable(&self, input: &str) -> Option<String>;
+}
+
+fn parser<'a>(
+    variables: &'a [&'a dyn HasVariables],
+) -> impl Parser<'a, &'a str, String, chumsky::extra::Err<Rich<'a, char>>> {
+    recursive(|p| {
+        just('$')
+            .ignore_then(p.delimited_by(just('('), just(')')))
+            .try_map(|s: String, span| {
+                variables
+                    .iter()
+                    .find_map(|v| v.get_variable(&s))
+                    .ok_or(Rich::custom(
+                        span,
+                        format!("could not expand variable $({})", s),
+                    ))
+            })
+            .or(none_of("$)").repeated().at_least(1).collect::<String>())
+            .repeated()
+            .at_least(1)
+            .collect::<Vec<_>>()
+            .map(|v| v.concat())
+    })
 }
 
 /// Substitute variables of the format `$(VAR)`, where `VAR` is the variable name
 /// passed to `get_var`.
-pub fn substitute<F>(get_var: F, input: &str) -> String
-where
-    F: Fn(&str) -> Option<String>,
-{
-    let mut result = String::new();
-    let mut chars = itertools::peek_nth(input.chars());
-    while let Some(c) = chars.next() {
-        if c == '$' {
-            if let Some('(') = chars.peek() {
-                chars.next();
-                let mut var_name = String::new();
-                while let Some(&next_char) = chars.peek() {
-                    if next_char == ')' {
-                        chars.next();
-                        break;
-                    }
-                    var_name.push(next_char);
-                    chars.next();
-                }
-                if let Some(path) = get_var(var_name.as_str()) {
-                    result.push_str(&path);
-                } else {
-                    result.push_str(format!("$({})", var_name).as_str());
-                }
-            } else {
-                result.push(c);
-            }
-        } else {
-            result.push(c);
+pub fn substitute(
+    variables: &[&dyn HasVariables],
+    input: &str,
+) -> Result<String, VariableSubstitutionError> {
+    let p = |input: &str| {
+        parser(variables).parse(input).into_result().map_err(|err| {
+            VariableSubstitutionError::SubstitutionError(
+                err.into_iter().map(|e| e.to_string()).collect(),
+            )
+        })
+    };
+
+    let mut output = p(input)?;
+    let mut next = p(&output)?;
+
+    let mut count = 0;
+
+    while next != output {
+        if count > 100 {
+            return Err(VariableSubstitutionError::RecursionLimit);
         }
+
+        count += 1;
+        output = next;
+        next = p(&output)?;
     }
-    result
+
+    Ok(output)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn substitute_helper() {
-        assert_eq!(substitute(get_var, "$(TEST_VAR)"), "foo".to_string());
-        assert_eq!(
-            substitute(get_var, "$(UNRECOGNISED)"),
-            "$(UNRECOGNISED)".to_string()
-        );
+    struct TestVariables;
+
+    impl HasVariables for TestVariables {
+        fn get_variable(&self, input: &str) -> Option<String> {
+            match input {
+                "TEST_VAR" => Some("foo".into()),
+                "RECURSIVE_VAR" => Some("$(TEST_VAR)".into()),
+                "FLATTEN_VAR" => Some("TEST_VAR".into()),
+                "INFINITELY_RECURSIVE_1" => Some("$(INFINITELY_RECURSIVE_2)".into()),
+                "INFINITELY_RECURSIVE_2" => Some("$(INFINITELY_RECURSIVE_1)".into()),
+                _ => None,
+            }
+        }
     }
 
-    fn get_var(var_name: &str) -> Option<String> {
-        match var_name {
-            "TEST_VAR" => Some("foo".into()),
-            _ => None,
-        }
+    #[test]
+    fn substitute_helper() {
+        assert_eq!(
+            substitute(&[&TestVariables], "$(TEST_VAR)").unwrap(),
+            "foo".to_string()
+        );
+        substitute(&[&TestVariables], "$(UNRECOGNISED)").unwrap_err();
+    }
+
+    #[test]
+    fn flattened_variables() {
+        let input = "$($(FLATTEN_VAR))";
+        let expected = "foo";
+        let result = substitute(&[&TestVariables], input).unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn recursive_variables() {
+        let input = "$(RECURSIVE_VAR)";
+        let expected = "foo";
+        let result = substitute(&[&TestVariables], input).unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn infinitely_recursive_variables() {
+        let input = "$(INFINITELY_RECURSIVE_1)";
+        let result = substitute(&[&TestVariables], input);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            VariableSubstitutionError::RecursionLimit
+        ));
+    }
+
+    #[test]
+    fn complex_substitution() {
+        let input = " '$(TEST_VAR)' = $($(FLATTEN_VAR)) $(RECURSIVE_VAR);";
+        let expected = " 'foo' = foo foo;";
+        let result = substitute(&[&TestVariables], input).unwrap();
+        assert_eq!(result, expected);
     }
 }

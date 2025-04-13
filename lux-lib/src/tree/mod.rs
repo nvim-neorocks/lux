@@ -1,8 +1,5 @@
 use crate::{
-    build::{
-        utils::escape_path,
-        variables::{self, HasVariables},
-    },
+    build::{utils::escape_path, variables::HasVariables},
     config::{tree::RockLayoutConfig, Config, LuaVersion},
     lockfile::{LocalPackage, LocalPackageId, Lockfile, OptState, ReadOnly},
     package::PackageReq,
@@ -76,24 +73,17 @@ impl RockLayout {
 }
 
 impl HasVariables for RockLayout {
-    /// Substitute `$(VAR)` with one of the paths, where `VAR`
-    /// is one of `PREFIX`, `LIBDIR`, `LUADIR`, `BINDIR`, `CONFDIR` or `DOCDIR`.
-    fn substitute_variables(&self, input: &str) -> String {
-        variables::substitute(
-            |var| {
-                let path = match var {
-                    "PREFIX" => Some(escape_path(&self.rock_path)),
-                    "LIBDIR" => Some(escape_path(&self.lib)),
-                    "LUADIR" => Some(escape_path(&self.src)),
-                    "BINDIR" => Some(escape_path(&self.bin)),
-                    "CONFDIR" => Some(escape_path(&self.conf)),
-                    "DOCDIR" => Some(escape_path(&self.doc)),
-                    _ => None,
-                }?;
-                Some(path)
-            },
-            input,
-        )
+    fn get_variable(&self, var: &str) -> Option<String> {
+        let path = match var {
+            "PREFIX" => Some(escape_path(&self.rock_path)),
+            "LIBDIR" => Some(escape_path(&self.lib)),
+            "LUADIR" => Some(escape_path(&self.src)),
+            "BINDIR" => Some(escape_path(&self.bin)),
+            "CONFDIR" => Some(escape_path(&self.conf)),
+            "DOCDIR" => Some(escape_path(&self.doc)),
+            _ => None,
+        }?;
+        Some(path)
     }
 }
 
@@ -351,7 +341,7 @@ mod tests {
     use insta::assert_yaml_snapshot;
 
     use crate::{
-        build::variables::HasVariables,
+        build::variables,
         config::{ConfigBuilder, LuaVersion},
         lockfile::{LocalPackage, LocalPackageHashes, LockConstraint},
         package::{PackageName, PackageSpec, PackageVersion},
@@ -515,12 +505,12 @@ mod tests {
             "$(BINDIR)",
             "$(CONFDIR)",
             "$(DOCDIR)",
-            "$(UNRECOGNISED)",
         ];
         let result: Vec<String> = build_variables
             .into_iter()
-            .map(|var| neorg.substitute_variables(var))
-            .collect();
+            .map(|var| variables::substitute(&[&neorg], var))
+            .try_collect()
+            .unwrap();
         assert_eq!(
             result,
             vec![
@@ -530,7 +520,6 @@ mod tests {
                 neorg.bin.to_string_lossy().to_string(),
                 neorg.conf.to_string_lossy().to_string(),
                 neorg.doc.to_string_lossy().to_string(),
-                "$(UNRECOGNISED)".into(),
             ]
         );
     }

@@ -9,7 +9,7 @@ use thiserror::Error;
 
 use crate::build::utils::escape_path;
 use crate::{
-    build::variables::{self, HasVariables},
+    build::variables::HasVariables,
     config::{Config, LuaVersion},
     package::PackageVersion,
 };
@@ -136,6 +136,14 @@ impl LuaInstallation {
         config.lua_dir().join(version.to_string())
     }
 
+    pub(crate) fn lua_lib_name(&self) -> String {
+        match self.version {
+            LuaVersion::LuaJIT => format!("luajit-5.1.{}", std::env::consts::DLL_EXTENSION),
+            LuaVersion::LuaJIT52 => format!("luajit-5.2.{}", std::env::consts::DLL_EXTENSION),
+            _ => format!("lua.{}", std::env::consts::DLL_EXTENSION),
+        }
+    }
+
     pub(crate) fn compile_args(&self) -> Vec<String> {
         if let Some(info) = &self.lib_info {
             info.include_paths
@@ -189,19 +197,15 @@ impl LuaInstallation {
 }
 
 impl HasVariables for LuaInstallation {
-    fn substitute_variables(&self, input: &str) -> String {
-        variables::substitute(
-            |var_name| {
-                let result = match var_name {
-                    "LUA_INCDIR" => Some(escape_path(&self.include_dir)),
-                    "LUA_LIBDIR" => Some(escape_path(&self.lib_dir)),
-                    "LUA" => Some(escape_path(&self.bin.clone().unwrap_or("lua".into()))),
-                    _ => None,
-                }?;
-                Some(result)
-            },
-            input,
-        )
+    fn get_variable(&self, input: &str) -> Option<String> {
+        let result = match input {
+            "LUA_INCDIR" => Some(escape_path(&self.include_dir)),
+            "LUA_LIBDIR" => Some(escape_path(&self.lib_dir)),
+            "LUA" => Some(escape_path(&self.bin.clone().unwrap_or("lua".into()))),
+            "LUALIB" => Some(self.lua_lib_name()),
+            _ => None,
+        }?;
+        Some(result)
     }
 }
 
