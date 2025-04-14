@@ -487,10 +487,10 @@ pub(crate) fn substitute_variables(
     variables::substitute(&[output_paths, lua, config], input)
 }
 
-pub(crate) fn escape_path(path: &Path) -> String {
-    let path_str = format!("{}", path.display());
+pub(crate) fn format_path(path: &Path) -> String {
+    let path_str = path.to_slash_lossy();
     if cfg!(windows) {
-        format!("\"{}\"", path_str)
+        format!(r#""{}""#, path_str)
     } else {
         try_quote(&path_str)
             .map(|str| str.to_string())

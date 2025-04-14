@@ -8,7 +8,7 @@ use std::{path::PathBuf, process::Command};
 use target_lexicon::Triple;
 use thiserror::Error;
 
-use crate::build::utils::escape_path;
+use crate::build::utils::format_path;
 use crate::{
     build::variables::HasVariables,
     config::{Config, LuaVersion},
@@ -240,9 +240,9 @@ fn format_linker_arg(arg: &str, compiler: &cc::Tool) -> String {
 impl HasVariables for LuaInstallation {
     fn get_variable(&self, input: &str) -> Option<String> {
         let result = match input {
-            "LUA_INCDIR" => Some(escape_path(&self.include_dir)),
-            "LUA_LIBDIR" => Some(escape_path(&self.lib_dir)),
-            "LUA" => Some(escape_path(&self.bin.clone().unwrap_or("lua".into()))),
+            "LUA_INCDIR" => Some(format_path(&self.include_dir)),
+            "LUA_LIBDIR" => Some(format_path(&self.lib_dir)),
+            "LUA" => Some(format_path(&self.bin.clone().unwrap_or("lua".into()))),
             "LUALIB" => Some(self.lua_lib_name()),
             _ => None,
         }?;

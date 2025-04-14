@@ -1,5 +1,5 @@
 use crate::{
-    build::{utils::escape_path, variables::HasVariables},
+    build::{utils::format_path, variables::HasVariables},
     config::{tree::RockLayoutConfig, Config, LuaVersion},
     lockfile::{LocalPackage, LocalPackageId, Lockfile, LockfileError, OptState, ReadOnly},
     package::PackageReq,
@@ -84,12 +84,12 @@ impl RockLayout {
 impl HasVariables for RockLayout {
     fn get_variable(&self, var: &str) -> Option<String> {
         let path = match var {
-            "PREFIX" => Some(escape_path(&self.rock_path)),
-            "LIBDIR" => Some(escape_path(&self.lib)),
-            "LUADIR" => Some(escape_path(&self.src)),
-            "BINDIR" => Some(escape_path(&self.bin)),
-            "CONFDIR" => Some(escape_path(&self.conf)),
-            "DOCDIR" => Some(escape_path(&self.doc)),
+            "PREFIX" => Some(format_path(&self.rock_path)),
+            "LIBDIR" => Some(format_path(&self.lib)),
+            "LUADIR" => Some(format_path(&self.src)),
+            "BINDIR" => Some(format_path(&self.bin)),
+            "CONFDIR" => Some(format_path(&self.conf)),
+            "DOCDIR" => Some(format_path(&self.doc)),
             _ => None,
         }?;
         Some(path)
@@ -290,9 +290,8 @@ impl mlua::UserData for Tree {
         });
         methods.add_method("bin", |_, this, ()| Ok(this.bin()));
         methods.add_method("match_rocks", |_, this, req: PackageReq| {
-            Ok(this
-                .match_rocks(&req)
-                .map_err(|err| mlua::Error::RuntimeError(err.to_string()))?)
+            this.match_rocks(&req)
+                .map_err(|err| mlua::Error::RuntimeError(err.to_string()))
         });
         methods.add_method(
             "match_rock_and",
@@ -304,9 +303,8 @@ impl mlua::UserData for Tree {
             },
         );
         methods.add_method("rock_layout", |_, this, package: LocalPackage| {
-            Ok(this
-                .installed_rock_layout(&package)
-                .map_err(|err| mlua::Error::RuntimeError(err.to_string()))?)
+            this.installed_rock_layout(&package)
+                .map_err(|err| mlua::Error::RuntimeError(err.to_string()))
         });
         methods.add_method("rock", |_, this, package: LocalPackage| {
             this.dependency(&package).into_lua_err()
