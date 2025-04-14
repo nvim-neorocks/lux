@@ -6,6 +6,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.3.6](https://github.com/nvim-neorocks/lux/compare/v0.3.5...v0.3.6) - 2025-04-14
+
+### Other
+- use compilation target to get platform identifier ([#597](https://github.com/nvim-neorocks/lux/pull/597))
+
+## `lux-lib` - [0.3.6](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.3.5...lux-lib-v0.3.6) - 2025-04-14
+
+### Fixed
+- *(pack)* regression in manifest creation ([#599](https://github.com/nvim-neorocks/lux/pull/599))
+
+### Other
+- use compilation target to get platform identifier ([#597](https://github.com/nvim-neorocks/lux/pull/597))
+
 ## `lux-cli` - [0.3.5](https://github.com/nvim-neorocks/lux/compare/v0.3.4...v0.3.5) - 2025-04-14
 
 ### Fixed
