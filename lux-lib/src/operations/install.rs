@@ -20,7 +20,7 @@ use crate::{
     project::{Project, ProjectTreeError},
     remote_package_db::{RemotePackageDB, RemotePackageDBError, RemotePackageDbIntegrityError},
     rockspec::Rockspec,
-    tree::{self, Tree},
+    tree::{self, Tree, TreeError},
 };
 
 use bytes::Bytes;
@@ -149,6 +149,8 @@ pub enum InstallError {
     LuaVersionUnset(#[from] LuaVersionUnset),
     #[error(transparent)]
     Io(#[from] io::Error),
+    #[error(transparent)]
+    Tree(#[from] TreeError),
     #[error("error instantiating LuaRocks compatibility layer: {0}")]
     LuaRocksError(#[from] LuaRocksError),
     #[error("error installing LuaRocks compatibility layer: {0}")]

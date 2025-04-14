@@ -7,7 +7,7 @@ use thiserror::Error;
 use crate::{
     lockfile::{LocalPackageId, PinnedState},
     package::PackageSpec,
-    tree::Tree,
+    tree::{Tree, TreeError},
 };
 
 // TODO(vhyrro): Differentiate pinned LocalPackages at the type level?
@@ -28,6 +28,8 @@ pub enum PinError {
     },
     #[error(transparent)]
     Io(#[from] io::Error),
+    #[error(transparent)]
+    Tree(#[from] TreeError),
     #[error("failed to move old package: {0}")]
     MoveItemsFailure(#[from] fs_extra::error::Error),
     #[error("cannot change pin state of {rock}, because it is not an entrypoint")]

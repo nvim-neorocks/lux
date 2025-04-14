@@ -7,7 +7,12 @@ use std::{fmt, io, path::Path};
 use thiserror::Error;
 use tokio::process::Command;
 
-use crate::{config::LuaVersion, lua_installation, path::Paths, tree::Tree};
+use crate::{
+    config::LuaVersion,
+    lua_installation,
+    path::{Paths, PathsError},
+    tree::Tree,
+};
 
 pub enum LuaBinary {
     /// The regular Lua interpreter.
@@ -52,7 +57,7 @@ pub enum RunLuaError {
         exit_code: Option<i32>,
     },
     #[error(transparent)]
-    Io(#[from] io::Error),
+    Paths(#[from] PathsError),
 }
 
 pub async fn run_lua(

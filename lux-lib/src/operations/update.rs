@@ -17,7 +17,7 @@ use crate::{
     project::{Project, ProjectError, ProjectTreeError},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
     rockspec::Rockspec,
-    tree::{self, Tree},
+    tree::{self, Tree, TreeError},
 };
 
 use super::{Install, InstallError, PackageInstallSpec, Remove, RemoveError, SyncError};
@@ -38,6 +38,8 @@ pub enum UpdateError {
     LuaVersionUnset(#[from] LuaVersionUnset),
     #[error(transparent)]
     Io(#[from] io::Error),
+    #[error(transparent)]
+    Tree(#[from] TreeError),
     #[error("error initialising project tree: {0}")]
     ProjectTree(#[from] ProjectTreeError),
     #[error("error initialising luarocks build backend: {0}")]

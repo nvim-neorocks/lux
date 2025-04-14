@@ -11,7 +11,7 @@ use tree::RockLayoutConfig;
 use url::Url;
 
 use crate::rockspec::LuaVersionCompatibility;
-use crate::tree::Tree;
+use crate::tree::{Tree, TreeError};
 use crate::{
     build::{utils, variables::HasVariables},
     package::{PackageVersion, PackageVersionReq},
@@ -246,11 +246,11 @@ impl Config {
         self.lua_version.as_ref()
     }
 
-    pub fn tree(&self, version: LuaVersion) -> io::Result<Tree> {
+    pub fn tree(&self, version: LuaVersion) -> Result<Tree, TreeError> {
         Tree::new(self.tree.clone(), version, self)
     }
 
-    pub fn test_tree(&self, version: LuaVersion) -> io::Result<Tree> {
+    pub fn test_tree(&self, version: LuaVersion) -> Result<Tree, TreeError> {
         let tree = self.tree(version.clone())?;
         let test_tree_root = tree.root().join("test_dependencies");
         Tree::new(test_tree_root, version, self)

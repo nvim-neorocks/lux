@@ -10,7 +10,7 @@ use crate::{
     config::Config,
     lua_rockspec::LuaVersionError,
     operations,
-    path::Paths,
+    path::{Paths, PathsError},
     project::{project_toml::LocalProjectTomlValidationError, Project, ProjectTreeError},
 };
 
@@ -66,6 +66,7 @@ pub enum RunError {
     RunLua(#[from] RunLuaError),
     ProjectTree(#[from] ProjectTreeError),
     Io(#[from] std::io::Error),
+    Paths(#[from] PathsError),
     #[error("No `run` field found in `lux.toml`")]
     NoRunField,
 }

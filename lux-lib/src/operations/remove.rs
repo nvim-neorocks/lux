@@ -4,6 +4,7 @@ use std::sync::Arc;
 use crate::config::{LuaVersion, LuaVersionUnset};
 use crate::lockfile::{LocalPackage, LocalPackageId};
 use crate::progress::{MultiProgress, Progress, ProgressBar};
+use crate::tree::TreeError;
 use crate::{config::Config, tree::Tree};
 use futures::future::join_all;
 use itertools::Itertools;
@@ -14,6 +15,8 @@ use thiserror::Error;
 pub enum RemoveError {
     LuaVersionUnset(#[from] LuaVersionUnset),
     Io(#[from] io::Error),
+    #[error(transparent)]
+    Tree(#[from] TreeError),
 }
 
 pub struct Remove<'a> {
