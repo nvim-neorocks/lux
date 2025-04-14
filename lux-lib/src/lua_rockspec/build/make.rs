@@ -2,12 +2,17 @@ use std::{collections::HashMap, path::PathBuf};
 
 use mlua::UserData;
 
+#[cfg(not(target_env = "msvc"))]
+const MAKEFILE: &str = "Makefile";
+#[cfg(target_env = "msvc")]
+const MAKEFILE: &str = "Makefile.win";
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct MakeBuildSpec {
     /// Makefile to be used.
     /// Default is "Makefile" on Unix variants and "Makefile.win" under Win32.
     pub makefile: PathBuf,
-    pub build_target: String,
+    pub build_target: Option<String>,
     /// Whether to perform a make pass on the target indicated by `build_target`.
     /// Default is true (i.e., to run make).
     pub build_pass: bool,
@@ -49,7 +54,7 @@ impl Default for MakeBuildSpec {
     fn default() -> Self {
         Self {
             makefile: default_makefile_name(),
-            build_target: String::default(),
+            build_target: Option::default(),
             build_pass: default_pass(),
             install_target: default_install_target(),
             install_pass: default_pass(),
@@ -60,14 +65,8 @@ impl Default for MakeBuildSpec {
     }
 }
 
-#[cfg(unix)]
 fn default_makefile_name() -> PathBuf {
-    PathBuf::from("Makefile")
-}
-
-#[cfg(windows)]
-fn default_makefile_name() -> PathBuf {
-    PathBuf::from("Makefile.win")
+    PathBuf::from(MAKEFILE)
 }
 
 fn default_pass() -> bool {
