@@ -315,7 +315,7 @@ impl Display for PackageVersionReq {
                 }
                 str.fmt(f)
             }
-            PackageVersionReq::Dev(name_req) => f.write_str(name_req.as_str()),
+            PackageVersionReq::Dev(name_req) => write!(f, "=={}", name_req.as_str()),
             PackageVersionReq::Any => f.write_str("any"),
         }
     }
@@ -338,8 +338,10 @@ impl FromStr for PackageVersionReq {
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         let text = correct_version_req_str(text);
 
-        if is_dev_version_str(text.trim_start_matches("==").trim()) {
-            return Ok(PackageVersionReq::Dev(text));
+        let trimmed = text.trim_start_matches('=').trim_start_matches('@').trim();
+
+        if is_dev_version_str(trimmed) {
+            return Ok(PackageVersionReq::Dev(trimmed.to_string()));
         }
 
         Ok(PackageVersionReq::SemVer(parse_version_req(&text)?))
@@ -606,19 +608,35 @@ mod tests {
         );
         assert_eq!(
             PackageVersionReq::parse("==dev").unwrap(),
-            PackageVersionReq::Dev("==dev".into())
+            PackageVersionReq::Dev("dev".into())
         );
         assert_eq!(
             PackageVersionReq::parse("==git").unwrap(),
-            PackageVersionReq::Dev("==git".into())
+            PackageVersionReq::Dev("git".into())
         );
         assert_eq!(
             PackageVersionReq::parse("== dev").unwrap(),
-            PackageVersionReq::Dev("== dev".into())
+            PackageVersionReq::Dev("dev".into())
         );
         assert_eq!(
             PackageVersionReq::parse("== scm").unwrap(),
-            PackageVersionReq::Dev("== scm".into())
+            PackageVersionReq::Dev("scm".into())
+        );
+        assert_eq!(
+            PackageVersionReq::parse("@dev").unwrap(),
+            PackageVersionReq::Dev("dev".into())
+        );
+        assert_eq!(
+            PackageVersionReq::parse("@git").unwrap(),
+            PackageVersionReq::Dev("git".into())
+        );
+        assert_eq!(
+            PackageVersionReq::parse("@ dev").unwrap(),
+            PackageVersionReq::Dev("dev".into())
+        );
+        assert_eq!(
+            PackageVersionReq::parse("@ scm").unwrap(),
+            PackageVersionReq::Dev("scm".into())
         );
         assert_eq!(
             PackageVersionReq::parse(">1-1,<1.2-2").unwrap(),
@@ -655,13 +673,15 @@ mod tests {
         assert_eq!(req.to_string(), ">=0.7.1, <0.7.2");
     }
 
-    // FIXME(#502):
-    // #[tokio::test]
-    // async fn package_version_req_devver_roundtrips() {
-    //     let req = PackageVersionReq::parse("== scm").unwrap();
-    //     assert_eq!(req.to_string(), "==scm");
-    //
-    //     let req = PackageVersionReq::parse("scm").unwrap();
-    //     assert_eq!(req.to_string(), "==scm");
-    // }
+    #[tokio::test]
+    async fn package_version_req_devver_roundtrips() {
+        let req = PackageVersionReq::parse("==scm").unwrap();
+        assert_eq!(req.to_string(), "==scm");
+
+        let req = PackageVersionReq::parse("@scm").unwrap();
+        assert_eq!(req.to_string(), "==scm");
+
+        let req = PackageVersionReq::parse("scm").unwrap();
+        assert_eq!(req.to_string(), "==scm");
+    }
 }
