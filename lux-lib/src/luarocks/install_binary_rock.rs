@@ -15,14 +15,16 @@ use crate::{
     },
     config::Config,
     hash::HasIntegrity,
-    lockfile::{LocalPackage, LocalPackageHashes, LockConstraint, OptState, PinnedState},
+    lockfile::{
+        LocalPackage, LocalPackageHashes, LockConstraint, LockfileError, OptState, PinnedState,
+    },
     lua_rockspec::{LuaVersionError, RemoteLuaRockspec},
     luarocks::rock_manifest::RockManifest,
     package::PackageSpec,
     progress::{Progress, ProgressBar},
     remote_package_source::RemotePackageSource,
     rockspec::Rockspec,
-    tree,
+    tree::{self, TreeError},
 };
 use crate::{lockfile::RemotePackageSourceUrl, rockspec::LuaVersionCompatibility};
 
@@ -32,6 +34,10 @@ use super::rock_manifest::RockManifestError;
 pub enum InstallBinaryRockError {
     #[error("IO operation failed: {0}")]
     Io(#[from] io::Error),
+    #[error(transparent)]
+    Lockfile(#[from] LockfileError),
+    #[error(transparent)]
+    Tree(#[from] TreeError),
     #[error(transparent)]
     ExternalDependencyError(#[from] ExternalDependencyError),
     #[error(transparent)]

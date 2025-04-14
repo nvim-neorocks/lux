@@ -5,11 +5,11 @@ use crate::{
     config::Config,
     lockfile::{OptState, PinnedState},
     package::{PackageName, PackageReq, PackageVersionReqError},
-    path::Paths,
+    path::{Paths, PathsError},
     progress::{MultiProgress, Progress},
     project::{project_toml::LocalProjectTomlValidationError, Project, ProjectTreeError},
     rockspec::Rockspec,
-    tree::{self, Tree},
+    tree::{self, Tree, TreeError},
 };
 use bon::Builder;
 use itertools::Itertools;
@@ -79,6 +79,8 @@ pub enum RunTestsError {
     RunCommandFailure(String, io::Error),
     #[error(transparent)]
     Io(#[from] io::Error),
+    #[error(transparent)]
+    Paths(#[from] PathsError),
     #[error(transparent)]
     Tree(#[from] ProjectTreeError),
     #[error(transparent)]
@@ -175,9 +177,9 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
 #[derive(Error, Debug)]
 #[error("error installing test dependencies: {0}")]
 pub enum InstallTestDependenciesError {
-    IoError(#[from] io::Error),
-    InstallError(#[from] InstallError),
-    PackageVersionReqError(#[from] PackageVersionReqError),
+    Tree(#[from] TreeError),
+    Install(#[from] InstallError),
+    PackageVersionReq(#[from] PackageVersionReqError),
 }
 
 /// Ensure that busted is installed.

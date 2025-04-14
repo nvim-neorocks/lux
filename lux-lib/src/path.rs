@@ -1,11 +1,12 @@
 use itertools::Itertools;
 use serde::Serialize;
-use std::{env, fmt::Display, io, path::PathBuf, str::FromStr};
+use std::{env, fmt::Display, path::PathBuf, str::FromStr};
+use thiserror::Error;
 
 use crate::{
     build::utils::lua_lib_extension,
     config::{Config, LuaVersion},
-    tree::Tree,
+    tree::{Tree, TreeError},
 };
 
 const LUA_PATH_SEPARATOR: &str = ";";
@@ -23,6 +24,12 @@ pub struct Paths {
     version: LuaVersion,
 }
 
+#[derive(Debug, Error)]
+pub enum PathsError {
+    #[error(transparent)]
+    Tree(#[from] TreeError),
+}
+
 impl Paths {
     fn default(tree: &Tree) -> Self {
         Self {
@@ -33,7 +40,7 @@ impl Paths {
         }
     }
 
-    pub fn new(tree: &Tree) -> io::Result<Self> {
+    pub fn new(tree: &Tree) -> Result<Self, PathsError> {
         let mut paths = tree
             .list()?
             .into_iter()
@@ -52,7 +59,7 @@ impl Paths {
                     .0
                     .push(package.lib.join(format!("?.{}", lua_lib_extension())));
                 paths.bin.0.push(package.bin);
-                Ok::<Paths, io::Error>(paths)
+                Ok::<Paths, TreeError>(paths)
             })?;
 
         let lib_path = option_env!("LUX_LIB_DIR")

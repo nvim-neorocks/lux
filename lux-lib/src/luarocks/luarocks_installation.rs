@@ -19,11 +19,11 @@ use crate::{
     lua_installation::LuaInstallation,
     lua_rockspec::RockspecFormat,
     operations::{get_all_dependencies, PackageInstallSpec, SearchAndDownloadError, UnpackError},
-    path::Paths,
+    path::{Paths, PathsError},
     progress::{MultiProgress, Progress, ProgressBar},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
     rockspec::Rockspec,
-    tree::{self, Tree},
+    tree::{self, Tree, TreeError},
 };
 
 #[cfg(target_family = "unix")]
@@ -51,14 +51,18 @@ build = {
 pub enum LuaRocksError {
     #[error(transparent)]
     LuaVersionUnset(#[from] LuaVersionUnset),
+    // #[error(transparent)]
+    // Io(#[from] io::Error),
     #[error(transparent)]
-    Io(#[from] io::Error),
+    Tree(#[from] TreeError),
 }
 
 #[derive(Error, Debug)]
 pub enum LuaRocksInstallError {
     #[error(transparent)]
     Io(#[from] io::Error),
+    #[error(transparent)]
+    Tree(#[from] TreeError),
     #[error(transparent)]
     BuildError(#[from] BuildError),
     #[error(transparent)]
@@ -73,6 +77,8 @@ pub enum LuaRocksInstallError {
 pub enum InstallBuildDependenciesError {
     #[error(transparent)]
     Io(#[from] io::Error),
+    #[error(transparent)]
+    Tree(#[from] TreeError),
     #[error(transparent)]
     RemotePackageDBError(#[from] RemotePackageDBError),
     #[error(transparent)]
@@ -89,6 +95,8 @@ pub enum ExecLuaRocksError {
     WriteLuarocksConfigError(io::Error),
     #[error("failed to run luarocks: {0}")]
     Io(#[from] io::Error),
+    #[error("error setting up luarocks paths: {0}")]
+    Paths(#[from] PathsError),
     #[error("luarocks binary not found at {0}")]
     LuarocksBinNotFound(PathBuf),
     #[error("executing luarocks compatibility layer failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]

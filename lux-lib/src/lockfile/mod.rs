@@ -815,6 +815,18 @@ pub struct ProjectLockfile<P: LockfilePermissions> {
 }
 
 #[derive(Error, Debug)]
+pub enum LockfileError {
+    #[error("error loading lockfile: {0}")]
+    Load(io::Error),
+    #[error("error creating lockfile: {0}")]
+    Create(io::Error),
+    #[error("error loading lockfile from JSON: {0}")]
+    JSON(#[from] serde_json::Error),
+    #[error("attempt load to a lockfile that does not match the expected rock layout.")]
+    MismatchedRockLayout,
+}
+
+#[derive(Error, Debug)]
 pub enum LockfileIntegrityError {
     #[error("rockspec integirty mismatch.\nExpected: {expected}\nBut got: {got}")]
     RockspecIntegrityMismatch { expected: Integrity, got: Integrity },
@@ -1033,7 +1045,7 @@ impl Lockfile<ReadOnly> {
     pub(crate) fn new(
         filepath: PathBuf,
         rock_layout: RockLayoutConfig,
-    ) -> io::Result<Lockfile<ReadOnly>> {
+    ) -> Result<Lockfile<ReadOnly>, LockfileError> {
         // Ensure that the lockfile exists
         match File::options().create_new(true).write(true).open(&filepath) {
             Ok(mut file) => {
@@ -1045,10 +1057,10 @@ impl Lockfile<ReadOnly> {
                     entrypoint_layout: rock_layout.clone(),
                 };
                 let json_str = serde_json::to_string(&empty_lockfile)?;
-                write!(file, "{}", json_str)?;
+                write!(file, "{}", json_str).map_err(|err| LockfileError::Create(err))?;
             }
             Err(err) if err.kind() == ErrorKind::AlreadyExists => {}
-            Err(err) => return Err(err),
+            Err(err) => return Err(LockfileError::Create(err)),
         }
 
         Self::load(filepath, Some(&rock_layout))
@@ -1059,15 +1071,14 @@ impl Lockfile<ReadOnly> {
     pub fn load(
         filepath: PathBuf,
         expected_rock_layout: Option<&RockLayoutConfig>,
-    ) -> io::Result<Lockfile<ReadOnly>> {
-        let mut lockfile: Lockfile<ReadOnly> =
-            serde_json::from_str(&std::fs::read_to_string(&filepath)?)?;
+    ) -> Result<Lockfile<ReadOnly>, LockfileError> {
+        let mut lockfile: Lockfile<ReadOnly> = serde_json::from_str(
+            &std::fs::read_to_string(&filepath).map_err(|err| LockfileError::Load(err))?,
+        )?;
         lockfile.filepath = filepath;
         if let Some(expected_rock_layout) = expected_rock_layout {
             if &lockfile.entrypoint_layout != expected_rock_layout {
-                return Err(io::Error::other(
-                    "attempt to a lockfile that does not match the expected rock layout.",
-                ));
+                return Err(LockfileError::MismatchedRockLayout);
             }
         }
         Ok(lockfile)

@@ -26,7 +26,7 @@ use crate::{
         lua_dependency::{DependencyType, LuaDependencySpec, LuaDependencyType},
         LuaVersionCompatibility,
     },
-    tree::Tree,
+    tree::{Tree, TreeError},
 };
 use crate::{
     lockfile::PinnedState,
@@ -72,7 +72,7 @@ pub enum ProjectEditError {
 #[derive(Error, Debug)]
 #[error(transparent)]
 pub enum ProjectTreeError {
-    Io(#[from] io::Error),
+    Tree(#[from] TreeError),
     LuaVersionError(#[from] LuaVersionError),
 }
 

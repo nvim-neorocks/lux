@@ -11,7 +11,7 @@ use crate::{
     package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress},
     rockspec::lua_dependency::LuaDependencySpec,
-    tree::{self, Tree},
+    tree::{self, Tree, TreeError},
 };
 use bon::{builder, Builder};
 use itertools::Itertools;
@@ -108,6 +108,8 @@ pub struct SyncReport {
 pub enum SyncError {
     #[error(transparent)]
     Io(#[from] io::Error),
+    #[error(transparent)]
+    Tree(#[from] TreeError),
     #[error(transparent)]
     Install(#[from] InstallError),
     #[error(transparent)]
