@@ -1,7 +1,8 @@
 use itertools::Itertools;
+use path_slash::PathBufExt;
 use std::{
     io,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, ExitStatus},
 };
 use thiserror::Error;
@@ -32,6 +33,8 @@ pub enum MakeError {
     CommandNotFound(String),
     #[error(transparent)]
     VariableSubstitutionError(#[from] VariableSubstitutionError),
+    #[error("{0} not found")]
+    MakefileNotFound(PathBuf),
 }
 
 impl Build for MakeBuildSpec {
@@ -52,16 +55,20 @@ impl Build for MakeBuildSpec {
                 .variables
                 .iter()
                 .chain(&self.build_variables)
+                .filter(|(_, value)| !value.is_empty())
                 .map(|(key, value)| {
                     let substituted_value =
                         utils::substitute_variables(value, output_paths, lua, config)?;
-                    Ok(format!("{key}={substituted_value}"))
+                    Ok(format!("{key}={substituted_value}").trim().to_string())
                 })
                 .try_collect::<_, Vec<_>, Self::Err>()?;
-            match Command::new(config.make_cmd())
+            let mut cmd = Command::new(config.make_cmd());
+            if let Some(build_target) = &self.build_target {
+                cmd.arg(build_target);
+            }
+            match cmd
                 .current_dir(build_dir)
-                .arg(&self.build_target)
-                .args(["-f", self.makefile.to_str().unwrap()])
+                .args(["-f", &self.makefile.to_slash_lossy()])
                 .args(build_args)
                 .spawn()
             {
@@ -69,7 +76,13 @@ impl Build for MakeBuildSpec {
                     Ok(output) if output.status.success() => {}
                     Ok(output) => {
                         return Err(MakeError::CommandFailure {
-                            name: format!("{} {}", config.make_cmd(), self.build_target),
+                            name: match self.build_target {
+                                Some(build_target) => {
+                                    format!("{} {}", config.make_cmd(), build_target)
+                                }
+                                None => config.make_cmd(),
+                            },
+
                             status: output.status,
                             stdout: String::from_utf8_lossy(&output.stdout).into(),
                             stderr: String::from_utf8_lossy(&output.stderr).into(),
@@ -87,16 +100,17 @@ impl Build for MakeBuildSpec {
                 .variables
                 .iter()
                 .chain(&self.install_variables)
+                .filter(|(_, value)| !value.is_empty())
                 .map(|(key, value)| {
                     let substituted_value =
                         utils::substitute_variables(value, output_paths, lua, config)?;
-                    Ok(format!("{key}={substituted_value}"))
+                    Ok(format!("{key}={substituted_value}").trim().to_string())
                 })
                 .try_collect::<_, Vec<_>, Self::Err>()?;
             match Command::new(config.make_cmd())
                 .current_dir(build_dir)
                 .arg(&self.install_target)
-                .args(["-f", self.makefile.to_str().unwrap()])
+                .args(["-f", &self.makefile.to_slash_lossy()])
                 .args(install_args)
                 .output()
             {

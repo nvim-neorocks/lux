@@ -123,7 +123,7 @@ impl BuildSpec {
                 let default = MakeBuildSpec::default();
                 Some(BuildBackendSpec::Make(MakeBuildSpec {
                     makefile: internal.makefile.unwrap_or(default.makefile),
-                    build_target: internal.make_build_target.unwrap_or_default(),
+                    build_target: internal.make_build_target,
                     build_pass: internal.build_pass.unwrap_or(default.build_pass),
                     install_target: internal
                         .make_install_target
