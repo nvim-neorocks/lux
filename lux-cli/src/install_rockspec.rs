@@ -8,7 +8,8 @@ use lux_lib::{
     build::{self, BuildBehaviour},
     config::Config,
     lockfile::{OptState, PinnedState},
-    lua_rockspec::RemoteLuaRockspec,
+    lua_rockspec::{BuildBackendSpec, RemoteLuaRockspec},
+    luarocks::luarocks_installation::LuaRocksInstallation,
     operations::{Install, PackageInstallSpec},
     package::PackageName,
     progress::MultiProgress,
@@ -74,13 +75,24 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
 
     Install::new(&tree, &config)
         .packages(dependencies_to_install)
-        .progress(progress_arc)
+        .progress(progress_arc.clone())
         .install()
         .await?;
 
     if let Some(project) = project_opt {
         std::fs::copy(tree.lockfile_path(), project.lockfile_path())
             .wrap_err("error creating project lockfile.")?;
+    }
+
+    if let Some(BuildBackendSpec::LuaRock(build_backend)) =
+        &rockspec.build().for_target_platform(&config).build_backend
+    {
+        let luarocks = LuaRocksInstallation::new(&config)?;
+        let bar = progress.map(|p| p.new_bar());
+        luarocks.ensure_installed(&bar).await?;
+        luarocks
+            .install_build_dependencies(build_backend, &rockspec, progress_arc.clone())
+            .await?;
     }
 
     build::Build::new(
