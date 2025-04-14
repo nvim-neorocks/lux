@@ -6,6 +6,25 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.3.5](https://github.com/nvim-neorocks/lux/compare/v0.3.4...v0.3.5) - 2025-04-14
+
+### Fixed
+- *(cli/install-rockspec)* ensure luarocks is installed
+- *(build)* wrap binaries ([#583](https://github.com/nvim-neorocks/lux/pull/583))
+
+## `lux-lib` - [0.3.5](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.3.4...lux-lib-v0.3.5) - 2025-04-14
+
+### Added
+- better dev version parsing
+- better variable expansion + error on missing variables
+
+### Fixed
+- install pre-packaged luarocks on windows ([#584](https://github.com/nvim-neorocks/lux/pull/584))
+- *(build)* wrap binaries ([#583](https://github.com/nvim-neorocks/lux/pull/583))
+
+### Other
+- *(deps)* bump bon from 3.5.0 to 3.6.0 ([#586](https://github.com/nvim-neorocks/lux/pull/586))
+
 ## `lux-cli` - [0.3.4](https://github.com/nvim-neorocks/lux/compare/v0.3.3...v0.3.4) - 2025-04-13
 
 ### Other
