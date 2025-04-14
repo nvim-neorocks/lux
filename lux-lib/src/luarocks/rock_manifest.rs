@@ -100,7 +100,7 @@ impl DisplayAsLuaKV for RockManifest {
 impl DisplayAsLuaKV for (&PathBuf, &String) {
     fn display_lua(&self) -> DisplayLuaKV {
         DisplayLuaKV {
-            key: format!("[\"{}\"]", self.0.display()),
+            key: format!("{}", self.0.display()),
             value: DisplayLuaValue::String(self.1.clone()),
         }
     }
