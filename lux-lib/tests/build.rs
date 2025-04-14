@@ -12,7 +12,6 @@ use lux_lib::{
 };
 use tokio::runtime::Builder;
 
-#[cfg(not(target_env = "msvc"))] // lua-cjson is not cross platform
 #[tokio::test]
 async fn builtin_build() {
     let dir = TempDir::new().unwrap();
