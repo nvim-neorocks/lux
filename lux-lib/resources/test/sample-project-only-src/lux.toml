@@ -5,11 +5,10 @@ lua = ">=5.1"
 [description]
 summary = ""
 maintainer = "nvim-neorocks"
-labels = [ "" ]
+labels = [""]
 
 [run]
-args = [ "src/main.lua" ]
+args = ["src/main.lua"]
 
 [build]
 type = "builtin"
-

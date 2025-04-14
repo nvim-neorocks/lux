@@ -127,7 +127,7 @@ async fn update_project(
 
     let dependencies = toml
         .dependencies()
-        .for_target_platform(args.config)
+        .current_platform()
         .iter()
         .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
         .cloned()
@@ -153,10 +153,7 @@ async fn update_project(
     .chain(dep_report.removed);
 
     let test_tree = project.test_tree(args.config)?;
-    let test_dependencies = toml
-        .test_dependencies()
-        .for_target_platform(args.config)
-        .clone();
+    let test_dependencies = toml.test_dependencies().current_platform().clone();
     let dep_report = super::Sync::new(&test_tree, &mut project_lockfile, args.config)
         .validate_integrity(false)
         .packages(test_dependencies)
@@ -177,10 +174,7 @@ async fn update_project(
     .chain(dep_report.removed);
 
     let luarocks = LuaRocksInstallation::new(args.config)?;
-    let build_dependencies = toml
-        .build_dependencies()
-        .for_target_platform(args.config)
-        .clone();
+    let build_dependencies = toml.build_dependencies().current_platform().clone();
 
     let dep_report = super::Sync::new(luarocks.tree(), &mut project_lockfile, luarocks.config())
         .validate_integrity(false)

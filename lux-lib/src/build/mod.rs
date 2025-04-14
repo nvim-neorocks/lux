@@ -183,12 +183,7 @@ async fn run_build<R: Rockspec + HasIntegrity>(
     progress.map(|p| p.set_message("🛠️ Building..."));
 
     Ok(
-        match rockspec
-            .build()
-            .for_target_platform(config)
-            .build_backend
-            .to_owned()
-        {
+        match rockspec.build().current_platform().build_backend.to_owned() {
             Some(BuildBackendSpec::Builtin(build_spec)) => {
                 build_spec
                     .run(output_paths, false, lua, config, build_dir, progress)
@@ -246,7 +241,7 @@ async fn install<R: Rockspec + HasIntegrity>(
         ))
     });
 
-    let install_spec = &rockspec.build().for_target_platform(config).install;
+    let install_spec = &rockspec.build().current_platform().install;
     let lua_len = install_spec.lua.len();
     let lib_len = install_spec.lib.len();
     let bin_len = install_spec.bin.len();
@@ -277,7 +272,7 @@ async fn install<R: Rockspec + HasIntegrity>(
         progress.map(|p| p.set_message("Copying binaries..."));
     }
     if *entry_type == EntryType::Entrypoint {
-        let deploy_spec = rockspec.deploy().for_target_platform(config);
+        let deploy_spec = rockspec.deploy().current_platform();
         for (target, source) in &install_spec.bin {
             utils::install_binary(
                 &build_dir.join(source),
@@ -308,10 +303,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
         ))
     });
 
-    for (name, dep) in rockspec
-        .external_dependencies()
-        .for_target_platform(build.config)
-    {
+    for (name, dep) in rockspec.external_dependencies().current_platform() {
         let _ = ExternalDependencyInfo::detect(name, dep, build.config.external_deps())?;
     }
 
@@ -332,11 +324,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
         source: source_metadata.hash,
     };
 
-    if let Some(expected) = &rockspec
-        .source()
-        .for_target_platform(build.config)
-        .integrity
-    {
+    if let Some(expected) = &rockspec.source().current_platform().integrity {
         if expected.matches(&hashes.source).is_none() {
             return Err(BuildError::SourceIntegrityMismatch {
                 expected: expected.clone(),
@@ -348,7 +336,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
     let mut package = LocalPackage::from(
         &PackageSpec::new(rockspec.package().clone(), rockspec.version().clone()),
         build.constraint,
-        rockspec.binaries(build.config),
+        rockspec.binaries(),
         build.source.unwrap_or_else(|| {
             RemotePackageSource::RockspecContent(rockspec.to_lua_rockspec_string())
         }),
@@ -368,7 +356,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
 
             let lua = LuaInstallation::new(&lua_version, build.config);
 
-            let rock_source = rockspec.source().for_target_platform(build.config);
+            let rock_source = rockspec.source().current_platform();
             let build_dir = match &rock_source.unpack_dir {
                 Some(unpack_dir) => temp_dir.path().join(unpack_dir),
                 None => {
@@ -396,7 +384,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
 
             Patch::new(
                 &build_dir,
-                &rockspec.build().for_target_platform(build.config).patches,
+                &rockspec.build().current_platform().patches,
                 build.progress,
             )
             .apply()?;
@@ -427,7 +415,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
 
             for directory in rockspec
                 .build()
-                .for_target_platform(build.config)
+                .current_platform()
                 .copy_directories
                 .iter()
                 .filter(|dir| {

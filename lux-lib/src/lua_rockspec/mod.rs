@@ -575,7 +575,6 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use crate::config::ConfigBuilder;
     use crate::lua_rockspec::PlatformIdentifier;
     use crate::package::PackageSpec;
 
@@ -1317,8 +1316,7 @@ mod tests {
             String::from_utf8(std::fs::read("resources/test/luasystem-0.4.4-1.rockspec").unwrap())
                 .unwrap();
         let rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap();
-        let config = ConfigBuilder::new().unwrap().build().unwrap();
-        let build_spec = rockspec.local.build.for_target_platform(&config);
+        let build_spec = rockspec.local.build.current_platform();
         assert!(matches!(
             build_spec.build_backend,
             Some(BuildBackendSpec::Builtin { .. })
@@ -1434,8 +1432,7 @@ mod tests {
     }
             ";
         let rockspec = RemoteLuaRockspec::new(rockspec_content).unwrap();
-        let config = ConfigBuilder::new().unwrap().build().unwrap();
-        let build_spec = rockspec.local.build.for_target_platform(&config);
+        let build_spec = rockspec.local.build.current_platform();
         if let Some(BuildBackendSpec::RustMlua(build_spec)) = build_spec.build_backend.to_owned() {
             assert_eq!(
                 build_spec.modules.get("foo").unwrap(),
@@ -1493,10 +1490,9 @@ mod tests {
         "#;
 
         let rockspec = RemoteLuaRockspec::new(rockspec_content).unwrap();
-        let config = ConfigBuilder::default().build().unwrap();
 
         assert_eq!(
-            rockspec.build().for_target_platform(&config).install.bin,
+            rockspec.build().current_platform().install.bin,
             HashMap::from([("wsapi".into(), PathBuf::from("src/launcher/wsapi.cgi"))])
         );
     }

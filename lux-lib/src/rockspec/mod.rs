@@ -42,10 +42,10 @@ pub trait Rockspec {
     fn format(&self) -> &Option<RockspecFormat>;
 
     /// Shorthand to extract the binaries that are part of the rockspec.
-    fn binaries(&self, config: &Config) -> RockBinaries {
+    fn binaries(&self) -> RockBinaries {
         RockBinaries(
             self.build()
-                .for_target_platform(config)
+                .current_platform()
                 .install
                 .bin
                 .keys()

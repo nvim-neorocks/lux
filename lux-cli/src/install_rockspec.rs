@@ -48,7 +48,7 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
     // Ensure all dependencies are installed first
     let dependencies = rockspec
         .dependencies()
-        .for_target_platform(&config)
+        .current_platform()
         .iter()
         .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
         .collect_vec();
@@ -85,7 +85,7 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
     }
 
     if let Some(BuildBackendSpec::LuaRock(build_backend)) =
-        &rockspec.build().for_target_platform(&config).build_backend
+        &rockspec.build().current_platform().build_backend
     {
         let luarocks = LuaRocksInstallation::new(&config)?;
         let bar = progress.map(|p| p.new_bar());

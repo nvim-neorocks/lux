@@ -205,16 +205,13 @@ impl LuaRocksInstallation {
                 // so we have to fetch the build backend from the dependencies.
                 rocks
                     .dependencies()
-                    .for_target_platform(&self.config)
+                    .current_platform()
                     .iter()
                     .filter(|dep| dep.name().to_string().contains(build_backend))
                     .cloned()
                     .collect_vec()
             }
-            _ => rocks
-                .build_dependencies()
-                .for_target_platform(&self.config)
-                .to_vec(),
+            _ => rocks.build_dependencies().current_platform().to_vec(),
         }
         .into_iter()
         .map(|dep| {

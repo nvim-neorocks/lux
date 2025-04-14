@@ -42,7 +42,7 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
                 .toml()
                 .into_local()?
                 .dependencies()
-                .for_target_platform(&config)
+                .current_platform()
                 .clone();
             Sync::new(&tree, &mut lockfile, &config)
                 .packages(packages)
@@ -65,7 +65,7 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
                 .toml()
                 .into_local()?
                 .build_dependencies()
-                .for_target_platform(&config)
+                .current_platform()
                 .clone();
             Sync::new(luarocks.tree(), &mut lockfile, luarocks.config())
                 .packages(packages)
@@ -87,7 +87,7 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
                 .toml()
                 .into_local()?
                 .test_dependencies()
-                .for_target_platform(&config)
+                .current_platform()
                 .clone();
             let tree = project.test_tree(&config)?;
             Sync::new(&tree, &mut lockfile, &config)

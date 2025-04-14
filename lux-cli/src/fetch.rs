@@ -27,7 +27,7 @@ pub async fn fetch_remote(data: UnpackRemote, config: Config) -> Result<()> {
         .fetch()
         .await?;
 
-    let rock_source = rockspec.source().for_target_platform(&config);
+    let rock_source = rockspec.source().current_platform();
     let build_dir = rock_source
         .unpack_dir
         .as_ref()

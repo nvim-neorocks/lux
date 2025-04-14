@@ -73,12 +73,7 @@ where
     pub(crate) async fn fetch_internal(self) -> Result<RemotePackageSourceMetadata, FetchSrcError> {
         let fetch = self._build();
         match do_fetch_src(&fetch).await {
-            Err(err) => match &fetch
-                .rockspec
-                .source()
-                .for_target_platform(fetch.config)
-                .source_spec
-            {
+            Err(err) => match &fetch.rockspec.source().current_platform().source_spec {
                 RockSourceSpec::Git(_) | RockSourceSpec::Url(_) => {
                     let package = PackageSpec::new(
                         fetch.rockspec.package().clone(),
@@ -158,7 +153,7 @@ async fn do_fetch_src<R: Rockspec>(
     fetch: &FetchSrc<'_, R>,
 ) -> Result<RemotePackageSourceMetadata, FetchSrcError> {
     let rockspec = fetch.rockspec;
-    let rock_source = rockspec.source().for_target_platform(fetch.config);
+    let rock_source = rockspec.source().current_platform();
     let progress = fetch.progress;
     let dest_dir = fetch.dest_dir;
     // prioritise lockfile source, if present

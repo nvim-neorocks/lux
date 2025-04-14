@@ -893,7 +893,6 @@ mod tests {
     use itertools::Itertools;
 
     use crate::{
-        config::ConfigBuilder,
         lua_rockspec::{PartialLuaRockspec, PerPlatform, RemoteLuaRockspec},
         project::ProjectRoot,
         rockspec::{lua_dependency::LuaDependencySpec, Rockspec},
@@ -1106,9 +1105,8 @@ mod tests {
             .to_lua_rockspec()
             .unwrap();
 
-        let config = ConfigBuilder::new().unwrap().build().unwrap();
         let sorted_package_reqs = |v: &PerPlatform<Vec<LuaDependencySpec>>| {
-            let mut v = v.for_target_platform(&config).clone();
+            let mut v = v.current_platform().clone();
             v.sort_by(|a, b| a.name().cmp(b.name()));
             v
         };
@@ -1262,9 +1260,8 @@ mod tests {
 
         let merged = project_toml.merge(partial_rockspec).into_remote().unwrap();
 
-        let config = ConfigBuilder::new().unwrap().build().unwrap();
         let sorted_package_reqs = |v: &PerPlatform<Vec<LuaDependencySpec>>| {
-            let mut v = v.for_target_platform(&config).clone();
+            let mut v = v.current_platform().clone();
             v.sort_by(|a, b| a.name().cmp(b.name()));
             v
         };

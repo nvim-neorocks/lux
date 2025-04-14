@@ -107,7 +107,7 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
 
         let test_dependencies = rocks
             .test_dependencies()
-            .for_target_platform(test.config)
+            .current_platform()
             .iter()
             .cloned()
             .collect_vec();
@@ -120,7 +120,7 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
 
         let dependencies = rocks
             .dependencies()
-            .for_target_platform(test.config)
+            .current_platform()
             .iter()
             .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
             .cloned()
@@ -220,7 +220,7 @@ async fn ensure_dependencies(
     ensure_busted(test_tree, config, progress.clone()).await?;
     let test_dependencies = rockspec
         .test_dependencies()
-        .for_target_platform(config)
+        .current_platform()
         .iter()
         .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
         .filter_map(|dep| {
@@ -252,7 +252,7 @@ async fn ensure_dependencies(
 
     let dependencies = rockspec
         .dependencies()
-        .for_target_platform(config)
+        .current_platform()
         .iter()
         .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
         .filter_map(|dep| {

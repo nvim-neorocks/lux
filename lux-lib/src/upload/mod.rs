@@ -201,7 +201,7 @@ async fn upload_from_project(
     let rockspec = project.toml().into_remote()?;
 
     // Disallow uploading non-deterministic rockspecs
-    helpers::verify_rockspec_determinism(rockspec.source().for_target_platform(config))?;
+    helpers::verify_rockspec_determinism(rockspec.source().current_platform())?;
 
     helpers::ensure_tool_version(&client, config.server()).await?;
     helpers::ensure_user_exists(&client, api_key, config.server()).await?;
@@ -375,7 +375,6 @@ mod helpers {
 #[cfg(test)]
 mod tests {
     use crate::{
-        config::ConfigBuilder,
         project::{project_toml::PartialProjectToml, ProjectRoot},
         rockspec::Rockspec,
     };
@@ -384,8 +383,6 @@ mod tests {
 
     #[test]
     fn upload_check_deterministic_rockspecs() {
-        let config = ConfigBuilder::new().unwrap().build().unwrap();
-
         let rockspec_content = r#"
             package = "test-package"
             version = "1.0.0"
@@ -403,8 +400,7 @@ mod tests {
             .into_remote()
             .unwrap();
 
-        helpers::verify_rockspec_determinism(rockspec.source().for_target_platform(&config))
-            .unwrap_err();
+        helpers::verify_rockspec_determinism(rockspec.source().current_platform()).unwrap_err();
 
         let rockspec_content = r#"
             package = "test-package"
@@ -424,8 +420,7 @@ mod tests {
             .into_remote()
             .unwrap();
 
-        helpers::verify_rockspec_determinism(rockspec.source().for_target_platform(&config))
-            .unwrap();
+        helpers::verify_rockspec_determinism(rockspec.source().current_platform()).unwrap();
 
         let rockspec_content = r#"
             package = "test-package"
@@ -445,7 +440,6 @@ mod tests {
             .into_remote()
             .unwrap();
 
-        helpers::verify_rockspec_determinism(rockspec.source().for_target_platform(&config))
-            .unwrap();
+        helpers::verify_rockspec_determinism(rockspec.source().current_platform()).unwrap();
     }
 }

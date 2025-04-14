@@ -3,7 +3,6 @@ use mlua::{FromLua, IntoLuaMulti, Lua, LuaSerdeExt, UserData, Value};
 use std::{cmp::Ordering, collections::HashMap, marker::PhantomData};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
-use target_lexicon::Triple;
 use thiserror::Error;
 
 use serde::{
@@ -11,8 +10,6 @@ use serde::{
     Deserialize, Deserializer,
 };
 use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
-
-use crate::config::Config;
 
 use super::{DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue};
 
@@ -36,22 +33,7 @@ pub enum PlatformIdentifier {
 
 impl Default for PlatformIdentifier {
     fn default() -> Self {
-        // NOTE: This is okay, as long as we don't support cross-compilation.
-        let host = Triple::host();
-        match cc::Build::new()
-            .cargo_output(false)
-            .cargo_metadata(false)
-            .cargo_debug(false)
-            .cargo_warnings(false)
-            .debug(false)
-            .opt_level(3)
-            .host(std::env::consts::OS)
-            .target(&host.to_string())
-            .try_get_compiler()
-        {
-            Ok(tool) => target_identifier(&tool),
-            Err(_) => lux_fallback_identifier(),
-        }
+        target_identifier()
     }
 }
 
@@ -84,27 +66,14 @@ impl FromLua for PlatformIdentifier {
     }
 }
 
-/// Maps a compiler tool to a `PlatformIdentifier`.
+/// Retrieves the platform identifier for the target platform
 ///
-/// This function analyzes the properties of the provided compiler tool
-/// and returns the `PlatformIdentifier` that matches the tool's characteristics.
-fn target_identifier(tool: &cc::Tool) -> PlatformIdentifier {
-    if tool.is_like_msvc() {
-        // There's no 32 bit version of Windows 11, so let's assume 64 bit support for Windows.
-        // If someone wants to use 32 bit Windows, they'll have to use luarocks.
-        PlatformIdentifier::Windows
-    } else {
-        // NOTE: We currently don't support cross-compilation, so we deduce more specific
-        // platorm identifiers from the host platform.
-        lux_fallback_identifier()
-    }
-}
-
-/// Retrieves the platform identifier for the platform lux was built with.
-/// WARNING: This is only to be used as a fallback in case no `cc::Tool` is available
-/// for use with `target_identifier`.
-fn lux_fallback_identifier() -> PlatformIdentifier {
-    if cfg!(target_os = "windows") && which::which("cygpath").is_err() {
+/// NOTE: This is the platform lux was built with.
+/// As we don't support cross-compilation, we currently expect
+/// users to use a version of lux that was built with the same platform
+/// as the one they are targeting
+fn target_identifier() -> PlatformIdentifier {
+    if cfg!(target_env = "msvc") {
         PlatformIdentifier::Windows
     } else if cfg!(target_os = "linux") {
         PlatformIdentifier::Linux
@@ -341,8 +310,8 @@ impl<T> PerPlatform<T> {
 
     /// Merge per-platform overrides for the configured build target platform,
     /// with more specific platform overrides having higher priority.
-    pub fn for_target_platform(&self, config: &Config) -> &T {
-        self.for_platform_identifier(config.target_platform())
+    pub fn current_platform(&self) -> &T {
+        self.for_platform_identifier(&target_identifier())
     }
 
     fn for_platform_identifier(&self, identifier: &PlatformIdentifier) -> &T {
@@ -610,7 +579,6 @@ mod tests {
 
     use super::*;
     use proptest::prelude::*;
-    use target_lexicon::Triple;
 
     fn platform_identifier_strategy() -> impl Strategy<Value = PlatformIdentifier> {
         prop_oneof![
@@ -701,41 +669,7 @@ mod tests {
     }
 
     fn run_test_target_identifier(expected: PlatformIdentifier) {
-        let host = Triple::host();
-        let tool = cc::Build::new()
-            .cargo_output(false)
-            .cargo_metadata(false)
-            .cargo_debug(false)
-            .cargo_warnings(false)
-            .debug(false)
-            .opt_level(3)
-            .host(std::env::consts::OS)
-            .target(&host.to_string())
-            .try_get_compiler()
-            .unwrap();
-        assert_eq!(expected, target_identifier(&tool));
-    }
-
-    #[cfg(target_os = "linux")]
-    #[tokio::test]
-    async fn test_lux_fallback_identifier() {
-        run_test_lux_fallback_identifier(PlatformIdentifier::Linux)
-    }
-
-    #[cfg(target_os = "macos")]
-    #[tokio::test]
-    async fn test_lux_fallback_identifier() {
-        run_test_lux_fallback_identifier(PlatformIdentifier::MacOSX)
-    }
-
-    #[cfg(target_env = "msvc")]
-    #[tokio::test]
-    async fn test_lux_fallback_identifier() {
-        run_test_lux_fallback_identifier(PlatformIdentifier::Windows)
-    }
-
-    fn run_test_lux_fallback_identifier(expected: PlatformIdentifier) {
-        assert_eq!(expected, lux_fallback_identifier());
+        assert_eq!(expected, target_identifier());
     }
 
     proptest! {

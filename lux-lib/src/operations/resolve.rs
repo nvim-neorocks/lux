@@ -84,7 +84,7 @@ where
                         let dependencies = downloaded_rock
                             .rockspec()
                             .dependencies()
-                            .for_target_platform(&config)
+                            .current_platform()
                             .iter()
                             .filter(|dep| !dep.name().eq(&"lua".into()))
                             .map(|dep| {
@@ -130,7 +130,7 @@ where
                             dependencies,
                             &pin,
                             &opt,
-                            rockspec.binaries(&config),
+                            rockspec.binaries(),
                         );
 
                         let install_spec = PackageInstallData {
