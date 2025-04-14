@@ -7,7 +7,9 @@ use crate::{
     package::{PackageName, PackageReq, PackageVersionReqError},
     path::{Paths, PathsError},
     progress::{MultiProgress, Progress},
-    project::{project_toml::LocalProjectTomlValidationError, Project, ProjectTreeError},
+    project::{
+        project_toml::LocalProjectTomlValidationError, Project, ProjectError, ProjectTreeError,
+    },
     rockspec::Rockspec,
     tree::{self, Tree, TreeError},
 };
@@ -79,6 +81,8 @@ pub enum RunTestsError {
     RunCommandFailure(String, io::Error),
     #[error(transparent)]
     Io(#[from] io::Error),
+    #[error(transparent)]
+    Project(#[from] ProjectError),
     #[error(transparent)]
     Paths(#[from] PathsError),
     #[error(transparent)]
