@@ -4,7 +4,7 @@ on:
     branches:
       - master
 
-name: Integration tests (Windows)
+name: Integration tests (Windows/MSVC)
 
 jobs:
   test:
@@ -29,17 +29,12 @@ jobs:
         with:
           luaVersion: "5.1"
 
-      - name: Specify Lua in config
-        run: |
-          mkdir -p C:/Users/runneradmin/AppData/Local/neorocks/lux/
-          echo 'lua_dir = "D:/a/lux/lux/.lua"' >> C:/Users/runneradmin/AppData/Local/neorocks/lux/config.toml 
-        shell: bash
-
       - name: Install Build+Test dependencies
         run: |
           $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\ProgramData\chocolatey\bin"
           [Environment]::SetEnvironmentVariable("Path", $env:PATH, "Machine")
           choco install -y --no-progress openssl libgit2 make cmake
+
       - name: Install Rust Toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Install cargo-nextest
