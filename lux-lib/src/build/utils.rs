@@ -179,12 +179,21 @@ pub(crate) fn compile_c_files(
 
 // TODO: (#261): special cases for mingw/cygwin?
 
-/// the extension for Lua libraries.
-pub(crate) fn lua_lib_extension() -> &'static str {
+/// the extension for Lua shared libraries.
+pub(crate) fn lua_dylib_extension() -> &'static str {
     if cfg!(target_env = "msvc") {
         "dll"
     } else {
         "so"
+    }
+}
+
+/// the extension for Lua static libraries.
+pub(crate) fn lua_lib_extension() -> &'static str {
+    if cfg!(target_env = "msvc") {
+        "lib"
+    } else {
+        "a"
     }
 }
 

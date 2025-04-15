@@ -1,14 +1,14 @@
 use is_executable::IsExecutable;
 use itertools::Itertools;
 use path_slash::PathBufExt;
-use pkg_config::{Config as PkgConfig, Library};
+use pkg_config::Library;
 use std::io;
 use std::path::Path;
 use std::{path::PathBuf, process::Command};
 use target_lexicon::Triple;
 use thiserror::Error;
 
-use crate::build::utils::format_path;
+use crate::build::utils::{format_path, lua_dylib_extension, lua_lib_extension};
 use crate::{
     build::variables::HasVariables,
     config::{Config, LuaVersion},
@@ -23,6 +23,9 @@ pub struct LuaInstallation {
     bin: Option<PathBuf>,
     /// pkg-config library information if available
     lib_info: Option<Library>,
+    /// Name of the Lua library, (without the 'lib' prefix on unix targets),
+    /// for example, "lua.so" or "lua.dll"
+    lua_lib_name: String,
 }
 
 impl LuaInstallation {
@@ -34,7 +37,7 @@ impl LuaInstallation {
             LuaVersion::Lua54 => "lua5.4",
             LuaVersion::LuaJIT | LuaVersion::LuaJIT52 => "luajit",
         };
-        let lib_info = PkgConfig::new()
+        let lib_info = pkg_config::Config::new()
             .print_system_libs(false)
             .cargo_metadata(false)
             .env_metadata(false)
@@ -49,12 +52,14 @@ impl LuaInstallation {
                     .map(|parent| parent.join("bin"))
                     .filter(|dir| dir.is_dir())
                     .and_then(|bin_path| find_lua_executable(&bin_path));
+                let lua_lib_name = get_lua_lib_name(&lib_dir, version);
                 return Self {
                     include_dir: PathBuf::from(&info.include_paths[0]),
                     lib_dir,
                     version: version.clone(),
                     lib_info: Some(info),
                     bin,
+                    lua_lib_name,
                 };
             }
         }
@@ -67,12 +72,15 @@ impl LuaInstallation {
             } else {
                 None
             };
+            let lib_dir = output.join("lib");
+            let lua_lib_name = get_lua_lib_name(&lib_dir, version);
             LuaInstallation {
                 include_dir: output.join("include"),
-                lib_dir: output.join("lib"),
+                lib_dir,
                 version: version.clone(),
                 lib_info: None,
                 bin,
+                lua_lib_name,
             }
         } else {
             let host = Triple::host();
@@ -123,12 +131,14 @@ impl LuaInstallation {
             } else {
                 None
             };
+            let lua_lib_name = get_lua_lib_name(&lib_dir, version);
             LuaInstallation {
                 include_dir,
                 lib_dir,
                 version: version.clone(),
                 lib_info: None,
                 bin,
+                lua_lib_name,
             }
         }
     }
@@ -137,12 +147,8 @@ impl LuaInstallation {
         config.lua_dir().join(version.to_string())
     }
 
-    pub(crate) fn lua_lib_name(&self) -> String {
-        match self.version {
-            LuaVersion::LuaJIT => format!("luajit-5.1.{}", std::env::consts::DLL_EXTENSION),
-            LuaVersion::LuaJIT52 => format!("luajit-5.2.{}", std::env::consts::DLL_EXTENSION),
-            _ => format!("lua.{}", std::env::consts::DLL_EXTENSION),
-        }
+    fn lua_lib_name(&self) -> String {
+        self.lua_lib_name.clone()
     }
 
     pub(crate) fn compile_args(&self) -> Vec<String> {
@@ -310,6 +316,54 @@ fn find_lua_executable(bin_path: &Path) -> Option<PathBuf> {
     })
 }
 
+fn is_lua_lib_name(name: &str, lua_version: &LuaVersion) -> bool {
+    let prefixes = match lua_version {
+        LuaVersion::LuaJIT | LuaVersion::LuaJIT52 => vec!["luajit", "lua"],
+        _ => vec!["lua"],
+    };
+    let version_str = lua_version.version_compatibility_str();
+    let version_suffix = version_str.replace(".", "");
+    #[cfg(target_family = "unix")]
+    let name = name.trim_start_matches("lib");
+    prefixes
+        .iter()
+        .any(|prefix| name == format!("{}.{}", *prefix, lua_lib_extension()))
+        || prefixes.iter().any(|prefix| name.starts_with(*prefix))
+            && (name.contains(&version_str) || name.contains(&version_suffix))
+}
+
+fn get_lua_lib_name(lib_dir: &Path, lua_version: &LuaVersion) -> String {
+    if let Some(file) = std::fs::read_dir(lib_dir).ok().and_then(|entries| {
+        entries
+            .filter_map(Result::ok)
+            .map(|entry| entry.path().to_path_buf())
+            .filter(|file| {
+                file.extension()
+                    .is_some_and(|ext| ext == lua_lib_extension())
+            })
+            .filter(|file| {
+                file.file_name()
+                    .is_some_and(|name| is_lua_lib_name(&name.to_string_lossy(), lua_version))
+            })
+            .collect_vec()
+            .first()
+            .cloned()
+    }) {
+        let file_name = file.file_name().unwrap();
+
+        if cfg!(target_family = "unix") {
+            file_name
+                .to_string_lossy()
+                .trim_start_matches("lib")
+                .to_string()
+        } else {
+            file_name.to_string_lossy().to_string()
+        }
+    } else {
+        format!("lua.{}", lua_dylib_extension())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::config::ConfigBuilder;
@@ -343,5 +397,33 @@ mod test {
         let pkg_version =
             get_installed_lua_version(&lua_installation.bin.unwrap().to_string_lossy()).unwrap();
         assert_eq!(&LuaVersion::from_version(pkg_version).unwrap(), lua_version);
+    }
+
+    #[cfg(not(target_env = "msvc"))]
+    #[tokio::test]
+    async fn test_is_lua_lib_name() {
+        assert!(is_lua_lib_name("lua.a", &LuaVersion::Lua51));
+        assert!(is_lua_lib_name("lua-5.1.a", &LuaVersion::Lua51));
+        assert!(is_lua_lib_name("lua5.1.a", &LuaVersion::Lua51));
+        assert!(is_lua_lib_name("lua51.a", &LuaVersion::Lua51));
+        assert!(!is_lua_lib_name("lua-5.2.a", &LuaVersion::Lua51));
+        assert!(is_lua_lib_name("luajit-5.2.a", &LuaVersion::LuaJIT52));
+        assert!(is_lua_lib_name("lua-5.2.a", &LuaVersion::LuaJIT52));
+        assert!(is_lua_lib_name("liblua.a", &LuaVersion::Lua51));
+        assert!(is_lua_lib_name("liblua-5.1.a", &LuaVersion::Lua51));
+        assert!(is_lua_lib_name("liblua53.a", &LuaVersion::Lua53));
+        assert!(is_lua_lib_name("liblua-54.a", &LuaVersion::Lua54));
+    }
+
+    #[cfg(target_env = "msvc")]
+    #[tokio::test]
+    async fn test_is_lua_lib_name() {
+        assert!(is_lua_lib_name("lua.lib", &LuaVersion::Lua51));
+        assert!(is_lua_lib_name("lua-5.1.lib", &LuaVersion::Lua51));
+        assert!(!is_lua_lib_name("lua-5.2.lib", &LuaVersion::Lua51));
+        assert!(!is_lua_lib_name("lua53.lib", &LuaVersion::Lua53));
+        assert!(!is_lua_lib_name("lua53.lib", &LuaVersion::Lua53));
+        assert!(is_lua_lib_name("luajit-5.2.lib", &LuaVersion::LuaJIT52));
+        assert!(is_lua_lib_name("lua-5.2.lib", &LuaVersion::LuaJIT52));
     }
 }
