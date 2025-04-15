@@ -4,7 +4,7 @@ use std::{env, fmt::Display, path::PathBuf, str::FromStr};
 use thiserror::Error;
 
 use crate::{
-    build::utils::lua_lib_extension,
+    build::utils::lua_dylib_extension,
     config::{Config, LuaVersion},
     tree::{Tree, TreeError},
 };
@@ -57,7 +57,7 @@ impl Paths {
                 paths
                     .lib
                     .0
-                    .push(package.lib.join(format!("?.{}", lua_lib_extension())));
+                    .push(package.lib.join(format!("?.{}", lua_dylib_extension())));
                 paths.bin.0.push(package.bin);
                 Ok::<Paths, TreeError>(paths)
             })?;
