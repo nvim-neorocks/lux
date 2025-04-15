@@ -1,13 +1,16 @@
 use itertools::Itertools;
 use mlua::{Lua, LuaSerdeExt};
 use reqwest::{header::ToStrError, Client};
+use std::path::Path;
 use std::time::SystemTime;
 use std::{cmp::Ordering, collections::HashMap};
 use thiserror::Error;
+use tokio::fs::{File, OpenOptions};
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio::{fs, io};
 use url::Url;
+use zip::ZipArchive;
 
-use crate::luarocks;
 use crate::package::{RemotePackageType, RemotePackageTypeFilterSpec};
 use crate::progress::{Progress, ProgressBar};
 use crate::{
@@ -28,6 +31,41 @@ pub enum ManifestFromServerError {
     InvalidHeader(#[from] ToStrError),
     #[error("error parsing manifest URL: {0}")]
     Url(#[from] url::ParseError),
+    #[error("failed to unzip manifest file")]
+    Zip(#[from] zip::result::ZipError),
+}
+
+async fn get_manifest(
+    url: Url,
+    manifest_version: String,
+    target: &Path,
+    client: &Client,
+) -> Result<String, ManifestFromServerError> {
+    let new_manifest_content = client.get(url).send().await?.bytes().await?;
+    let mut archive = ZipArchive::new(std::io::Cursor::new(new_manifest_content))?;
+
+    let temp = tempdir::TempDir::new("lux-manifest")?;
+
+    archive.extract_unwrapped_root_dir(&temp, zip::read::root_dir_common_filter)?;
+
+    let mut extracted_manifest =
+        File::open(temp.path().join(format!("manifest-{}", manifest_version))).await?;
+    let mut target = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(target)
+        .await?;
+
+    io::copy(&mut extracted_manifest, &mut target).await?;
+
+    let mut manifest = String::new();
+
+    target.seek(io::SeekFrom::Start(0)).await?;
+    target.read_to_string(&mut manifest).await?;
+
+    Ok(manifest)
 }
 
 async fn manifest_from_server(
@@ -35,25 +73,27 @@ async fn manifest_from_server(
     config: &Config,
     bar: &Progress<ProgressBar>,
 ) -> Result<String, ManifestFromServerError> {
-    let manifest_filename = "manifest".to_string()
-        + &config
+    let manifest_version = &config
+        .lua_version()
+        .filter(|lua_version| {
+            // There's no manifest-luajit
+            matches!(
+                lua_version,
+                LuaVersion::Lua51 | LuaVersion::Lua52 | LuaVersion::Lua53 | LuaVersion::Lua54
+            )
+        })
+        .or(config
             .lua_version()
-            .filter(|lua_version| {
-                // There's no manifest-luajit
-                matches!(
-                    lua_version,
-                    LuaVersion::Lua51 | LuaVersion::Lua52 | LuaVersion::Lua53 | LuaVersion::Lua54
-                )
-            })
-            .or(config
-                .lua_version()
-                .and_then(|lua_version| match lua_version {
-                    LuaVersion::LuaJIT => Some(&LuaVersion::Lua51),
-                    LuaVersion::LuaJIT52 => Some(&LuaVersion::Lua52),
-                    _ => None,
-                }))
-            .map(|s| format!("-{}", s))
-            .unwrap_or_default();
+            .and_then(|lua_version| match lua_version {
+                LuaVersion::LuaJIT => Some(&LuaVersion::Lua51),
+                LuaVersion::LuaJIT52 => Some(&LuaVersion::Lua52),
+                _ => None,
+            }))
+        .map(|ver| ver.to_string())
+        .unwrap_or_default();
+
+    let manifest_filename = format!("manifest-{}.zip", manifest_version);
+
     let url = match config.namespace() {
         Some(ns) => url
             .join(&format!("manifests/{}/", ns))?
@@ -66,7 +106,8 @@ async fn manifest_from_server(
     let cache = config.cache_dir().join(
         // Convert the url to a directory name so we don't create too many subdirectories
         url.to_string()
-            .replace(&[':', '*', '?', '"', '<', '>', '|', '/', '\\'][..], "_"),
+            .replace(&[':', '*', '?', '"', '<', '>', '|', '/', '\\'][..], "_")
+            .trim_end_matches(".zip"),
     );
 
     // Ensure all intermediate directories for the cache file are created (e.g. `~/.cache/lux/manifest`)
@@ -88,11 +129,11 @@ async fn manifest_from_server(
             if server_last_modified > last_modified_local {
                 // Since we only pulled in the headers previously we must now request the entire
                 // manifest from scratch.
-                bar.map(|bar| bar.set_message(format!("📥 Downloading updated manifest from {}", &url)));
-                let new_manifest_content = client.get(url).send().await?.text().await?;
-                fs::write(&cache, &new_manifest_content).await?;
+                bar.map(|bar| {
+                    bar.set_message(format!("📥 Downloading updated manifest from {}", &url))
+                });
 
-                return Ok(new_manifest_content);
+                return get_manifest(url, manifest_version.clone(), &cache, &client).await;
             }
 
             // Else return the cached manifest.
@@ -101,15 +142,10 @@ async fn manifest_from_server(
     }
 
     // If our cache file does not exist then pull the whole manifest.
-;
     // TODO(#337): switch to something that can report progress
     bar.map(|bar| bar.set_message(format!("📥 Downloading manifest from {}", &url)));
 
-    let new_manifest = client.get(url).send().await?.text().await?;
-
-    fs::write(&cache, &new_manifest).await?;
-
-    Ok(new_manifest)
+    get_manifest(url, manifest_version.clone(), &cache, &client).await
 }
 
 #[derive(Clone, Debug)]
@@ -290,7 +326,7 @@ impl TryFrom<ManifestRockEntry> for RemotePackageType {
             "rockspec" => Ok(RemotePackageType::Rockspec),
             "src" => Ok(RemotePackageType::Src),
             "all" => Ok(RemotePackageType::Binary),
-            arch if arch == luarocks::current_platform_luarocks_identifier() => {
+            arch if arch == crate::luarocks::current_platform_luarocks_identifier() => {
                 Ok(RemotePackageType::Binary)
             }
             _ => Err(UnsupportedArchitectureError),
@@ -326,12 +362,21 @@ mod tests {
         let server = Server::run();
         let manifest_path = format!("/{}", manifest_name);
         server.expect(
-            Expectation::matching(request::path(manifest_path.to_string()))
+            Expectation::matching(request::path(manifest_path + ".zip"))
                 .times(1..)
                 .respond_with(
                     status_code(200)
                         .append_header("Last-Modified", "Sat, 20 Jan 2024 13:14:12 GMT")
-                        .body("dummy data"),
+                        .body(
+                            std::fs::read(
+                                format!(
+                                    "{}/resources/test/manifest-5.1.zip",
+                                    env!("CARGO_MANIFEST_DIR")
+                                )
+                                .as_str(),
+                            )
+                            .unwrap(),
+                        ),
                 ),
         );
         server
@@ -389,10 +434,13 @@ mod tests {
         let server = start_test_server("manifest-5.1".into());
         let mut url_str = server.url_str(""); // Remove trailing "/"
         url_str.pop();
-        let manifest_content = "dummy data";
+        let manifest_content = std::fs::read_to_string(
+            format!("{}/resources/test/manifest-5.1", env!("CARGO_MANIFEST_DIR")).as_str(),
+        )
+        .unwrap();
         let cache_dir = assert_fs::TempDir::new().unwrap();
         let cache = cache_dir.join("manifest-5.1");
-        fs::write(&cache, manifest_content).await.unwrap();
+        fs::write(&cache, &manifest_content).await.unwrap();
         let _metadata = fs::metadata(&cache).await.unwrap();
         let config = ConfigBuilder::new()
             .unwrap()
