@@ -10,6 +10,7 @@ use lux_lib::{
     tree,
 };
 use tempdir::TempDir;
+use tokio::runtime::Builder;
 
 #[tokio::test]
 async fn builtin_build() {
@@ -213,4 +214,53 @@ async fn test_build_local_project_only_src() {
     assert!(layout.src.is_dir());
     assert!(layout.src.join("main.lua").is_file());
     assert!(layout.src.join("foo.lua").is_file());
+}
+
+#[test]
+fn test_build_multiple_treesitter_parsers() {
+    let dir = TempDir::new("lux-test").unwrap();
+
+    let content = String::from_utf8(
+        std::fs::read("resources/test/tree-sitter-rust-0.0.43.rockspec").unwrap(),
+    )
+    .unwrap();
+    let rockspec = RemoteLuaRockspec::new(&content).unwrap();
+
+    let config = ConfigBuilder::new()
+        .unwrap()
+        .tree(Some(dir.into_path()))
+        .build()
+        .unwrap();
+
+    let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
+
+    let runtime = Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let mut handles = vec![];
+
+    for _ in 0..4 {
+        let config = config.clone();
+        let tree = tree.clone();
+        let rockspec = rockspec.clone();
+
+        handles.push(runtime.spawn(async move {
+            Build::new(
+                &rockspec,
+                &tree,
+                tree::EntryType::Entrypoint,
+                &config,
+                &Progress::NoProgress,
+            )
+            .behaviour(Force)
+            .build()
+            .await
+            .unwrap()
+        }));
+    }
+
+    runtime.block_on(futures::future::join_all(handles));
 }

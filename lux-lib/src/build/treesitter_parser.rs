@@ -70,11 +70,15 @@ impl Build for TreesitterParserBuildSpec {
                     dir: parser_dir.clone(),
                     err,
                 })?;
-            let mut loader = tree_sitter_loader::Loader::new()
-                .map_err(|err| TreesitterBuildError::Loader(err.to_string()))?;
+            let loader = tree_sitter_loader::Loader::with_parser_lib_path(build_dir.clone());
             let output_path =
                 parser_dir.join(format!("{}.{}", self.lang, std::env::consts::DLL_EXTENSION));
-            loader.force_rebuild(true);
+            // HACK(vhyrro): `tree-sitter-loader` will only use a temp directory instead of a
+            // lockfile if a `CROSS_RUNNER` env variable is set (why??). We should probably make a
+            // PR fixing this with a flag. This should make-do for now: theoretically, this could
+            // break since it's on an async thread, but in practice this will never be executed
+            // many times during the lifetime of the `lx` binary.
+            std::env::set_var("CROSS_RUNNER", "");
             loader
                 .compile_parser_at_path(&build_dir, output_path, &[])
                 .map_err(|err| TreesitterBuildError::TreesitterCompileError(err.to_string()))?;
