@@ -490,7 +490,7 @@ pub(crate) fn substitute_variables(
 pub(crate) fn format_path(path: &Path) -> String {
     let path_str = path.to_slash_lossy();
     if cfg!(windows) {
-        format!(r#""{}""#, path_str)
+        path_str.to_string()
     } else {
         try_quote(&path_str)
             .map(|str| str.to_string())

@@ -2350,8 +2350,6 @@ dependencies = [
  "time",
  "tokio",
  "tokio-util",
- "toml",
- "toml_edit",
  "tracing",
 ]
 
