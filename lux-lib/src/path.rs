@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use path_slash::PathBufExt;
 use serde::Serialize;
 use std::{env, fmt::Display, path::PathBuf, str::FromStr};
 use thiserror::Error;
@@ -128,7 +129,7 @@ impl PackagePath {
         self.0
             .iter()
             .unique()
-            .map(|path| path.to_string_lossy())
+            .map(|path| path.to_slash_lossy())
             .join(LUA_PATH_SEPARATOR)
     }
 }

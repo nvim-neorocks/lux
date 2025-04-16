@@ -117,6 +117,8 @@ pub enum BuildError {
     CompileIntermediatesError(cc::Error),
     #[error("failed to compile build modules: {0}")]
     CompilationError(#[from] cc::Error),
+    #[error("compilation succeeded, but the expected library {0} was not created")]
+    LibOutputNotCreated(String),
     #[error(transparent)]
     CMakeError(#[from] CMakeError),
     #[error(transparent)]

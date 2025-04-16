@@ -5,6 +5,7 @@ use assert_fs::TempDir;
 use lux_lib::{
     build::{Build, BuildBehaviour::Force},
     config::{ConfigBuilder, LuaVersion},
+    lua_installation::get_installed_lua_version,
     lua_rockspec::RemoteLuaRockspec,
     progress::{MultiProgress, Progress},
     project::Project,
@@ -21,9 +22,15 @@ async fn builtin_build() {
             .unwrap();
     let rockspec = RemoteLuaRockspec::new(&content).unwrap();
 
+    let lua_version = get_installed_lua_version("lua")
+        .ok()
+        .and_then(|version| LuaVersion::from_version(version).ok())
+        .or(Some(LuaVersion::Lua51));
+
     let config = ConfigBuilder::new()
         .unwrap()
         .tree(Some(dir.to_path_buf()))
+        .lua_version(lua_version)
         .build()
         .unwrap();
 
@@ -55,9 +62,15 @@ async fn make_build() {
     .unwrap();
     let rockspec = RemoteLuaRockspec::new(&content).unwrap();
 
+    let lua_version = get_installed_lua_version("lua")
+        .ok()
+        .and_then(|version| LuaVersion::from_version(version).ok())
+        .or(Some(LuaVersion::Lua51));
+
     let config = ConfigBuilder::new()
         .unwrap()
         .tree(Some(dir.to_path_buf()))
+        .lua_version(lua_version)
         .build()
         .unwrap();
 
@@ -102,9 +115,15 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
     let content = String::from_utf8(std::fs::read(rockspec_path).unwrap()).unwrap();
     let rockspec = RemoteLuaRockspec::new(&content).unwrap();
 
+    let lua_version = get_installed_lua_version("lua")
+        .ok()
+        .and_then(|version| LuaVersion::from_version(version).ok())
+        .or(Some(LuaVersion::Lua51));
+
     let config = ConfigBuilder::new()
         .unwrap()
         .tree(Some(dir.to_path_buf()))
+        .lua_version(lua_version)
         .build()
         .unwrap();
 
@@ -136,9 +155,15 @@ async fn treesitter_parser_build() {
     .unwrap();
     let rockspec = RemoteLuaRockspec::new(&content).unwrap();
 
+    let lua_version = get_installed_lua_version("lua")
+        .ok()
+        .and_then(|version| LuaVersion::from_version(version).ok())
+        .or(Some(LuaVersion::Lua51));
+
     let config = ConfigBuilder::new()
         .unwrap()
         .tree(Some(dir.to_path_buf()))
+        .lua_version(lua_version)
         .build()
         .unwrap();
 
@@ -168,7 +193,18 @@ async fn test_build_local_project_no_source() {
 
     let project = Project::from(&project_root).unwrap().unwrap();
     let project_toml = project.toml().into_local().unwrap();
-    let config = ConfigBuilder::new().unwrap().build().unwrap();
+
+    let lua_version = get_installed_lua_version("lua")
+        .ok()
+        .and_then(|version| LuaVersion::from_version(version).ok())
+        .or(Some(LuaVersion::Lua51));
+
+    let config = ConfigBuilder::new()
+        .unwrap()
+        .lua_version(lua_version)
+        .build()
+        .unwrap();
+
     let tree = project.tree(&config).unwrap();
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
@@ -194,7 +230,18 @@ async fn test_build_local_project_only_src() {
 
     let project = Project::from(&project_root).unwrap().unwrap();
     let project_toml = project.toml().into_local().unwrap();
-    let config = ConfigBuilder::new().unwrap().build().unwrap();
+
+    let lua_version = get_installed_lua_version("lua")
+        .ok()
+        .and_then(|version| LuaVersion::from_version(version).ok())
+        .or(Some(LuaVersion::Lua51));
+
+    let config = ConfigBuilder::new()
+        .unwrap()
+        .lua_version(lua_version)
+        .build()
+        .unwrap();
+
     let tree = project.tree(&config).unwrap();
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
@@ -227,13 +274,10 @@ fn test_build_multiple_treesitter_parsers() {
     .unwrap();
     let rockspec = RemoteLuaRockspec::new(&content).unwrap();
 
-    let config = ConfigBuilder::new()
-        .unwrap()
-        .tree(Some(dir.to_path_buf()))
-        .build()
-        .unwrap();
-
-    let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
+    let lua_version = get_installed_lua_version("lua")
+        .ok()
+        .and_then(|version| LuaVersion::from_version(version).ok())
+        .or(Some(LuaVersion::Lua51));
 
     let runtime = Builder::new_multi_thread()
         .worker_threads(4)
@@ -243,7 +287,16 @@ fn test_build_multiple_treesitter_parsers() {
 
     let mut handles = vec![];
 
-    for _ in 0..4 {
+    for i in 0..4 {
+        let config = ConfigBuilder::new()
+            .unwrap()
+            .tree(Some(dir.join(format!("{}", i))))
+            .lua_version(lua_version.clone())
+            .build()
+            .unwrap();
+
+        let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
+
         let config = config.clone();
         let tree = tree.clone();
         let rockspec = rockspec.clone();

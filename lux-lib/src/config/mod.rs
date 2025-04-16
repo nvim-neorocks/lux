@@ -168,7 +168,7 @@ pub struct Config {
     extra_servers: Vec<Url>,
     only_sources: Option<String>,
     namespace: Option<String>,
-    lua_dir: PathBuf,
+    lua_dir: Option<PathBuf>,
     lua_version: Option<LuaVersion>,
     tree: PathBuf,
     luarocks_tree: PathBuf,
@@ -238,8 +238,8 @@ impl Config {
         self.namespace.as_ref()
     }
 
-    pub fn lua_dir(&self) -> &PathBuf {
-        &self.lua_dir
+    pub fn lua_dir(&self) -> Option<&PathBuf> {
+        self.lua_dir.as_ref()
     }
 
     pub fn lua_version(&self) -> Option<&LuaVersion> {
@@ -494,7 +494,7 @@ impl ConfigBuilder {
             extra_servers: self.extra_servers.unwrap_or_default(),
             only_sources: self.only_sources,
             namespace: self.namespace,
-            lua_dir: self.lua_dir.unwrap_or_else(|| data_dir.join("lua")),
+            lua_dir: self.lua_dir,
             lua_version,
             tree,
             luarocks_tree,
@@ -521,7 +521,7 @@ impl From<Config> for ConfigBuilder {
             extra_servers: Some(value.extra_servers),
             only_sources: value.only_sources,
             namespace: value.namespace,
-            lua_dir: Some(value.lua_dir),
+            lua_dir: value.lua_dir,
             lua_version: value.lua_version,
             tree: Some(value.tree),
             luarocks_tree: Some(value.luarocks_tree),

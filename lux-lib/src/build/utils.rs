@@ -89,18 +89,12 @@ pub(crate) fn compile_c_files(
 ) -> Result<(), BuildError> {
     let target = target_dir.join(target_module.to_lib_path());
 
-    let parent = target.parent().unwrap_or_else(|| {
-        panic!(
-            "Couldn't determine parent for path {}",
-            target.to_str().unwrap_or("")
-        )
-    });
-    let file = target.file_name().unwrap_or_else(|| {
-        panic!(
-            "Couldn't determine filename for path {}",
-            target.to_str().unwrap_or("")
-        )
-    });
+    let parent = target.parent().expect("Couldn't determine parent");
+    let file = target
+        .file_name()
+        .expect("Couldn't determine filename")
+        .to_string_lossy()
+        .to_string();
 
     std::fs::create_dir_all(parent)?;
 
@@ -115,21 +109,22 @@ pub(crate) fn compile_c_files(
         .cargo_metadata(false)
         .cargo_warnings(false)
         .warnings(false)
-        .flag("-w") // Suppress all warnings
         .files(files)
         .host(std::env::consts::OS)
+        .include(&lua.include_dir)
         .opt_level(2)
         .out_dir(intermediate_dir)
         .target(&host.to_string());
 
-    let is_msvc = build.try_get_compiler()?.is_like_msvc();
+    let compiler = build.try_get_compiler()?;
+    let is_msvc = compiler.is_like_msvc();
+    // Suppress all warnings
     if is_msvc {
-        build.flag("/DLL");
+        build.flag("-W0");
     } else {
-        build.shared_flag(true);
+        build.flag("-w");
     }
-
-    for arg in lua.compile_args() {
+    for arg in lua.define_flags() {
         build.flag(&arg);
     }
 
@@ -137,44 +132,63 @@ pub(crate) fn compile_c_files(
         .try_compile_intermediates()
         .map_err(BuildError::CompileIntermediatesError)?;
 
-    let output_file = format!("{}", parent.join(file).display());
-    let (out_args, lib_args) = if is_msvc {
-        (
-            vec![
-                "/link".into(),
-                format!("/OUT:{}", output_file),
-                "/DLL".into(),
-            ],
-            format!("/LIBPATH:{}", lua.lib_dir.display()),
-        )
-    } else {
-        (
-            vec!["-shared".into(), "-o".into(), output_file],
-            format!("-L{}", lua.lib_dir.display()),
-        )
-    };
+    let output_path = parent.join(&file);
 
-    let output = if is_msvc {
-        build
-            .try_get_compiler()?
+    let output = if compiler.is_like_msvc() {
+        let def_temp_dir = tempdir::TempDir::new("msvc-def")?.into_path().to_path_buf();
+        let def_file = mk_def_file(def_temp_dir, &file, target_module)?;
+        compiler
             .to_command()
-            .args(&objects) // MSVC wants the objects first
-            .args(out_args)
-            .arg(lib_args)
-            .args(lua.link_args(&build.try_get_compiler()?))
+            .arg("/nologo")
+            .args(&objects)
+            .arg("/LD")
+            .arg("/link")
+            .arg(format!("/DEF:{}", def_file.display()))
+            .arg(format!("/OUT:{}", output_path.display()))
+            .args(lua.lib_link_args(&compiler))
             .output()?
     } else {
         build
+            .shared_flag(true)
             .try_get_compiler()?
             .to_command()
-            .args(out_args)
-            .arg(lib_args)
-            .args(lua.link_args(&build.try_get_compiler()?)) // NOTE: In luarocks, this is behind a link_lua_explicitly config option Library directory
+            .args(vec!["-o".into(), output_path.to_string_lossy().to_string()])
+            .args(lua.lib_link_args(&compiler))
             .args(&objects)
             .output()?
     };
     validate_output(output)?;
-    Ok(())
+
+    if output_path.exists() {
+        Ok(())
+    } else {
+        Err(BuildError::LibOutputNotCreated(
+            output_path.to_slash_lossy().to_string(),
+        ))
+    }
+}
+
+/// On MSVC, we need to create Lua definitions manually
+fn mk_def_file(
+    dir: PathBuf,
+    output_file_name: &str,
+    target_module: &LuaModule,
+) -> io::Result<PathBuf> {
+    let mut def_file: PathBuf = dir.join(output_file_name);
+    def_file.set_extension(".def");
+    let exported_name = target_module.to_string().replace(".", "_");
+    let exported_name = exported_name
+        .split_once('-')
+        .map(|(_, after_hyphen)| after_hyphen.to_string())
+        .unwrap_or_else(|| exported_name.clone());
+    let content = format!(
+        r#"EXPORTS
+luaopen_{}
+"#,
+        exported_name
+    );
+    std::fs::write(&def_file, content)?;
+    Ok(def_file)
 }
 
 // TODO: (#261): special cases for mingw/cygwin?
@@ -236,12 +250,7 @@ pub(crate) fn compile_c_modules(
 ) -> Result<(), BuildError> {
     let target = target_dir.join(target_module.to_lib_path());
 
-    let parent = target.parent().unwrap_or_else(|| {
-        panic!(
-            "Couldn't determine parent for path {}",
-            target.to_str().unwrap_or("")
-        )
-    });
+    let parent = target.parent().expect("Couldn't determine parent");
     std::fs::create_dir_all(parent)?;
 
     let host = Triple::host();
@@ -264,22 +273,23 @@ pub(crate) fn compile_c_modules(
         .cargo_metadata(false)
         .cargo_warnings(false)
         .warnings(false)
-        .flag("-w") // Suppress all warnings
         .files(source_files)
         .host(std::env::consts::OS)
         .includes(&include_dirs)
+        .include(&lua.include_dir)
         .opt_level(2)
         .out_dir(intermediate_dir)
         .target(&host.to_string());
 
-    let is_msvc = build.try_get_compiler()?.is_like_msvc();
+    let compiler = build.try_get_compiler()?;
+    let is_msvc = compiler.is_like_msvc();
+    // Suppress all warnings
     if is_msvc {
-        build.flag("/DLL");
+        build.flag("-W0");
     } else {
-        build.shared_flag(true);
+        build.flag("-w");
     }
-
-    for arg in lua.compile_args() {
+    for arg in lua.define_flags() {
         build.flag(&arg);
     }
 
@@ -289,12 +299,11 @@ pub(crate) fn compile_c_modules(
         build.define(name, value.as_deref());
     }
 
-    let file = target.file_name().unwrap_or_else(|| {
-        panic!(
-            "Couldn't determine filename for path {}",
-            target.to_str().unwrap_or("")
-        )
-    });
+    let file = target
+        .file_name()
+        .expect("Couldn't determine filename")
+        .to_string_lossy()
+        .to_string();
     // See https://github.com/rust-lang/cc-rs/issues/594#issuecomment-2110551057
     let objects = build
         .try_compile_intermediates()
@@ -316,41 +325,30 @@ pub(crate) fn compile_c_modules(
         }
     });
 
-    let output_file = format!("{}", parent.join(file).display());
-    let (out_args, lib_args) = if is_msvc {
-        (
-            vec![
-                "/link".into(),
-                format!("/OUT:{}", output_file),
-                "/DLL".into(),
-            ],
-            format!("/LIBPATH:{}", lua.lib_dir.display()),
-        )
-    } else {
-        (
-            vec!["-shared".into(), "-o".into(), output_file],
-            format!("-L{}", lua.lib_dir.display()),
-        )
-    };
-
+    let output_path = parent.join(&file);
     let output = if is_msvc {
+        let def_temp_dir = tempdir::TempDir::new("msvc-def")?.into_path().to_path_buf();
+        let def_file = mk_def_file(def_temp_dir, &file, target_module)?;
         build
             .try_get_compiler()?
             .to_command()
-            .args(&objects) // MSVC wants the objects first
-            .args(out_args)
-            .arg(lib_args)
-            .args(lua.link_args(&build.try_get_compiler()?))
+            .arg("/nologo")
+            .args(&objects)
+            .arg("/LD")
+            .arg("/link")
+            .arg(format!("/DEF:{}", def_file.display()))
+            .arg(format!("/OUT:{}", output_path.display()))
+            .args(lua.lib_link_args(&build.try_get_compiler()?))
             .args(libdir_args)
             .args(library_args)
             .output()?
     } else {
         build
+            .shared_flag(true)
             .try_get_compiler()?
             .to_command()
-            .args(out_args)
-            .arg(lib_args)
-            .args(lua.link_args(&build.try_get_compiler()?)) // NOTE: In luarocks, this is behind a link_lua_explicitly config option Library directory
+            .args(vec!["-o".into(), output_path.to_string_lossy().to_string()])
+            .args(lua.lib_link_args(&build.try_get_compiler()?))
             .args(&objects)
             .args(libdir_args)
             .args(library_args)
@@ -358,7 +356,13 @@ pub(crate) fn compile_c_modules(
     };
     validate_output(output)?;
 
-    Ok(())
+    if output_path.exists() {
+        Ok(())
+    } else {
+        Err(BuildError::LibOutputNotCreated(
+            output_path.to_slash_lossy().to_string(),
+        ))
+    }
 }
 
 #[derive(Debug, Error)]
@@ -370,10 +374,9 @@ pub enum InstallBinaryError {
 }
 
 #[derive(Debug, Error)]
+#[error(transparent)]
 pub enum WrapBinaryError {
-    #[error(transparent)]
     Io(#[from] io::Error),
-    #[error(transparent)]
     Utf8(#[from] FromUtf8Error),
 }
 
