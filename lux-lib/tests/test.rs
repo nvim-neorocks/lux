@@ -1,7 +1,12 @@
 use std::path::PathBuf;
 
 use assert_fs::prelude::PathCopy;
-use lux_lib::{config::ConfigBuilder, operations::Test, project::Project};
+use lux_lib::{
+    config::{ConfigBuilder, LuaVersion},
+    lua_installation::get_installed_lua_version,
+    operations::Test,
+    project::Project,
+};
 
 #[tokio::test]
 async fn run_busted_test() {
@@ -13,11 +18,19 @@ async fn run_busted_test() {
     let project: Project = Project::from(project_root).unwrap().unwrap();
     let tree_root = project.root().to_path_buf().join(".lux");
     let _ = std::fs::remove_dir_all(&tree_root);
+
+    let lua_version = get_installed_lua_version("lua")
+        .ok()
+        .and_then(|version| LuaVersion::from_version(version).ok())
+        .or(Some(LuaVersion::Lua51));
+
     let config = ConfigBuilder::new()
         .unwrap()
         .tree(Some(tree_root))
+        .lua_version(lua_version)
         .build()
         .unwrap();
+
     Test::new(project, &config).run().await.unwrap();
 }
 
@@ -31,11 +44,19 @@ async fn run_busted_test_no_lock() {
     let project: Project = Project::from(project_root).unwrap().unwrap();
     let tree_root = project.root().to_path_buf().join(".lux");
     let _ = std::fs::remove_dir_all(&tree_root);
+
+    let lua_version = get_installed_lua_version("lua")
+        .ok()
+        .and_then(|version| LuaVersion::from_version(version).ok())
+        .or(Some(LuaVersion::Lua51));
+
     let config = ConfigBuilder::new()
         .unwrap()
         .tree(Some(tree_root))
+        .lua_version(lua_version)
         .build()
         .unwrap();
+
     Test::new(project, &config)
         .no_lock(true)
         .run()

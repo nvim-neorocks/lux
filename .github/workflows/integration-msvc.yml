@@ -10,24 +10,29 @@ jobs:
   test:
     runs-on: windows-2019
     steps:
-      - uses: actions/checkout@v4
-      - name: Install neovim
-        uses: rhysd/action-setup-vim@v1 # Used by the 'run' integration test
-        with:
-          neovim: true
-          version: v0.11.0
-
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
       - name: Install C/C++ Compiler
         uses: rlalik/setup-cpp-compiler@master
         with:
           compiler: clang-latest
+
       - name: Install MSVC Compiler Toolchain
         uses: ilammy/msvc-dev-cmd@v1
+      - name: Install Rust Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Install Lua
         uses: luarocks/gh-actions-lua@master
         with:
           luaVersion: "5.1"
+
+      - name: Install neovim
+        uses: rhysd/action-setup-vim@v1 # Used by the 'run' integration test
+        with:
+          neovim: true
+          version: v0.11.0
 
       - name: Install Build+Test dependencies
         run: |
@@ -37,6 +42,7 @@ jobs:
 
       - name: Install Rust Toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
+
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
 
@@ -44,5 +50,7 @@ jobs:
         env:
           OPENSSL_DIR: C:\Program Files\OpenSSL
           OPENSSL_LIB_DIR: C:\Program Files\OpenSSL\lib\VC\x64\MD
+          CC_ENABLE_DEBUG_OUTPUT: true
+          CFLAGS: "/NOLOGO /MT /O2"
         run: |
           cargo nextest run --test "*" --no-fail-fast --features vendored-lua
