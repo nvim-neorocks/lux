@@ -19,6 +19,11 @@ use thiserror::Error;
 
 use super::{Install, InstallError, PackageInstallSpec, Sync, SyncError};
 
+#[cfg(target_family = "unix")]
+const BUSTED_EXE: &str = "busted";
+#[cfg(target_family = "windows")]
+const BUSTED_EXE: &str = "busted.bat";
+
 #[derive(Builder)]
 #[builder(start_fn = new, finish_fn(name = _run, vis = ""))]
 pub struct Test<'a> {
@@ -142,7 +147,7 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
     let mut paths = Paths::new(&project_tree)?;
     let test_tree_paths = Paths::new(&test_tree)?;
     paths.prepend(&test_tree_paths);
-    let mut command = Command::new("busted");
+    let mut command = Command::new(BUSTED_EXE);
     let mut command = command
         .current_dir(test.project.root().deref())
         .args(test.args)
