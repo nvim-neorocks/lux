@@ -64,8 +64,8 @@ impl LuaInstallation {
             }
         }
 
-        let output = Self::path(version, config);
-        if output.exists() {
+        let output = Self::root_dir(version, config);
+        if output.is_dir() {
             let bin_path = output.join("bin");
             let bin = if bin_path.is_dir() {
                 find_lua_executable(&bin_path)
@@ -143,8 +143,13 @@ impl LuaInstallation {
         }
     }
 
-    pub fn path(version: &LuaVersion, config: &Config) -> PathBuf {
-        config.lua_dir().join(version.to_string())
+    fn root_dir(version: &LuaVersion, config: &Config) -> PathBuf {
+        if config.lua_dir().join("lib").is_dir() {
+            // lua_dir has been set in the config by the user
+            config.lua_dir().clone()
+        } else {
+            config.lua_dir().join(version.to_string())
+        }
     }
 
     fn lua_lib_name(&self) -> String {
