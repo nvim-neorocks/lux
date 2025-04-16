@@ -2332,7 +2332,7 @@ dependencies = [
  "hashbrown 0.15.1",
  "hyper",
  "hyper-util",
- "indexmap 1.9.3",
+ "indexmap 2.9.0",
  "lock_api",
  "log",
  "memchr",
