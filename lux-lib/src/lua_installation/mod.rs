@@ -8,7 +8,7 @@ use std::{path::PathBuf, process::Command};
 use target_lexicon::Triple;
 use thiserror::Error;
 
-use crate::build::utils::{format_path, lua_dylib_extension, lua_lib_extension};
+use crate::build::utils::{format_path, lua_lib_extension};
 use crate::{
     build::variables::HasVariables,
     config::{Config, LuaVersion},
@@ -25,7 +25,7 @@ pub struct LuaInstallation {
     lib_info: Option<Library>,
     /// Name of the Lua library, (without the 'lib' prefix on unix targets),
     /// for example, "lua.so" or "lua.dll"
-    lua_lib_name: String,
+    lua_lib_name: Option<String>,
 }
 
 impl LuaInstallation {
@@ -152,7 +152,7 @@ impl LuaInstallation {
         }
     }
 
-    fn lua_lib_name(&self) -> String {
+    fn lua_lib_name(&self) -> Option<String> {
         self.lua_lib_name.clone()
     }
 
@@ -254,7 +254,7 @@ impl HasVariables for LuaInstallation {
             "LUA_INCDIR" => Some(format_path(&self.include_dir)),
             "LUA_LIBDIR" => Some(format_path(&self.lib_dir)),
             "LUA" => Some(format_path(&self.bin.clone().unwrap_or("lua".into()))),
-            "LUALIB" => Some(self.lua_lib_name()),
+            "LUALIB" => self.lua_lib_name(),
             _ => None,
         }?;
         Some(result)
@@ -337,7 +337,7 @@ fn is_lua_lib_name(name: &str, lua_version: &LuaVersion) -> bool {
             && (name.contains(&version_str) || name.contains(&version_suffix))
 }
 
-fn get_lua_lib_name(lib_dir: &Path, lua_version: &LuaVersion) -> String {
+fn get_lua_lib_name(lib_dir: &Path, lua_version: &LuaVersion) -> Option<String> {
     if let Some(file) = std::fs::read_dir(lib_dir).ok().and_then(|entries| {
         entries
             .filter_map(Result::ok)
@@ -356,16 +356,17 @@ fn get_lua_lib_name(lib_dir: &Path, lua_version: &LuaVersion) -> String {
     }) {
         let file_name = file.file_name().unwrap();
 
-        if cfg!(target_family = "unix") {
+        let lib_name = if cfg!(target_family = "unix") {
             file_name
                 .to_string_lossy()
                 .trim_start_matches("lib")
                 .to_string()
         } else {
             file_name.to_string_lossy().to_string()
-        }
+        };
+        Some(lib_name)
     } else {
-        format!("lua.{}", lua_dylib_extension())
+        None
     }
 }
 
