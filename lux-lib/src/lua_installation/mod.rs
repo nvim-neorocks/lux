@@ -268,7 +268,7 @@ impl HasVariables for LuaInstallation {
             "LUA_INCDIR" => Some(format_path(&self.include_dir)),
             "LUA_LIBDIR" => Some(format_path(&self.lib_dir)),
             "LUA" => Some(format_path(&self.bin.clone().unwrap_or("lua".into()))),
-            "LUALIB" => self.lua_lib(),
+            "LUALIB" => self.lua_lib().or(Some("".into())),
             _ => None,
         }?;
         Some(result)
