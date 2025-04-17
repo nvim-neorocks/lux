@@ -19,19 +19,18 @@ fn parser<'a>(
     recursive(|p| {
         just('$')
             .ignore_then(p.delimited_by(just('('), just(')')))
-            .map(|s: String| {
+            .try_map(|s: String, span| {
                 variables
                     .iter()
                     .find_map(|v| v.get_variable(&s))
-                    .unwrap_or_else(|| {
-                        // Apparently not always substituting some variables is a luarocks feature.
-                        // Example: $(LUALIB)
-                        eprintln!("⚠️ WARNING: Failed to substitute variable $({})", s);
-                        "".to_string()
-                    })
+                    .ok_or(Rich::custom(
+                        span,
+                        format!("could not expand variable $({})", s),
+                    ))
             })
             .or(none_of("$)").repeated().at_least(1).collect::<String>())
             .repeated()
+            .at_least(1)
             .collect::<Vec<_>>()
             .map(|v| v.concat())
     })
@@ -89,23 +88,12 @@ mod tests {
     }
 
     #[test]
-    fn unrecognized() {
+    fn substitute_helper() {
         assert_eq!(
             substitute(&[&TestVariables], "$(TEST_VAR)").unwrap(),
             "foo".to_string()
         );
-        assert_eq!(
-            substitute(&[&TestVariables], "$(UNRECOGNISED)").unwrap(),
-            "".to_string()
-        );
-    }
-
-    #[test]
-    fn no_variables() {
-        assert_eq!(
-            substitute(&[&TestVariables], "bla").unwrap(),
-            "bla".to_string()
-        );
+        substitute(&[&TestVariables], "$(UNRECOGNISED)").unwrap_err();
     }
 
     #[test]
