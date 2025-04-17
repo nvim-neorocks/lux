@@ -9,6 +9,7 @@ use debug::Debug;
 use doc::Doc;
 use download::Download;
 use exec::Exec;
+use generate_rockspec::GenerateRockspec;
 use info::Info;
 use install::Install;
 use install_rockspec::InstallRockspec;
@@ -39,6 +40,7 @@ pub mod download;
 pub mod exec;
 pub mod fetch;
 pub mod format;
+pub mod generate_rockspec;
 pub mod info;
 pub mod install;
 pub mod install_lua;
@@ -147,6 +149,8 @@ pub enum Commands {
     Download(Download),
     /// Formats the codebase with stylua.
     Fmt,
+    /// Generate a rockspec file from a project.
+    GenerateRockspec(GenerateRockspec),
     /// Show metadata for any rock.
     Info(Info),
     /// Install a rock for use on the system.
