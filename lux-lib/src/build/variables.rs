@@ -30,7 +30,6 @@ fn parser<'a>(
             })
             .or(none_of("$)").repeated().at_least(1).collect::<String>())
             .repeated()
-            .at_least(1)
             .collect::<Vec<_>>()
             .map(|v| v.concat())
     })
@@ -82,6 +81,7 @@ mod tests {
                 "FLATTEN_VAR" => Some("TEST_VAR".into()),
                 "INFINITELY_RECURSIVE_1" => Some("$(INFINITELY_RECURSIVE_2)".into()),
                 "INFINITELY_RECURSIVE_2" => Some("$(INFINITELY_RECURSIVE_1)".into()),
+                "EMPTY_STRING" => Some("".into()),
                 _ => None,
             }
         }
@@ -129,5 +129,13 @@ mod tests {
         let expected = " 'foo' = foo foo;";
         let result = substitute(&[&TestVariables], input).unwrap();
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn empty_string() {
+        assert_eq!(
+            substitute(&[&TestVariables], "$(EMPTY_STRING)").unwrap(),
+            "".to_string()
+        );
     }
 }
