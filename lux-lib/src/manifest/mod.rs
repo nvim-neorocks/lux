@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use mlua::{Lua, LuaSerdeExt};
 use reqwest::{header::ToStrError, Client};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use std::{cmp::Ordering, collections::HashMap};
 use thiserror::Error;
@@ -68,50 +68,19 @@ async fn get_manifest(
     Ok(manifest)
 }
 
-async fn manifest_from_server(
-    url: &Url,
+/// Look up the manifest from a cache, or get the manifest from the server
+/// if the cache doesn't exist or is outdated.
+async fn manifest_from_cache_or_server(
+    server_url: &Url,
     config: &Config,
     bar: &Progress<ProgressBar>,
 ) -> Result<String, ManifestFromServerError> {
-    let manifest_version = &config
-        .lua_version()
-        .filter(|lua_version| {
-            // There's no manifest-luajit
-            matches!(
-                lua_version,
-                LuaVersion::Lua51 | LuaVersion::Lua52 | LuaVersion::Lua53 | LuaVersion::Lua54
-            )
-        })
-        .or(config
-            .lua_version()
-            .and_then(|lua_version| match lua_version {
-                LuaVersion::LuaJIT => Some(&LuaVersion::Lua51),
-                LuaVersion::LuaJIT52 => Some(&LuaVersion::Lua52),
-                _ => None,
-            }))
-        .map(|ver| ver.to_string())
-        .unwrap_or_default();
-
-    let manifest_filename = format!("manifest-{}.zip", manifest_version);
-
-    let url = match config.namespace() {
-        Some(ns) => url
-            .join(&format!("manifests/{}/", ns))?
-            .join(&manifest_filename)?,
-        None => url.join(&manifest_filename)?,
-    };
+    let manifest_version = manifest_version_str(config);
+    let url = mk_manifest_url(server_url, &manifest_version, config)?;
 
     // Stores a path to the manifest cache (this allows us to operate on a manifest without
     // needing to pull it from the luarocks servers each time).
-    let cache = config.cache_dir().join(
-        // Convert the url to a directory name so we don't create too many subdirectories
-        url.to_string()
-            .replace(&[':', '*', '?', '"', '<', '>', '|', '/', '\\'][..], "_")
-            .trim_end_matches(".zip"),
-    );
-
-    // Ensure all intermediate directories for the cache file are created (e.g. `~/.cache/lux/manifest`)
-    fs::create_dir_all(cache.parent().unwrap()).await?;
+    let cache = mk_manifest_cache(&url, config).await?;
 
     let client = Client::new();
 
@@ -146,6 +115,69 @@ async fn manifest_from_server(
     bar.map(|bar| bar.set_message(format!("📥 Downloading manifest from {}", &url)));
 
     get_manifest(url, manifest_version.clone(), &cache, &client).await
+}
+
+/// Get the manifest from the server, ignoring the cache.
+/// This still populates the cache.
+pub(crate) async fn manifest_from_server_only(
+    server_url: &Url,
+    config: &Config,
+    bar: &Progress<ProgressBar>,
+) -> Result<String, ManifestFromServerError> {
+    let manifest_version = manifest_version_str(config);
+    let url = mk_manifest_url(server_url, &manifest_version, config)?;
+    let cache = mk_manifest_cache(&url, config).await?;
+    let client = Client::new();
+    bar.map(|bar| bar.set_message(format!("📥 Downloading manifest from {}", &url)));
+    get_manifest(url, manifest_version.clone(), &cache, &client).await
+}
+
+fn manifest_version_str(config: &Config) -> String {
+    config
+        .lua_version()
+        .filter(|lua_version| {
+            // There's no manifest-luajit
+            matches!(
+                lua_version,
+                LuaVersion::Lua51 | LuaVersion::Lua52 | LuaVersion::Lua53 | LuaVersion::Lua54
+            )
+        })
+        .or(config
+            .lua_version()
+            .and_then(|lua_version| match lua_version {
+                LuaVersion::LuaJIT => Some(&LuaVersion::Lua51),
+                LuaVersion::LuaJIT52 => Some(&LuaVersion::Lua52),
+                _ => None,
+            }))
+        .map(|ver| ver.to_string())
+        .unwrap_or_default()
+}
+
+fn mk_manifest_url(
+    server_url: &Url,
+    manifest_version: &str,
+    config: &Config,
+) -> Result<Url, ManifestFromServerError> {
+    let manifest_filename = format!("manifest-{}.zip", manifest_version);
+    let url = match config.namespace() {
+        Some(ns) => server_url
+            .join(&format!("manifests/{}/", ns))?
+            .join(&manifest_filename)?,
+        None => server_url.join(&manifest_filename)?,
+    };
+    Ok(url)
+}
+
+async fn mk_manifest_cache(url: &Url, config: &Config) -> io::Result<PathBuf> {
+    let cache = config.cache_dir().join(
+        // Convert the url to a directory name so we don't create too many subdirectories
+        url.to_string()
+            .replace(&[':', '*', '?', '"', '<', '>', '|', '/', '\\'][..], "_")
+            .trim_end_matches(".zip"),
+    );
+    // Ensure all intermediate directories for the cache file are created (e.g. `~/.cache/lux/manifest`)
+    fs::create_dir_all(cache.parent().unwrap()).await?;
+    Ok(cache)
 }
 
 #[derive(Clone, Debug)]
@@ -278,13 +310,23 @@ impl Manifest {
         config: &Config,
         progress: &Progress<ProgressBar>,
     ) -> Result<Self, ManifestError> {
-        let manifest = crate::manifest::manifest_from_server(&server_url, config, progress).await?;
-        let metadata = ManifestMetadata::new(&manifest)?;
-        Ok(Self::new(server_url, metadata))
+        let content =
+            crate::manifest::manifest_from_cache_or_server(&server_url, config, progress).await?;
+        match ManifestMetadata::new(&content) {
+            Ok(metadata) => Ok(Self::new(server_url, metadata)),
+            Err(_) => {
+                let manifest =
+                    crate::manifest::manifest_from_server_only(&server_url, config, progress)
+                        .await?;
+                Ok(Self::new(server_url, ManifestMetadata::new(&manifest)?))
+            }
+        }
     }
+
     pub fn server_url(&self) -> &Url {
         &self.server_url
     }
+
     pub fn metadata(&self) -> &ManifestMetadata {
         &self.metadata
     }
@@ -395,7 +437,7 @@ mod tests {
             .lua_version(Some(crate::config::LuaVersion::LuaJIT))
             .build()
             .unwrap();
-        manifest_from_server(
+        manifest_from_cache_or_server(
             &Url::parse(&url_str).unwrap(),
             &config,
             &Progress::NoProgress,
@@ -419,7 +461,7 @@ mod tests {
             .build()
             .unwrap();
 
-        manifest_from_server(
+        manifest_from_cache_or_server(
             &Url::parse(&url_str).unwrap(),
             &config,
             &Progress::NoProgress,
@@ -448,7 +490,7 @@ mod tests {
             .lua_version(Some(crate::config::LuaVersion::Lua51))
             .build()
             .unwrap();
-        let result = manifest_from_server(
+        let result = manifest_from_cache_or_server(
             &Url::parse(&url_str).unwrap(),
             &config,
             &Progress::NoProgress,
