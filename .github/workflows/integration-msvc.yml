@@ -46,6 +46,12 @@ jobs:
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
 
+      - name: Build
+        env:
+          OPENSSL_DIR: C:\Program Files\OpenSSL
+          OPENSSL_LIB_DIR: C:\Program Files\OpenSSL\lib\VC\x64\MD
+        run: cargo build --features vendored-lua
+
       - name: Run tests
         env:
           OPENSSL_DIR: C:\Program Files\OpenSSL
