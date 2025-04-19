@@ -7,10 +7,10 @@ use crate::{
     lua_rockspec::LuaVersionError,
     operations::Install,
     package::{PackageReq, PackageVersionReqError},
-    path::Paths,
+    path::{Paths, PathsError},
     project::{Project, ProjectTreeError},
     remote_package_db::RemotePackageDBError,
-    tree,
+    tree::{self, TreeError},
 };
 use bon::Builder;
 use itertools::Itertools;
@@ -62,7 +62,9 @@ pub enum ExecError {
     #[error(transparent)]
     LuaVersionUnset(#[from] LuaVersionUnset),
     #[error(transparent)]
-    Io(#[from] io::Error),
+    Tree(#[from] TreeError),
+    #[error(transparent)]
+    Paths(#[from] PathsError),
     #[error(transparent)]
     LuaVersionError(#[from] LuaVersionError),
     #[error(transparent)]
@@ -107,7 +109,7 @@ pub enum InstallCmdError {
     InstallError(#[from] InstallError),
     PackageVersionReqError(#[from] PackageVersionReqError),
     RemotePackageDBError(#[from] RemotePackageDBError),
-    Io(#[from] io::Error),
+    Tree(#[from] TreeError),
     LuaVersionUnset(#[from] LuaVersionUnset),
 }
 

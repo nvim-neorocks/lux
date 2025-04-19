@@ -26,10 +26,7 @@ impl RepoMetadata {
                 .to_string(),
             description: None,
             license: None,
-            contributors: vec![uzers::get_current_username()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string()],
+            contributors: vec![whoami::realname()],
             labels: None,
         })
     }

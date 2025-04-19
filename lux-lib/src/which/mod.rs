@@ -8,6 +8,7 @@ use crate::{
     config::{Config, LuaVersion, LuaVersionUnset},
     lua_rockspec::LuaModule,
     package::PackageReq,
+    tree::TreeError,
 };
 
 /// A rocks module finder.
@@ -48,6 +49,8 @@ where
 pub enum WhichError {
     #[error(transparent)]
     Io(#[from] io::Error),
+    #[error(transparent)]
+    Tree(#[from] TreeError),
     #[error(transparent)]
     LuaVersionUnset(#[from] LuaVersionUnset),
     #[error("lua module {0} not found.")]

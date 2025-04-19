@@ -1,13 +1,14 @@
 use crate::{
-    build::{utils::escape_path, variables::HasVariables},
+    build::{utils::format_path, variables::HasVariables},
     config::{tree::RockLayoutConfig, Config, LuaVersion},
-    lockfile::{LocalPackage, LocalPackageId, Lockfile, OptState, ReadOnly},
+    lockfile::{LocalPackage, LocalPackageId, Lockfile, LockfileError, OptState, ReadOnly},
     package::PackageReq,
 };
 use std::{io, path::PathBuf};
 
 use itertools::Itertools;
 use mlua::{ExternalResult, IntoLua};
+use thiserror::Error;
 
 mod list;
 
@@ -32,6 +33,14 @@ pub struct Tree {
     root: PathBuf,
     /// The rock layout config for this tree
     entrypoint_layout: RockLayoutConfig,
+}
+
+#[derive(Debug, Error)]
+pub enum TreeError {
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    Lockfile(#[from] LockfileError),
 }
 
 /// Change-agnostic way of referencing various paths for a rock.
@@ -75,12 +84,12 @@ impl RockLayout {
 impl HasVariables for RockLayout {
     fn get_variable(&self, var: &str) -> Option<String> {
         let path = match var {
-            "PREFIX" => Some(escape_path(&self.rock_path)),
-            "LIBDIR" => Some(escape_path(&self.lib)),
-            "LUADIR" => Some(escape_path(&self.src)),
-            "BINDIR" => Some(escape_path(&self.bin)),
-            "CONFDIR" => Some(escape_path(&self.conf)),
-            "DOCDIR" => Some(escape_path(&self.doc)),
+            "PREFIX" => Some(format_path(&self.rock_path)),
+            "LIBDIR" => Some(format_path(&self.lib)),
+            "LUADIR" => Some(format_path(&self.src)),
+            "BINDIR" => Some(format_path(&self.bin)),
+            "CONFDIR" => Some(format_path(&self.conf)),
+            "DOCDIR" => Some(format_path(&self.doc)),
             _ => None,
         }?;
         Some(path)
@@ -102,7 +111,11 @@ impl mlua::UserData for RockLayout {
 impl Tree {
     /// NOTE: This is exposed for use by the config module.
     /// Use `Config::tree()`
-    pub(crate) fn new(root: PathBuf, version: LuaVersion, config: &Config) -> io::Result<Self> {
+    pub(crate) fn new(
+        root: PathBuf,
+        version: LuaVersion,
+        config: &Config,
+    ) -> Result<Self, TreeError> {
         let path_with_version = root.join(version.to_string());
 
         // Ensure that the root and the version directory exist.
@@ -151,7 +164,7 @@ impl Tree {
         self.bin().join("unwrapped")
     }
 
-    pub fn match_rocks(&self, req: &PackageReq) -> io::Result<RockMatches> {
+    pub fn match_rocks(&self, req: &PackageReq) -> Result<RockMatches, TreeError> {
         let mut found_packages = self.lockfile()?.find_rocks(req);
         Ok(match found_packages.len() {
             0 => RockMatches::NotFound(req.clone()),
@@ -160,7 +173,7 @@ impl Tree {
         })
     }
 
-    pub fn match_rocks_and<F>(&self, req: &PackageReq, filter: F) -> io::Result<RockMatches>
+    pub fn match_rocks_and<F>(&self, req: &PackageReq, filter: F) -> Result<RockMatches, TreeError>
     where
         F: Fn(&LocalPackage) -> bool,
     {
@@ -186,7 +199,7 @@ impl Tree {
     }
 
     /// Get the `RockLayout` for an installed package.
-    pub fn installed_rock_layout(&self, package: &LocalPackage) -> io::Result<RockLayout> {
+    pub fn installed_rock_layout(&self, package: &LocalPackage) -> Result<RockLayout, TreeError> {
         let lockfile = self.lockfile()?;
         if lockfile.is_entrypoint(&package.id()) {
             Ok(self.entrypoint_layout(package))
@@ -256,8 +269,11 @@ impl Tree {
         Ok(rock_layout)
     }
 
-    pub fn lockfile(&self) -> io::Result<Lockfile<ReadOnly>> {
-        Lockfile::new(self.lockfile_path(), self.entrypoint_layout.clone())
+    pub fn lockfile(&self) -> Result<Lockfile<ReadOnly>, TreeError> {
+        Ok(Lockfile::new(
+            self.lockfile_path(),
+            self.entrypoint_layout.clone(),
+        )?)
     }
 
     /// Get this tree's lockfile path.
@@ -274,7 +290,8 @@ impl mlua::UserData for Tree {
         });
         methods.add_method("bin", |_, this, ()| Ok(this.bin()));
         methods.add_method("match_rocks", |_, this, req: PackageReq| {
-            Ok(this.match_rocks(&req)?)
+            this.match_rocks(&req)
+                .map_err(|err| mlua::Error::RuntimeError(err.to_string()))
         });
         methods.add_method(
             "match_rock_and",
@@ -286,7 +303,8 @@ impl mlua::UserData for Tree {
             },
         );
         methods.add_method("rock_layout", |_, this, package: LocalPackage| {
-            Ok(this.installed_rock_layout(&package)?)
+            this.installed_rock_layout(&package)
+                .map_err(|err| mlua::Error::RuntimeError(err.to_string()))
         });
         methods.add_method("rock", |_, this, package: LocalPackage| {
             this.dependency(&package).into_lua_err()

@@ -5,7 +5,7 @@ use ssri::Integrity;
 use std::{
     collections::HashMap,
     io,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, ExitStatus},
     sync::Arc,
 };
@@ -19,72 +19,17 @@ use crate::{
     lua_installation::LuaInstallation,
     lua_rockspec::RockspecFormat,
     operations::{get_all_dependencies, PackageInstallSpec, SearchAndDownloadError, UnpackError},
-    path::Paths,
+    path::{Paths, PathsError},
     progress::{MultiProgress, Progress, ProgressBar},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
     rockspec::Rockspec,
-    tree::{self, Tree},
+    tree::{self, Tree, TreeError},
 };
 
 #[cfg(target_family = "unix")]
 const LUAROCKS_EXE: &str = "luarocks";
 #[cfg(target_family = "windows")]
 const LUAROCKS_EXE: &str = "luarocks.exe";
-
-#[derive(Error, Debug)]
-pub enum LuaRocksError {
-    #[error(transparent)]
-    LuaVersionUnset(#[from] LuaVersionUnset),
-    #[error(transparent)]
-    Io(#[from] io::Error),
-}
-
-#[derive(Error, Debug)]
-pub enum LuaRocksInstallError {
-    #[error(transparent)]
-    Io(#[from] io::Error),
-    #[error(transparent)]
-    BuildError(#[from] BuildError),
-    #[error(transparent)]
-    Request(#[from] reqwest::Error),
-    #[error(transparent)]
-    UnpackError(#[from] UnpackError),
-    #[error("luarocks integrity mismatch.\nExpected: {expected}\nBut got: {got}")]
-    IntegrityMismatch { expected: Integrity, got: Integrity },
-}
-
-#[derive(Error, Debug)]
-pub enum InstallBuildDependenciesError {
-    #[error(transparent)]
-    Io(#[from] io::Error),
-    #[error(transparent)]
-    RemotePackageDBError(#[from] RemotePackageDBError),
-    #[error(transparent)]
-    SearchAndDownloadError(#[from] SearchAndDownloadError),
-    #[error(transparent)]
-    BuildError(#[from] BuildError),
-}
-
-#[derive(Error, Debug)]
-pub enum ExecLuaRocksError {
-    #[error(transparent)]
-    LuaVersionUnset(#[from] LuaVersionUnset),
-    #[error("could not write luarocks config: {0}")]
-    WriteLuarocksConfigError(io::Error),
-    #[error("failed to run luarocks: {0}")]
-    Io(#[from] io::Error),
-    #[error("executing luarocks compatibility layer failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
-    CommandFailure {
-        status: ExitStatus,
-        stdout: String,
-        stderr: String,
-    },
-}
-
-pub struct LuaRocksInstallation {
-    tree: Tree,
-    config: Config,
-}
 
 pub(crate) const LUAROCKS_VERSION: &str = "3.11.1-1";
 
@@ -101,6 +46,71 @@ build = {
     type = 'builtin',
 }
 ";
+
+#[derive(Error, Debug)]
+pub enum LuaRocksError {
+    #[error(transparent)]
+    LuaVersionUnset(#[from] LuaVersionUnset),
+    // #[error(transparent)]
+    // Io(#[from] io::Error),
+    #[error(transparent)]
+    Tree(#[from] TreeError),
+}
+
+#[derive(Error, Debug)]
+pub enum LuaRocksInstallError {
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    Tree(#[from] TreeError),
+    #[error(transparent)]
+    BuildError(#[from] BuildError),
+    #[error(transparent)]
+    Request(#[from] reqwest::Error),
+    #[error(transparent)]
+    UnpackError(#[from] UnpackError),
+    #[error("luarocks integrity mismatch.\nExpected: {expected}\nBut got: {got}")]
+    IntegrityMismatch { expected: Integrity, got: Integrity },
+}
+
+#[derive(Error, Debug)]
+pub enum InstallBuildDependenciesError {
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    Tree(#[from] TreeError),
+    #[error(transparent)]
+    RemotePackageDBError(#[from] RemotePackageDBError),
+    #[error(transparent)]
+    SearchAndDownloadError(#[from] SearchAndDownloadError),
+    #[error(transparent)]
+    BuildError(#[from] BuildError),
+}
+
+#[derive(Error, Debug)]
+pub enum ExecLuaRocksError {
+    #[error(transparent)]
+    LuaVersionUnset(#[from] LuaVersionUnset),
+    #[error("could not write luarocks config: {0}")]
+    WriteLuarocksConfigError(io::Error),
+    #[error("failed to run luarocks: {0}")]
+    Io(#[from] io::Error),
+    #[error("error setting up luarocks paths: {0}")]
+    Paths(#[from] PathsError),
+    #[error("luarocks binary not found at {0}")]
+    LuarocksBinNotFound(PathBuf),
+    #[error("executing luarocks compatibility layer failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
+    CommandFailure {
+        status: ExitStatus,
+        stdout: String,
+        stderr: String,
+    },
+}
+
+pub struct LuaRocksInstallation {
+    tree: Tree,
+    config: Config,
+}
 
 impl LuaRocksInstallation {
     pub fn new(config: &Config) -> Result<Self, LuaRocksError> {
@@ -351,6 +361,9 @@ variables = {{
         std::fs::write(luarocks_config.clone(), luarocks_config_content)
             .map_err(ExecLuaRocksError::WriteLuarocksConfigError)?;
         let luarocks_bin = self.tree().bin().join(LUAROCKS_EXE);
+        if !luarocks_bin.is_file() {
+            return Err(ExecLuaRocksError::LuarocksBinNotFound(luarocks_bin));
+        }
         let output = Command::new(luarocks_bin)
             .current_dir(cwd)
             .args(args)

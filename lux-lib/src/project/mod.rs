@@ -16,7 +16,7 @@ use toml_edit::{DocumentMut, Item};
 use crate::{
     build,
     config::{Config, LuaVersion},
-    lockfile::{ProjectLockfile, ReadOnly},
+    lockfile::{LockfileError, ProjectLockfile, ReadOnly},
     lua_rockspec::{
         ExternalDependencySpec, LocalLuaRockspec, LuaRockspecError, LuaVersionError,
         PartialLuaRockspec, PartialRockspecError, RemoteLuaRockspec,
@@ -26,7 +26,7 @@ use crate::{
         lua_dependency::{DependencyType, LuaDependencySpec, LuaDependencyType},
         LuaVersionCompatibility,
     },
-    tree::Tree,
+    tree::{Tree, TreeError},
 };
 use crate::{
     lockfile::PinnedState,
@@ -42,6 +42,7 @@ pub const EXTRA_ROCKSPEC: &str = "extra.rockspec";
 #[error(transparent)]
 pub enum ProjectError {
     Io(#[from] io::Error),
+    Lockfile(#[from] LockfileError),
     Project(#[from] LocalProjectTomlValidationError),
     Toml(#[from] toml::de::Error),
     #[error("error when parsing `extra.rockspec`: {0}")]
@@ -72,7 +73,7 @@ pub enum ProjectEditError {
 #[derive(Error, Debug)]
 #[error(transparent)]
 pub enum ProjectTreeError {
-    Io(#[from] io::Error),
+    Tree(#[from] TreeError),
     LuaVersionError(#[from] LuaVersionError),
 }
 
@@ -231,12 +232,12 @@ impl Project {
     }
 
     /// Get the `lux.lock` lockfile in the project root.
-    pub fn lockfile(&self) -> Result<ProjectLockfile<ReadOnly>, io::Error> {
-        ProjectLockfile::new(self.lockfile_path())
+    pub fn lockfile(&self) -> Result<ProjectLockfile<ReadOnly>, ProjectError> {
+        Ok(ProjectLockfile::new(self.lockfile_path())?)
     }
 
     /// Get the `lux.lock` lockfile in the project root, if present.
-    pub fn try_lockfile(&self) -> Result<Option<ProjectLockfile<ReadOnly>>, io::Error> {
+    pub fn try_lockfile(&self) -> Result<Option<ProjectLockfile<ReadOnly>>, ProjectError> {
         let path = self.lockfile_path();
         if path.is_file() {
             Ok(Some(ProjectLockfile::load(path)?))

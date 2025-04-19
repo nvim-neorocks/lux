@@ -13,6 +13,9 @@ indent_size = 2
 [Makefile]
 indent_style = tab
 
+[Makefile.win]
+indent_style = tab
+
 [.github/**]
 charset = unset
 end_of_line = unset

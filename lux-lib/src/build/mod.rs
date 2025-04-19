@@ -1,7 +1,7 @@
-use crate::lockfile::{OptState, RemotePackageSourceUrl};
+use crate::lockfile::{LockfileError, OptState, RemotePackageSourceUrl};
 use crate::lua_rockspec::LuaVersionError;
 use crate::rockspec::{LuaVersionCompatibility, Rockspec};
-use crate::tree::{self, EntryType};
+use crate::tree::{self, EntryType, TreeError};
 use std::{io, path::Path, process::ExitStatus};
 
 use crate::{
@@ -103,14 +103,22 @@ where
 pub enum BuildError {
     #[error("IO operation failed: {0}")]
     Io(#[from] io::Error),
+    #[error(transparent)]
+    Lockfile(#[from] LockfileError),
+    #[error(transparent)]
+    Tree(#[from] TreeError),
     #[error("failed to create spinner: {0}")]
     SpinnerFailure(#[from] TemplateError),
     #[error(transparent)]
     ExternalDependencyError(#[from] ExternalDependencyError),
     #[error(transparent)]
     PatchError(#[from] PatchError),
+    #[error("failed to compile intermediates: {0}")]
+    CompileIntermediatesError(cc::Error),
     #[error("failed to compile build modules: {0}")]
     CompilationError(#[from] cc::Error),
+    #[error("compilation succeeded, but the expected library {0} was not created")]
+    LibOutputNotCreated(String),
     #[error(transparent)]
     CMakeError(#[from] CMakeError),
     #[error(transparent)]

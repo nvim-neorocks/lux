@@ -1,5 +1,3 @@
-use std::io;
-
 use clap::Args;
 use eyre::{eyre, Result};
 use inquire::Confirm;
@@ -11,7 +9,7 @@ use lux_lib::{
     operations::{self, PackageInstallSpec},
     package::PackageReq,
     progress::MultiProgress,
-    tree::{self, RockMatches},
+    tree::{self, RockMatches, TreeError},
 };
 
 #[derive(Args)]
@@ -27,7 +25,7 @@ pub async fn uninstall(uninstall_args: Uninstall, config: Config) -> Result<()> 
         .packages
         .iter()
         .map(|package_req| tree.match_rocks(package_req))
-        .try_collect::<_, Vec<_>, io::Error>()?;
+        .try_collect::<_, Vec<_>, TreeError>()?;
 
     let (packages, nonexistent_packages, duplicate_packages) = package_matches.into_iter().fold(
         (Vec::new(), Vec::new(), Vec::new()),

@@ -815,6 +815,20 @@ pub struct ProjectLockfile<P: LockfilePermissions> {
 }
 
 #[derive(Error, Debug)]
+pub enum LockfileError {
+    #[error("error loading lockfile: {0}")]
+    Load(io::Error),
+    #[error("error creating lockfile: {0}")]
+    Create(io::Error),
+    #[error("error parsing lockfile from JSON: {0}")]
+    ParseJson(serde_json::Error),
+    #[error("error writing lockfile to JSON: {0}")]
+    WriteJson(serde_json::Error),
+    #[error("attempt load to a lockfile that does not match the expected rock layout.")]
+    MismatchedRockLayout,
+}
+
+#[derive(Error, Debug)]
 pub enum LockfileIntegrityError {
     #[error("rockspec integirty mismatch.\nExpected: {expected}\nBut got: {got}")]
     RockspecIntegrityMismatch { expected: Integrity, got: Integrity },
@@ -1033,7 +1047,7 @@ impl Lockfile<ReadOnly> {
     pub(crate) fn new(
         filepath: PathBuf,
         rock_layout: RockLayoutConfig,
-    ) -> io::Result<Lockfile<ReadOnly>> {
+    ) -> Result<Lockfile<ReadOnly>, LockfileError> {
         // Ensure that the lockfile exists
         match File::options().create_new(true).write(true).open(&filepath) {
             Ok(mut file) => {
@@ -1044,11 +1058,12 @@ impl Lockfile<ReadOnly> {
                     lock: LocalPackageLock::default(),
                     entrypoint_layout: rock_layout.clone(),
                 };
-                let json_str = serde_json::to_string(&empty_lockfile)?;
-                write!(file, "{}", json_str)?;
+                let json_str =
+                    serde_json::to_string(&empty_lockfile).map_err(LockfileError::WriteJson)?;
+                write!(file, "{}", json_str).map_err(LockfileError::Create)?;
             }
             Err(err) if err.kind() == ErrorKind::AlreadyExists => {}
-            Err(err) => return Err(err),
+            Err(err) => return Err(LockfileError::Create(err)),
         }
 
         Self::load(filepath, Some(&rock_layout))
@@ -1059,15 +1074,14 @@ impl Lockfile<ReadOnly> {
     pub fn load(
         filepath: PathBuf,
         expected_rock_layout: Option<&RockLayoutConfig>,
-    ) -> io::Result<Lockfile<ReadOnly>> {
+    ) -> Result<Lockfile<ReadOnly>, LockfileError> {
+        let content = std::fs::read_to_string(&filepath).map_err(LockfileError::Load)?;
         let mut lockfile: Lockfile<ReadOnly> =
-            serde_json::from_str(&std::fs::read_to_string(&filepath)?)?;
+            serde_json::from_str(&content).map_err(LockfileError::ParseJson)?;
         lockfile.filepath = filepath;
         if let Some(expected_rock_layout) = expected_rock_layout {
             if &lockfile.entrypoint_layout != expected_rock_layout {
-                return Err(io::Error::other(
-                    "attempt to a lockfile that does not match the expected rock layout.",
-                ));
+                return Err(LockfileError::MismatchedRockLayout);
             }
         }
         Ok(lockfile)
@@ -1128,7 +1142,7 @@ impl Lockfile<ReadOnly> {
 
 impl ProjectLockfile<ReadOnly> {
     /// Create a new `ProjectLockfile`, writing an empty file if none exists.
-    pub fn new(filepath: PathBuf) -> io::Result<ProjectLockfile<ReadOnly>> {
+    pub fn new(filepath: PathBuf) -> Result<ProjectLockfile<ReadOnly>, LockfileError> {
         // Ensure that the lockfile exists
         match File::options().create_new(true).write(true).open(&filepath) {
             Ok(mut file) => {
@@ -1140,20 +1154,22 @@ impl ProjectLockfile<ReadOnly> {
                     test_dependencies: LocalPackageLock::default(),
                     build_dependencies: LocalPackageLock::default(),
                 };
-                let json_str = serde_json::to_string(&empty_lockfile)?;
-                write!(file, "{}", json_str)?;
+                let json_str =
+                    serde_json::to_string(&empty_lockfile).map_err(LockfileError::WriteJson)?;
+                write!(file, "{}", json_str).map_err(LockfileError::Create)?;
             }
             Err(err) if err.kind() == ErrorKind::AlreadyExists => {}
-            Err(err) => return Err(err),
+            Err(err) => return Err(LockfileError::Create(err)),
         }
 
         Self::load(filepath)
     }
 
     /// Load a `ProjectLockfile`, failing if none exists.
-    pub fn load(filepath: PathBuf) -> io::Result<ProjectLockfile<ReadOnly>> {
+    pub fn load(filepath: PathBuf) -> Result<ProjectLockfile<ReadOnly>, LockfileError> {
+        let content = std::fs::read_to_string(&filepath).map_err(LockfileError::Load)?;
         let mut lockfile: ProjectLockfile<ReadOnly> =
-            serde_json::from_str(&std::fs::read_to_string(&filepath)?)?;
+            serde_json::from_str(&content).map_err(LockfileError::ParseJson)?;
 
         lockfile.filepath = filepath;
 
