@@ -99,6 +99,21 @@ The following table provides a brief comparison:
       To comply with SemVer, we treat anything after the third version component
       (except for the specrev) as a prerelease/build version.
 
+## :wrench: Building from source
+
+Dependencies:
+
+- `openssl`
+- `libgit2`
+- `gnupg`, `libgpg-error` and `gpgme` (*nix only)
+- `lua` (optional, if building without the `vendored-lua` feature)
+
+We recommend building with the `vendored-lua` feature enabled:
+
+```bash
+cargo build --features vendored-lua
+```
+
 ## :bulb: You may also like...
 
 - [luarocks](https://github.com/luarocks/luarocks) - The original Lua package manager
