@@ -260,12 +260,7 @@ pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
                         .contributors
                         .first()
                         .cloned()
-                        .unwrap_or_else(|| {
-                            uzers::get_current_username()
-                                .expect("current user could not be found. Was it deleted?")
-                                .to_string_lossy()
-                                .to_string()
-                        });
+                        .unwrap_or_else(whoami::realname);
                     Text::new("Maintainer:")
                         .with_default(&default_maintainer)
                         .prompt()
