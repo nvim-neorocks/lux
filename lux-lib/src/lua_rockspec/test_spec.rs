@@ -256,7 +256,7 @@ mod tests {
         let lua = Lua::new();
         lua.load(lua_content).exec().unwrap();
         let test_spec = PerPlatform::from_lua(lua.globals().get("test").unwrap(), &lua).unwrap();
-        assert!(matches!(test_spec.default, TestSpec::AutoDetect { .. }));
+        assert!(matches!(test_spec.default, TestSpec::AutoDetect));
         let lua_content = "
         test = {\n
             type = 'busted',\n
