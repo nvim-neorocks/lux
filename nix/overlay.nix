@@ -182,6 +182,33 @@ in {
       cargoNextestPartitionsExtraArgs = "--no-tests=pass";
     });
 
+  lux-nextest-lua = craneLib.cargoNextest (commonArgs
+    // {
+      pname = "lux-lua";
+      version = "0.1.0";
+      src = self;
+      cargoExtraArgs = "-p lux-lua --features test";
+      buildInputs = commonArgs.buildInputs;
+
+      nativeCheckInputs = with final; [
+        cacert
+        cargo-nextest
+        zlib # used for checking external dependencies
+        lua
+        nix # we use nix-hash in tests
+      ];
+
+      preCheck = ''
+        export HOME=$(realpath .)
+      '';
+
+      cargoArtifacts = lux-deps;
+      partitions = 1;
+      partitionType = "count";
+      cargoNextestExtraArgs = "--no-fail-fast --lib"; # Disable integration tests
+      cargoNextestPartitionsExtraArgs = "--no-tests=pass";
+    });
+
   lux-taplo = with final;
     craneLib.craneLib.taploFmt {
       inherit (luxCliCargo) pname version;

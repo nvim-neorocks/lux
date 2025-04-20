@@ -1,6 +1,6 @@
 use std::{collections::HashMap, convert::Infallible, fmt::Display, str::FromStr};
 
-use mlua::{FromLua, LuaSerdeExt};
+use mlua::{FromLua, IntoLua, LuaSerdeExt};
 use serde::{Deserialize, Deserializer};
 use thiserror::Error;
 
@@ -179,10 +179,130 @@ pub enum DependencyType<T> {
     External(HashMap<String, ExternalDependencySpec>),
 }
 
+impl<T> IntoLua for DependencyType<T>
+where
+    T: IntoLua,
+{
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        let table = lua.create_table()?;
+
+        match self {
+            DependencyType::Regular(deps) => {
+                table.set("regular", deps)?;
+            }
+            DependencyType::Build(deps) => {
+                table.set("build", deps)?;
+            }
+            DependencyType::Test(deps) => {
+                table.set("test", deps)?;
+            }
+            DependencyType::External(deps) => {
+                table.set("external", deps)?;
+            }
+        }
+
+        Ok(mlua::Value::Table(table))
+    }
+}
+
+impl<T> FromLua for DependencyType<T>
+where
+    T: FromLua,
+{
+    fn from_lua(value: mlua::Value, _lua: &mlua::Lua) -> mlua::Result<Self> {
+        let tbl = value
+            .as_table()
+            .ok_or(mlua::Error::FromLuaConversionError {
+                from: "Value",
+                to: "table".to_string(),
+                message: Some("Expected a table".to_string()),
+            })?;
+
+        let deps = {
+            if let Some(regular) = tbl.get("regular")? {
+                DependencyType::Regular(regular)
+            } else if let Some(build) = tbl.get("build")? {
+                DependencyType::Build(build)
+            } else if let Some(test) = tbl.get("test")? {
+                DependencyType::Test(test)
+            } else if let Some(external) = tbl.get("external")? {
+                DependencyType::External(external)
+            } else {
+                return Err(mlua::Error::FromLuaConversionError {
+                    from: "table",
+                    to: "DependencyType".to_string(),
+                    message: Some(
+                        "expected a table with `regular`, `build`, `test` or `external`"
+                            .to_string(),
+                    ),
+                });
+            }
+        };
+
+        Ok(deps)
+    }
+}
+
 pub enum LuaDependencyType<T> {
     Regular(Vec<T>),
     Build(Vec<T>),
     Test(Vec<T>),
+}
+
+impl<T> IntoLua for LuaDependencyType<T>
+where
+    T: IntoLua,
+{
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        let table = lua.create_table()?;
+
+        match self {
+            LuaDependencyType::Regular(deps) => {
+                table.set("regular", deps)?;
+            }
+            LuaDependencyType::Build(deps) => {
+                table.set("build", deps)?;
+            }
+            LuaDependencyType::Test(deps) => {
+                table.set("test", deps)?;
+            }
+        }
+
+        Ok(mlua::Value::Table(table))
+    }
+}
+
+impl<T> FromLua for LuaDependencyType<T>
+where
+    T: FromLua,
+{
+    fn from_lua(value: mlua::Value, _lua: &mlua::Lua) -> mlua::Result<Self> {
+        let tbl = value
+            .as_table()
+            .ok_or(mlua::Error::FromLuaConversionError {
+                from: "Value",
+                to: "table".to_string(),
+                message: Some("Expected a table".to_string()),
+            })?;
+
+        let deps = {
+            if let Some(regular) = tbl.get("regular")? {
+                LuaDependencyType::Regular(regular)
+            } else if let Some(build) = tbl.get("build")? {
+                LuaDependencyType::Build(build)
+            } else if let Some(test) = tbl.get("test")? {
+                LuaDependencyType::Test(test)
+            } else {
+                return Err(mlua::Error::FromLuaConversionError {
+                    from: "table",
+                    to: "LuaDependencyType".to_string(),
+                    message: Some("expected a table with `regular`, `build` or `test`".to_string()),
+                });
+            }
+        };
+
+        Ok(deps)
+    }
 }
 
 #[cfg(test)]

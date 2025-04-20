@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use mlua::{Lua, LuaSerdeExt, Value};
+use mlua::{Lua, LuaSerdeExt, UserData, Value};
 
 use crate::{
     lua_rockspec::RockspecFormat,
@@ -28,6 +28,8 @@ pub struct PartialLuaRockspec {
     pub(crate) source: Option<RockSourceInternal>,
     pub(crate) test: Option<TestSpecInternal>,
 }
+
+impl UserData for PartialLuaRockspec {}
 
 pub type PartialRockspecError = mlua::Error;
 

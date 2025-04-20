@@ -86,6 +86,7 @@
             git-hooks-check
             ;
           tests = pkgs.lux-nextest;
+          lua-tests = pkgs.lux-nextest-lua;
           clippy = pkgs.lux-clippy;
           workspace-hack = pkgs.lux-workspace-hack;
           taplo = pkgs.lux-taplo;

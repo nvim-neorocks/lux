@@ -1,6 +1,6 @@
 use std::{collections::HashMap, convert::Infallible, path::PathBuf};
 
-use mlua::IntoLua;
+use mlua::{FromLua, IntoLua};
 use path_slash::PathBufExt;
 use serde::Deserialize;
 
@@ -28,6 +28,23 @@ impl IntoLua for ExternalDependencySpec {
             table.set("library", path.to_slash_lossy().to_string())?;
         }
         Ok(mlua::Value::Table(table))
+    }
+}
+
+impl FromLua for ExternalDependencySpec {
+    fn from_lua(value: mlua::Value, _lua: &mlua::Lua) -> mlua::Result<Self> {
+        if let mlua::Value::Table(table) = value {
+            let header = table.get("header")?;
+            let library = table.get("library")?;
+
+            Ok(Self { header, library })
+        } else {
+            Err(mlua::Error::FromLuaConversionError {
+                from: "ExternalDependencySpec",
+                to: "table".to_string(),
+                message: Some("Expected a table".to_string()),
+            })
+        }
     }
 }
 

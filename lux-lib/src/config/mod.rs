@@ -1,7 +1,7 @@
 use directories::ProjectDirs;
 use external_deps::ExternalDependencySearchConfig;
 use itertools::Itertools;
-use mlua::{ExternalError, FromLua, IntoLua, UserData};
+use mlua::{ExternalError, ExternalResult, FromLua, IntoLua, UserData};
 use serde::{Deserialize, Serialize, Serializer};
 use std::{
     collections::HashMap, env, fmt::Display, io, path::PathBuf, str::FromStr, time::Duration,
@@ -39,6 +39,13 @@ pub enum LuaVersion {
     LuaJIT52,
     // TODO(vhyrro): Support luau?
     // LuaU,
+}
+
+impl FromLua for LuaVersion {
+    fn from_lua(value: mlua::Value, lua: &mlua::Lua) -> mlua::Result<Self> {
+        let version_str: String = FromLua::from_lua(value, lua)?;
+        LuaVersion::from_str(&version_str).into_lua_err()
+    }
 }
 
 impl IntoLua for LuaVersion {
@@ -330,7 +337,7 @@ pub enum ConfigError {
     CompilerToolchain(#[from] cc::Error),
 }
 
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Clone, Default, Deserialize, Serialize)]
 pub struct ConfigBuilder {
     #[serde(
         default,
@@ -595,6 +602,16 @@ where
     }
 }
 
+struct LuaUrl(Url);
+
+impl FromLua for LuaUrl {
+    fn from_lua(value: mlua::Value, lua: &mlua::Lua) -> mlua::Result<Self> {
+        let url_str: String = FromLua::from_lua(value, lua)?;
+
+        Url::parse(&url_str).map(LuaUrl).into_lua_err()
+    }
+}
+
 impl UserData for Config {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_function("default", |_, _: ()| {
@@ -603,6 +620,109 @@ impl UserData for Config {
                 .map_err(|err| err.into_lua_err())
         });
 
-        // TODO: Implement builder with `require("lux").config.build()`
+        methods.add_function("builder", |_, ()| ConfigBuilder::new().into_lua_err());
+
+        methods.add_method("server", |_, this, ()| Ok(this.server().to_string()));
+        methods.add_method("extra_servers", |_, this, ()| {
+            Ok(this
+                .extra_servers()
+                .iter()
+                .map(|url| url.to_string())
+                .collect_vec())
+        });
+        methods.add_method("only_sources", |_, this, ()| {
+            Ok(this.only_sources().cloned())
+        });
+        methods.add_method("namespace", |_, this, ()| Ok(this.namespace().cloned()));
+        methods.add_method("lua_dir", |_, this, ()| Ok(this.lua_dir().cloned()));
+        methods.add_method("lua_version", |_, this, ()| Ok(this.lua_version().cloned()));
+        methods.add_method("tree", |_, this, lua_version: LuaVersion| {
+            this.tree(lua_version).into_lua_err()
+        });
+        methods.add_method("luarocks_tree", |_, this, ()| {
+            Ok(this.luarocks_tree().clone())
+        });
+        methods.add_method("no_project", |_, this, ()| Ok(this.no_project()));
+        methods.add_method("verbose", |_, this, ()| Ok(this.verbose()));
+        methods.add_method("timeout", |_, this, ()| Ok(this.timeout().as_secs()));
+        methods.add_method("cache_dir", |_, this, ()| Ok(this.cache_dir().clone()));
+        methods.add_method("data_dir", |_, this, ()| Ok(this.data_dir().clone()));
+        methods.add_method("entrypoint_layout", |_, this, ()| {
+            Ok(this.entrypoint_layout().clone())
+        });
+        methods.add_method("variables", |_, this, ()| Ok(this.variables().clone()));
+        // FIXME: This is a temporary workaround to get the external_deps hooked up to Lua
+        // methods.add_method("external_deps", |_, this, ()| {
+        //     Ok(this.external_deps().clone())
+        // });
+        methods.add_method("make_cmd", |_, this, ()| Ok(this.make_cmd()));
+        methods.add_method("cmake_cmd", |_, this, ()| Ok(this.cmake_cmd()));
+        methods.add_method("enabled_dev_servers", |_, this, ()| {
+            Ok(this
+                .enabled_dev_servers()
+                .into_lua_err()?
+                .into_iter()
+                .map(|url| url.to_string())
+                .collect_vec())
+        });
+    }
+}
+
+impl UserData for ConfigBuilder {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("dev", |_, this, dev: Option<bool>| {
+            Ok(this.clone().dev(dev))
+        });
+        methods.add_method("server", |_, this, server: Option<LuaUrl>| {
+            Ok(this.clone().server(server.map(|url| url.0)))
+        });
+        methods.add_method("extra_servers", |_, this, servers: Option<Vec<LuaUrl>>| {
+            Ok(this
+                .clone()
+                .extra_servers(servers.map(|urls| urls.into_iter().map(|url| url.0).collect())))
+        });
+        methods.add_method("only_sources", |_, this, sources: Option<String>| {
+            Ok(this.clone().only_sources(sources))
+        });
+        methods.add_method("namespace", |_, this, namespace: Option<String>| {
+            Ok(this.clone().namespace(namespace))
+        });
+        methods.add_method("lua_dir", |_, this, lua_dir: Option<PathBuf>| {
+            Ok(this.clone().lua_dir(lua_dir))
+        });
+        methods.add_method("lua_version", |_, this, lua_version: Option<LuaVersion>| {
+            Ok(this.clone().lua_version(lua_version))
+        });
+        methods.add_method("tree", |_, this, tree: Option<PathBuf>| {
+            Ok(this.clone().tree(tree))
+        });
+        methods.add_method(
+            "luarocks_tree",
+            |_, this, luarocks_tree: Option<PathBuf>| Ok(this.clone().luarocks_tree(luarocks_tree)),
+        );
+        methods.add_method("no_project", |_, this, no_project: Option<bool>| {
+            Ok(this.clone().no_project(no_project))
+        });
+        methods.add_method("verbose", |_, this, verbose: Option<bool>| {
+            Ok(this.clone().verbose(verbose))
+        });
+        methods.add_method("timeout", |_, this, timeout: Option<u64>| {
+            Ok(this.clone().timeout(timeout.map(Duration::from_secs)))
+        });
+        methods.add_method("cache_dir", |_, this, cache_dir: Option<PathBuf>| {
+            Ok(this.clone().cache_dir(cache_dir))
+        });
+        methods.add_method("data_dir", |_, this, data_dir: Option<PathBuf>| {
+            Ok(this.clone().data_dir(data_dir))
+        });
+        methods.add_method(
+            "entrypoint_layout",
+            |_, this, entrypoint_layout: Option<RockLayoutConfig>| {
+                Ok(this
+                    .clone()
+                    .entrypoint_layout(entrypoint_layout.unwrap_or_default()))
+            },
+        );
+        methods.add_method("build", |_, this, ()| this.clone().build().into_lua_err());
     }
 }

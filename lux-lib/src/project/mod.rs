@@ -18,10 +18,12 @@ use crate::{
     build,
     config::{Config, LuaVersion},
     lockfile::{LockfileError, ProjectLockfile, ReadOnly},
+    lua::lua_runtime,
     lua_rockspec::{
         LocalLuaRockspec, LuaRockspecError, LuaVersionError, PartialLuaRockspec,
         PartialRockspecError, RemoteLuaRockspec,
     },
+    progress::Progress,
     remote_package_db::RemotePackageDB,
     rockspec::{
         lua_dependency::{DependencyType, LuaDependencySpec, LuaDependencyType},
@@ -145,10 +147,71 @@ impl UserData for Project {
         methods.add_method("lua_version", |_, this, config: Config| {
             this.lua_version(&config).into_lua_err()
         });
+        methods.add_method("extra_rockspec", |_, this, ()| {
+            this.extra_rockspec().into_lua_err()
+        });
 
-        //methods.add_method("lockfile", |_, this, ()| this.lockfile().into_lua_err());
-        //methods.add_method("extra_rockspec", |_, this, ()| this.extra_rockspec().into_lua_err());
-        //methods.add_method("add")
+        methods.add_async_method_mut(
+            "add",
+            |_, mut this, (deps, config): (DependencyType<PackageReq>, Config)| async move {
+                // NOTE(vhyrro): Supposedly, these guards may cause crashes since they must be
+                // dropped in reverse order of creation.
+                //
+                // However, this limitation only seems to apply to `Handle::enter()`, not
+                // `Runtime::enter()`. During testing in `lux-lua`, this seems to be working just fine.
+                let _guard = lua_runtime().enter();
+
+                let package_db = RemotePackageDB::from_config(&config, &Progress::NoProgress)
+                    .await
+                    .into_lua_err()?;
+                this.add(deps, &package_db).await.into_lua_err()
+            },
+        );
+
+        methods.add_async_method_mut(
+            "remove",
+            |_, mut this, deps: DependencyType<PackageName>| async move {
+                let _guard = lua_runtime().enter();
+
+                this.remove(deps).await.into_lua_err()
+            },
+        );
+
+        methods.add_async_method_mut(
+            "upgrade",
+            |_, mut this, (deps, package_db): (LuaDependencyType<PackageName>, RemotePackageDB)| async move {
+                let _guard = lua_runtime().enter();
+
+                this.upgrade(deps, &package_db).await.into_lua_err()
+            },
+        );
+
+        methods.add_async_method_mut(
+            "upgrade_all",
+            |_, mut this, package_db: RemotePackageDB| async move {
+                let _guard = lua_runtime().enter();
+
+                this.upgrade_all(&package_db).await.into_lua_err()
+            },
+        );
+
+        methods.add_async_method_mut(
+            "set_pinned_state",
+            |_, mut this, (deps, pin): (LuaDependencyType<PackageName>, PinnedState)| async move {
+                let _guard = lua_runtime().enter();
+
+                this.set_pinned_state(deps, pin).await.into_lua_err()
+            },
+        );
+
+        methods.add_method("project_files", |_, this, ()| Ok(this.project_files()));
+
+        // NOTE: No useful public methods for `ProjectLockfile` yet
+        // If the lockfile can be fed into other functions in the API, then we should just
+        // implement a blank UserData for it.
+        //
+        // methods.add_method("lockfile", |_, this, ()| this.lockfile().into_lua_err());
+        // methods.add_method("try_lockfile", |_, this, ()| { this.try_lockfile().into_lua_err() });
     }
 }
 

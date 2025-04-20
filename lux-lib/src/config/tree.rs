@@ -1,8 +1,9 @@
+use mlua::{FromLua, UserData};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Template configuration for a rock's tree layout
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, FromLua)]
 pub struct RockLayoutConfig {
     /// The root of a packages `etc` directory.
     /// If unset (the default), the root is the package root.
@@ -55,5 +56,14 @@ impl Default for RockLayoutConfig {
             conf: "conf".into(),
             doc: "doc".into(),
         }
+    }
+}
+
+impl UserData for RockLayoutConfig {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_function("new", |_, ()| Ok(RockLayoutConfig::default()));
+        methods.add_function("new_nvim_layout", |_, ()| {
+            Ok(RockLayoutConfig::new_nvim_layout())
+        });
     }
 }

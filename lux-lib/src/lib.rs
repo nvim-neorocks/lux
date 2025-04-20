@@ -18,6 +18,7 @@ pub mod tree;
 pub mod upload;
 pub mod which;
 
+pub(crate) mod lua;
 pub(crate) mod remote_package_source;
 
 /// An internal string describing the server-side API version that we support.

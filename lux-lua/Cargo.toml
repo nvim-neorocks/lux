@@ -9,12 +9,17 @@ crate-type = ["cdylib"]
 
 [dependencies]
 lux-lib = { version = "0.3.11", path = "../lux-lib", default-features = false }
-mlua = { version = "0.10.1", features = ["module", "async"] }
+mlua = { version = "0.10.1", features = ["async"] }
 path-absolutize = "3.1.1"
 lux-workspace-hack = { version = "0.1", path = "../lux-workspace-hack" }
 
+[dev-dependencies]
+assert_fs = "1.1.2"
+
 [features]
-lua51 = ["mlua/lua51", "lux-lib/lua51"]
-lua52 = ["mlua/lua52", "lux-lib/lua52"]
-lua53 = ["mlua/lua53", "lux-lib/lua53"]
-lua54 = ["mlua/lua54", "lux-lib/lua54"]
+lua51 = ["mlua/module", "mlua/lua51", "lux-lib/lua51"]
+lua52 = ["mlua/module", "mlua/lua52", "lux-lib/lua52"]
+lua53 = ["mlua/module", "mlua/lua53", "lux-lib/lua53"]
+lua54 = ["mlua/module", "mlua/lua54", "lux-lib/lua54"]
+# Run tests without module mode so we can link against Lua and run the tests.
+test = ["mlua/vendored", "lux-lib/lua51"]

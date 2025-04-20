@@ -263,8 +263,8 @@ impl From<PackageName> for PackageReq {
 
 impl FromLua for PackageReq {
     fn from_lua(value: mlua::Value, lua: &mlua::Lua) -> mlua::Result<Self> {
-        let (name, version) = lua.from_value(value)?;
-        Self::new(name, version).into_lua_err()
+        let str: String = lua.from_value(value)?;
+        Self::parse(&str).into_lua_err()
     }
 }
 
