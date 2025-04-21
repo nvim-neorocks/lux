@@ -1,13 +1,13 @@
 use clap::Args;
-use eyre::{Context, OptionExt, Result};
+use eyre::{OptionExt, Result};
 use lux_lib::{
-    config::Config,
-    luarocks::luarocks_installation::LuaRocksInstallation,
-    operations::Sync,
-    package::PackageName,
-    progress::MultiProgress,
-    project::Project,
-    rockspec::{lua_dependency, Rockspec},
+    config::Config, package::PackageName, progress::MultiProgress, project::Project,
+    rockspec::lua_dependency,
+};
+
+use crate::utils::project::{
+    sync_build_dependencies_if_locked, sync_dependencies_if_locked,
+    sync_test_dependencies_if_locked,
 };
 
 #[derive(Args)]
@@ -27,30 +27,13 @@ pub struct Remove {
 
 pub async fn remove(data: Remove, config: Config) -> Result<()> {
     let mut project = Project::current()?.ok_or_eyre("No project found")?;
-    let tree = project.tree(&config)?;
     let progress = MultiProgress::new_arc();
 
     if !data.package.is_empty() {
         project
             .remove(lua_dependency::DependencyType::Regular(data.package))
             .await?;
-        // NOTE: We only update the lockfile if one exists.
-        // Otherwise, the next `lx build` will remove the packages.
-        if let Some(lockfile) = project.try_lockfile()? {
-            let mut lockfile = lockfile.write_guard();
-            let packages = project
-                .toml()
-                .into_local()?
-                .dependencies()
-                .current_platform()
-                .clone();
-            Sync::new(&tree, &mut lockfile, &config)
-                .packages(packages)
-                .progress(progress.clone())
-                .sync_dependencies()
-                .await
-                .wrap_err("syncing dependencies with the project lockfile failed.")?;
-        }
+        sync_dependencies_if_locked(&project, progress.clone(), &config).await?;
     }
 
     let build_packages = data.build.unwrap_or_default();
@@ -58,22 +41,7 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
         project
             .remove(lua_dependency::DependencyType::Build(build_packages))
             .await?;
-        if let Some(lockfile) = project.try_lockfile()? {
-            let luarocks = LuaRocksInstallation::new(&config)?;
-            let mut lockfile = lockfile.write_guard();
-            let packages = project
-                .toml()
-                .into_local()?
-                .build_dependencies()
-                .current_platform()
-                .clone();
-            Sync::new(luarocks.tree(), &mut lockfile, luarocks.config())
-                .packages(packages)
-                .progress(progress.clone())
-                .sync_build_dependencies()
-                .await
-                .wrap_err("syncing build dependencies with the project lockfile failed.")?;
-        }
+        sync_build_dependencies_if_locked(&project, progress.clone(), &config).await?;
     }
 
     let test_packages = data.test.unwrap_or_default();
@@ -81,22 +49,7 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
         project
             .remove(lua_dependency::DependencyType::Test(test_packages))
             .await?;
-        if let Some(lockfile) = project.try_lockfile()? {
-            let mut lockfile = lockfile.write_guard();
-            let packages = project
-                .toml()
-                .into_local()?
-                .test_dependencies()
-                .current_platform()
-                .clone();
-            let tree = project.test_tree(&config)?;
-            Sync::new(&tree, &mut lockfile, &config)
-                .packages(packages)
-                .progress(progress.clone())
-                .sync_test_dependencies()
-                .await
-                .wrap_err("syncing test dependencies with the project lockfile failed.")?;
-        }
+        sync_test_dependencies_if_locked(&project, progress.clone(), &config).await?;
     }
 
     Ok(())
