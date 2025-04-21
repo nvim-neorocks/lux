@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `lux-cli` - [0.3.8](https://github.com/nvim-neorocks/lux/compare/v0.3.7...v0.3.8) - 2025-04-21
+
+### Added
+- windows msvc toolchain support ([#501](https://github.com/nvim-neorocks/lux/pull/501))
+- `lx generate-rockspec`
+
+### Fixed
+- lockfile entries removed after `lx add` ([#617](https://github.com/nvim-neorocks/lux/pull/617))
+
+## `lux-lib` - [0.3.8](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.3.7...lux-lib-v0.3.8) - 2025-04-21
+
+### Added
+- windows msvc toolchain support ([#501](https://github.com/nvim-neorocks/lux/pull/501))
+
+### Fixed
+- *(manifest)* re-download if corrupted
+
+### Other
+- update flake.lock ([#615](https://github.com/nvim-neorocks/lux/pull/615))
+
 ## `lux-cli` - [0.3.7](https://github.com/nvim-neorocks/lux/compare/v0.3.6...v0.3.7) - 2025-04-16
 
 ### Other
