@@ -132,10 +132,15 @@ mod tests {
     }
 
     #[test]
-    fn empty_string() {
+    fn substitute_with_empty_string() {
         assert_eq!(
             substitute(&[&TestVariables], "$(EMPTY_STRING)").unwrap(),
             "".to_string()
         );
+    }
+
+    #[test]
+    fn substitute_empty_string() {
+        assert_eq!(substitute(&[&TestVariables], "").unwrap(), "".to_string());
     }
 }

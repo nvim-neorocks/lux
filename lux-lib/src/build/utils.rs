@@ -112,14 +112,13 @@ pub(crate) fn compile_c_files(
         .files(files)
         .host(std::env::consts::OS)
         .include(&lua.include_dir)
-        .opt_level(2)
+        .opt_level(3)
         .out_dir(intermediate_dir)
         .target(&host.to_string());
 
     let compiler = build.try_get_compiler()?;
-    let is_msvc = compiler.is_like_msvc();
     // Suppress all warnings
-    if is_msvc {
+    if compiler.is_like_msvc() {
         build.flag("-W0");
     } else {
         build.flag("-w");
@@ -139,7 +138,7 @@ pub(crate) fn compile_c_files(
         let def_file = mk_def_file(def_temp_dir, &file, target_module)?;
         compiler
             .to_command()
-            .arg("/nologo")
+            .arg("/NOLOGO")
             .args(&objects)
             .arg("/LD")
             .arg("/link")
@@ -277,7 +276,7 @@ pub(crate) fn compile_c_modules(
         .host(std::env::consts::OS)
         .includes(&include_dirs)
         .include(&lua.include_dir)
-        .opt_level(2)
+        .opt_level(3)
         .out_dir(intermediate_dir)
         .target(&host.to_string());
 
@@ -332,7 +331,7 @@ pub(crate) fn compile_c_modules(
         build
             .try_get_compiler()?
             .to_command()
-            .arg("/nologo")
+            .arg("/NOLOGO")
             .args(&objects)
             .arg("/LD")
             .arg("/link")
