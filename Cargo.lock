@@ -4003,9 +4003,9 @@ dependencies = [
 
 [[package]]
 name = "stylua"
-version = "2.0.0"
+version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e6386373b2654c462c85eaa879760c840cbfeac62dbb754d602dadc3d246206"
+checksum = "58c31c25dd76d1830e698ebfde219c105890504da85eb53acb7d446682712359"
 dependencies = [
  "anyhow",
  "cfg-if",
