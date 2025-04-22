@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `lux-cli` - [0.3.9](https://github.com/nvim-neorocks/lux/compare/v0.3.8...v0.3.9) - 2025-04-22
+
+### Other
+- *(deps)* bump stylua from 2.0.0 to 2.0.2 ([#619](https://github.com/nvim-neorocks/lux/pull/619))
+
 ## `lux-cli` - [0.3.8](https://github.com/nvim-neorocks/lux/compare/v0.3.7...v0.3.8) - 2025-04-21
 
 ### Added

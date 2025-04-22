@@ -1,6 +1,6 @@
 [package]
 name = "lux-cli"
-version = "0.3.8"
+version = "0.3.9"
 description = "A luxurious package manager for Lua"
 authors = ["vhyrro <vhyrro@gmail.com>", "mrcjkb <marc@jakobi.dev>"]
 homepage = "https://github.com/nvim-neorocks/lux"
