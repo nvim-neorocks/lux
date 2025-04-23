@@ -122,18 +122,17 @@ impl FromStr for PackageVersion {
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         let (modrev, specrev) = split_specrev(text)?;
-        if is_dev_version_str(modrev) {
-            return Ok(PackageVersion::DevVer(DevVer {
+        match parse_version(modrev) {
+            Ok(version) => Ok(PackageVersion::SemVer(SemVer {
+                component_count: cmp::min(text.chars().filter(|c| *c == '.').count() + 1, 3),
+                version,
+                specrev,
+            })),
+            Err(_) => Ok(PackageVersion::DevVer(DevVer {
                 modrev: modrev.into(),
                 specrev,
-            }));
+            })),
         }
-
-        Ok(PackageVersion::SemVer(SemVer {
-            component_count: cmp::min(text.chars().filter(|c| *c == '.').count() + 1, 3),
-            version: parse_version(modrev)?,
-            specrev,
-        }))
     }
 }
 
@@ -340,11 +339,10 @@ impl FromStr for PackageVersionReq {
 
         let trimmed = text.trim_start_matches('=').trim_start_matches('@').trim();
 
-        if is_dev_version_str(trimmed) {
-            return Ok(PackageVersionReq::Dev(trimmed.to_string()));
+        match parse_version_req(&text) {
+            Ok(_) => Ok(PackageVersionReq::SemVer(parse_version_req(&text)?)),
+            Err(_) => Ok(PackageVersionReq::Dev(trimmed.to_string())),
         }
-
-        Ok(PackageVersionReq::SemVer(parse_version_req(&text)?))
     }
 }
 
@@ -354,7 +352,7 @@ fn correct_version_req_str(text: &str) -> String {
         .into_iter()
         .map(|(is_version_str, chars)| (is_version_str, chars.collect::<String>()))
         .map(|(is_version_str, chunk)| {
-            if is_version_str && !is_dev_version_str(&chunk) {
+            if is_version_str && !is_known_dev_version_str(&chunk) {
                 let version_str = trim_specrev(&chunk);
                 correct_prerelease_version_string(version_str)
             } else {
@@ -410,7 +408,7 @@ fn split_specrev(version_str: &str) -> Result<(&str, u16), SpecrevParseError> {
     }
 }
 
-fn is_dev_version_str(text: &str) -> bool {
+fn is_known_dev_version_str(text: &str) -> bool {
     matches!(text, "dev" | "scm" | "git")
 }
 
@@ -683,5 +681,11 @@ mod tests {
 
         let req = PackageVersionReq::parse("scm").unwrap();
         assert_eq!(req.to_string(), "==scm");
+
+        let req = PackageVersionReq::parse("==a144124839f027a2d0a95791936c478d047126fc").unwrap();
+        assert_eq!(
+            req.to_string(),
+            "==a144124839f027a2d0a95791936c478d047126fc"
+        );
     }
 }
