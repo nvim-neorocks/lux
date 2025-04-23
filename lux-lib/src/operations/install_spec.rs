@@ -1,6 +1,7 @@
 use crate::{
     build::BuildBehaviour,
     lockfile::{LockConstraint, OptState, PinnedState},
+    lua_rockspec::RockSourceSpec,
     package::PackageReq,
     tree,
 };
@@ -16,6 +17,7 @@ pub struct PackageInstallSpec {
     /// Optional constraint, carried over from a previous install,
     /// e.g. defined in a lockfile.
     pub(crate) constraint: Option<LockConstraint>,
+    pub(crate) source: Option<RockSourceSpec>,
 }
 
 impl PackageInstallSpec {
@@ -26,6 +28,7 @@ impl PackageInstallSpec {
         opt: OptState,
         entry_type: tree::EntryType,
         constraint: Option<LockConstraint>,
+        source: Option<RockSourceSpec>,
     ) -> Self {
         Self {
             package,
@@ -34,6 +37,7 @@ impl PackageInstallSpec {
             opt,
             entry_type,
             constraint,
+            source,
         }
     }
 }

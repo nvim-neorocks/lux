@@ -133,6 +133,7 @@ Reinstall?
                         package.opt(),
                         tree::EntryType::DependencyOnly,
                         Some(package.constraint()),
+                        None,
                     )
                 })
                 .collect_vec();

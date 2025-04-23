@@ -81,6 +81,7 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
                             OptState::default(),
                             tree::EntryType::Entrypoint,
                             None,
+                            None,
                         ))
                         .progress(progress)
                         .install()

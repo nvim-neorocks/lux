@@ -53,6 +53,7 @@ pub fn apply_build_behaviour(
                     OptState::Required,
                     tree::EntryType::Entrypoint,
                     None,
+                    None,
                 )
             })
         })

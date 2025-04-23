@@ -68,6 +68,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                     *dep.opt(),
                     tree::EntryType::Entrypoint,
                     None,
+                    None,
                 )
             });
 
@@ -91,6 +92,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                     *dep.pin(),
                     *dep.opt(),
                     tree::EntryType::Entrypoint,
+                    None,
                     None,
                 )
             })

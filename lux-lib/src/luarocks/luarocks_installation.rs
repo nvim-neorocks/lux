@@ -232,6 +232,7 @@ impl LuaRocksInstallation {
                 OptState::default(),
                 tree::EntryType::Entrypoint,
                 None,
+                None,
             )
         })
         .collect_vec();

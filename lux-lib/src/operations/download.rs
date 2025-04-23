@@ -11,12 +11,16 @@ use url::{ParseError, Url};
 use crate::{
     config::Config,
     lockfile::RemotePackageSourceUrl,
-    lua_rockspec::{LuaRockspecError, RemoteLuaRockspec},
+    lua_rockspec::{GitSource, LuaRockspecError, RemoteLuaRockspec, RockSourceSpec},
     luarocks,
-    package::{PackageName, PackageReq, PackageSpec, PackageVersion, RemotePackageTypeFilterSpec},
+    package::{
+        PackageName, PackageReq, PackageSpec, PackageSpecFromPackageReqError, PackageVersion,
+        RemotePackageTypeFilterSpec,
+    },
     progress::{Progress, ProgressBar},
     remote_package_db::{RemotePackageDB, RemotePackageDBError, SearchError},
     remote_package_source::RemotePackageSource,
+    rockspec::Rockspec,
 };
 
 /// Builder for a rock downloader.
@@ -158,6 +162,31 @@ impl RemoteRockDownload {
             } => rockspec_download,
         }
     }
+    // Instead of downloading a rockspec, generate one from a `PackageReq` and a `RockSourceSpec`.
+    pub(crate) fn from_package_req_and_source_spec(
+        package_req: PackageReq,
+        source_spec: RockSourceSpec,
+    ) -> Result<Self, SearchAndDownloadError> {
+        let package_spec = package_req.try_into()?;
+        let source_url = Some(match &source_spec {
+            RockSourceSpec::Git(GitSource { url, checkout_ref }) => RemotePackageSourceUrl::Git {
+                url: url.to_string(),
+                checkout_ref: checkout_ref
+                    .clone()
+                    .ok_or(SearchAndDownloadError::MissingCheckoutRef(url.to_string()))?,
+            },
+            RockSourceSpec::File(path) => RemotePackageSourceUrl::File { path: path.clone() },
+            RockSourceSpec::Url(url) => RemotePackageSourceUrl::Url { url: url.clone() },
+        });
+        let rockspec = RemoteLuaRockspec::from_package_and_source_spec(package_spec, source_spec);
+        let rockspec_content = rockspec.to_lua_rockspec_string();
+        let rockspec_download = DownloadedRockspec {
+            rockspec,
+            source_url,
+            source: RemotePackageSource::RockspecContent(rockspec_content),
+        };
+        Ok(Self::RockspecOnly { rockspec_download })
+    }
 }
 
 #[derive(Error, Debug)]
@@ -294,6 +323,10 @@ pub enum SearchAndDownloadError {
     Zip(#[from] zip::result::ZipError),
     #[error("{0} not found in the packed rock.")]
     RockspecNotFoundInPackedRock(String),
+    #[error(transparent)]
+    PackageSpecFromPackageReq(#[from] PackageSpecFromPackageReqError),
+    #[error("git source {0} without a revision or tag.")]
+    MissingCheckoutRef(String),
 }
 
 async fn search_and_download_src_rock(

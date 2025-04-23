@@ -27,7 +27,7 @@ use url::Url;
 use crate::{
     config::{LuaVersion, LuaVersionUnset},
     hash::HasIntegrity,
-    package::{PackageName, PackageVersion},
+    package::{PackageName, PackageSpec, PackageVersion},
     project::ProjectRoot,
     rockspec::{lua_dependency::LuaDependencySpec, Rockspec},
 };
@@ -123,10 +123,7 @@ impl LocalLuaRockspec {
             source: globals
                 .get::<Option<PerPlatform<RemoteRockSource>>>("source")?
                 .unwrap_or_else(|| {
-                    PerPlatform::new(RemoteRockSource {
-                        local: LocalRockSource::default(),
-                        source_spec: RockSourceSpec::File(project_root.to_path_buf()),
-                    })
+                    PerPlatform::new(RockSourceSpec::File(project_root.to_path_buf()).into())
                 }),
         };
 
@@ -290,6 +287,56 @@ impl RemoteLuaRockspec {
         };
 
         Ok(rockspec)
+    }
+
+    pub fn from_package_and_source_spec(
+        package_spec: PackageSpec,
+        source_spec: RockSourceSpec,
+    ) -> Self {
+        let version = package_spec.version().clone();
+        let rockspec_format: RockspecFormat = "3.0".into();
+        let raw_content = format!(
+            r#"
+rockspec_format = "{}"
+package = "{}"
+version = "{}"
+{}
+build = {{
+  type = "copy-everything"
+}}"#,
+            &rockspec_format,
+            package_spec.name(),
+            &version,
+            &source_spec.display_lua(),
+        );
+
+        let source: RemoteRockSource = source_spec.into();
+
+        let local = LocalLuaRockspec {
+            rockspec_format: Some(rockspec_format),
+            package: package_spec.name().clone(),
+            version,
+            description: RockDescription::default(),
+            supported_platforms: PlatformSupport::default(),
+            dependencies: PerPlatform::default(),
+            build_dependencies: PerPlatform::default(),
+            external_dependencies: PerPlatform::default(),
+            test_dependencies: PerPlatform::default(),
+            build: PerPlatform::new(BuildSpec {
+                build_backend: Some(BuildBackendSpec::CopyEverything),
+                install: InstallSpec::default(),
+                copy_directories: Vec::new(),
+                patches: HashMap::new(),
+            }),
+            source: PerPlatform::new(source.clone()),
+            test: PerPlatform::default(),
+            deploy: PerPlatform::default(),
+            raw_content,
+        };
+        Self {
+            local,
+            source: PerPlatform::new(source),
+        }
     }
 }
 
@@ -1552,5 +1599,22 @@ mod tests {
                 header: Some("openssl/ssl.h".into()),
             }
         );
+    }
+
+    #[tokio::test]
+    pub async fn remote_lua_rockspec_from_package_and_source_spec() {
+        let package_req = "foo@1.0.5".parse().unwrap();
+        let source = GitSource {
+            url: "https://hub.com/example-project.git".parse().unwrap(),
+            checkout_ref: Some("1.0.5".into()),
+        };
+        let source_spec = RockSourceSpec::Git(source);
+        let rockspec =
+            RemoteLuaRockspec::from_package_and_source_spec(package_req, source_spec.clone());
+        let generated_rockspec_str = dbg!(rockspec.local.raw_content);
+        let rockspec2 = RemoteLuaRockspec::new(&generated_rockspec_str).unwrap();
+        assert_eq!(rockspec2.local.package, "foo".into());
+        assert_eq!(rockspec2.local.version, "1.0.5".parse().unwrap());
+        assert_eq!(rockspec2.local.source, PerPlatform::new(source_spec.into()));
     }
 }

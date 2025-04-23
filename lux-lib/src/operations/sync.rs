@@ -172,6 +172,7 @@ async fn do_sync(
                 pkg.opt(),
                 entry_type,
                 Some(pkg.constraint()),
+                None,
             )
         })
         .collect_vec();
@@ -229,6 +230,7 @@ async fn do_sync(
                 *pkg.pin(),
                 *pkg.opt(),
                 tree::EntryType::Entrypoint,
+                None,
                 None,
             )
         });

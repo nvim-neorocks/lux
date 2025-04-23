@@ -10,6 +10,7 @@ mod version;
 pub use outdated::*;
 pub use version::{
     PackageVersion, PackageVersionParseError, PackageVersionReq, PackageVersionReqError,
+    VersionReqToVersionError,
 };
 
 use crate::{
@@ -18,6 +19,15 @@ use crate::{
     remote_package_source::RemotePackageSource,
     rockspec::lua_dependency::LuaDependencySpec,
 };
+
+#[derive(Debug, Error)]
+pub enum PackageSpecFromPackageReqError {
+    #[error("invalid version for rock {rock}: {err}")]
+    Version {
+        rock: PackageName,
+        err: VersionReqToVersionError,
+    },
+}
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]
@@ -47,6 +57,21 @@ impl PackageSpec {
             name: self.name,
             version_req: self.version.into_version_req(),
         }
+    }
+}
+
+impl TryFrom<PackageReq> for PackageSpec {
+    type Error = PackageSpecFromPackageReqError;
+
+    fn try_from(value: PackageReq) -> Result<Self, Self::Error> {
+        let name = value.name;
+        let version = value.version_req.try_into().map_err(|err| {
+            PackageSpecFromPackageReqError::Version {
+                rock: name.clone(),
+                err,
+            }
+        })?;
+        Ok(Self { name, version })
     }
 }
 

@@ -24,6 +24,15 @@ pub struct RemoteRockSource {
     pub source_spec: RockSourceSpec,
 }
 
+impl From<RockSourceSpec> for RemoteRockSource {
+    fn from(source_spec: RockSourceSpec) -> Self {
+        Self {
+            local: LocalRockSource::default(),
+            source_spec,
+        }
+    }
+}
+
 impl UserData for RemoteRockSource {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("source_spec", |_, this, _: ()| Ok(this.source_spec.clone()));
@@ -155,6 +164,36 @@ impl<'de> Deserialize<'de> for RockSourceSpec {
     }
 }
 
+impl DisplayAsLuaKV for RockSourceSpec {
+    fn display_lua(&self) -> DisplayLuaKV {
+        match self {
+            RockSourceSpec::Git(git_source) => git_source.display_lua(),
+            RockSourceSpec::File(path) => {
+                let mut source_tbl = Vec::new();
+                source_tbl.push(DisplayLuaKV {
+                    key: "url".to_string(),
+                    value: DisplayLuaValue::String(format!("file:://{}", path.display())),
+                });
+                DisplayLuaKV {
+                    key: "source".to_string(),
+                    value: DisplayLuaValue::Table(source_tbl),
+                }
+            }
+            RockSourceSpec::Url(url) => {
+                let mut source_tbl = Vec::new();
+                source_tbl.push(DisplayLuaKV {
+                    key: "url".to_string(),
+                    value: DisplayLuaValue::String(format!("{}", url)),
+                });
+                DisplayLuaKV {
+                    key: "source".to_string(),
+                    value: DisplayLuaValue::Table(source_tbl),
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct GitSource {
     pub url: GitUrl,
@@ -167,6 +206,28 @@ impl UserData for GitSource {
         methods.add_method("checkout_ref", |_, this, _: ()| {
             Ok(this.checkout_ref.clone())
         });
+    }
+}
+
+impl DisplayAsLuaKV for GitSource {
+    fn display_lua(&self) -> DisplayLuaKV {
+        let mut source_tbl = Vec::new();
+        source_tbl.push(DisplayLuaKV {
+            key: "url".to_string(),
+            value: DisplayLuaValue::String(format!("{}", self.url)),
+        });
+        if let Some(checkout_ref) = &self.checkout_ref {
+            source_tbl.push(DisplayLuaKV {
+                // branches are not reproducible, so we will only ever generate tags.
+                // lux can also fetch revisions.
+                key: "tag".to_string(),
+                value: DisplayLuaValue::String(checkout_ref.to_string()),
+            });
+        }
+        DisplayLuaKV {
+            key: "source".to_string(),
+            value: DisplayLuaValue::Table(source_tbl),
+        }
     }
 }
 
@@ -319,6 +380,7 @@ impl FromStr for SourceUrl {
             {
                 Ok(Self::Git(s.trim_start_matches("git+").parse()?))
             }
+            s if s.ends_with(".git") => Ok(Self::Git(s.parse()?)),
             s if starts_with_any(s, ["https://", "http://", "ftp://"].into()) => {
                 Ok(Self::Url(s.parse().map_err(SourceUrlError::Url)?))
             }

@@ -225,6 +225,39 @@ async fn run_build<R: Rockspec + HasIntegrity>(
             Some(BuildBackendSpec::LuaRock(_)) => {
                 luarocks::build(rockspec, output_paths, lua, config, build_dir, progress).await?
             }
+            Some(BuildBackendSpec::CopyEverything) => {
+                let mut src_dir = build_dir.join("src");
+                if !src_dir.is_dir() {
+                    src_dir = build_dir.join("lua");
+                }
+                recursive_copy_dir(&src_dir, &output_paths.src)?;
+                recursive_copy_doc_dir(output_paths, build_dir)?;
+                for subdirectory in std::fs::read_dir(build_dir)?
+                    .filter_map(Result::ok)
+                    .filter_map(|entry| {
+                        let path = entry.path();
+                        if path.is_dir()
+                            && path.file_name().is_some_and(|name| {
+                                !matches!(
+                                    name.to_string_lossy().to_string().as_str(),
+                                    "lua" | "src" | "doc" | "docs"
+                                )
+                            })
+                        {
+                            path.file_name()
+                                .map(|name| name.to_string_lossy().to_string())
+                        } else {
+                            None
+                        }
+                    })
+                {
+                    recursive_copy_dir(
+                        &build_dir.join(&subdirectory),
+                        &output_paths.etc.join(&subdirectory),
+                    )?;
+                }
+                BuildInfo::default()
+            }
             None => BuildInfo::default(),
         },
     )

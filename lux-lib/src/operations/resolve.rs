@@ -64,6 +64,7 @@ where
                      opt,
                      entry_type,
                      constraint,
+                     source,
                  }| {
                     let config = config.clone();
                     let tx = tx.clone();
@@ -74,10 +75,17 @@ where
                     tokio::spawn(async move {
                         let bar = progress.map(|p| p.new_bar());
 
-                        let downloaded_rock = Download::new(&package, &config, &bar)
-                            .package_db(&package_db)
-                            .download_remote_rock()
-                            .await?;
+                        let downloaded_rock = if let Some(source) = source {
+                            RemoteRockDownload::from_package_req_and_source_spec(
+                                package.clone(),
+                                source,
+                            )?
+                        } else {
+                            Download::new(&package, &config, &bar)
+                                .package_db(&package_db)
+                                .download_remote_rock()
+                                .await?
+                        };
 
                         let constraint = constraint.unwrap_or(package.version_req().clone().into());
 
@@ -107,6 +115,7 @@ where
                                     pin,
                                     opt,
                                     entry_type,
+                                    None,
                                     None,
                                 )
                             })

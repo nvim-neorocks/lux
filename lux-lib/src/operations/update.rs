@@ -330,5 +330,6 @@ fn mk_install_spec(
         package.opt(),
         entry_type,
         None,
+        None,
     )
 }

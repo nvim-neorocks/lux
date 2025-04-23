@@ -123,6 +123,7 @@ pub async fn install_command(command: &str, config: &Config) -> Result<(), Insta
         OptState::default(),
         tree::EntryType::Entrypoint,
         None,
+        None,
     );
     Install::new(&config.tree(LuaVersion::from(config)?)?, config)
         .package(install_spec)

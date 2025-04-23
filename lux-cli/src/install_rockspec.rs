@@ -70,6 +70,7 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
                 OptState::Required,
                 tree::EntryType::DependencyOnly,
                 None,
+                None,
             )
         });
 
