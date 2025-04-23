@@ -2190,7 +2190,7 @@ dependencies = [
 
 [[package]]
 name = "lux-cli"
-version = "0.3.9"
+version = "0.3.10"
 dependencies = [
  "assert_fs",
  "clap 4.5.23",
