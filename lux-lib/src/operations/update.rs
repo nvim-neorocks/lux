@@ -5,7 +5,6 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use crate::{
-    build::BuildBehaviour,
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{
         LocalPackage, LocalPackageLockType, Lockfile, PinnedState, ProjectLockfile, ReadOnly,
@@ -323,13 +322,8 @@ fn mk_install_spec(
     } else {
         tree::EntryType::DependencyOnly
     };
-    PackageInstallSpec::new(
-        req.clone(),
-        BuildBehaviour::default(),
-        PinnedState::Unpinned,
-        package.opt(),
-        entry_type,
-        None,
-        None,
-    )
+    PackageInstallSpec::new(req.clone(), entry_type)
+        .pin(PinnedState::Unpinned)
+        .opt(package.opt())
+        .build()
 }

@@ -109,15 +109,11 @@ where
                                     tree::EntryType::DependencyOnly
                                 };
 
-                                PackageInstallSpec::new(
-                                    dep.package_req().clone(),
-                                    build_behaviour,
-                                    pin,
-                                    opt,
-                                    entry_type,
-                                    None,
-                                    None,
-                                )
+                                PackageInstallSpec::new(dep.package_req().clone(), entry_type)
+                                    .build_behaviour(build_behaviour)
+                                    .pin(pin)
+                                    .opt(opt)
+                                    .build()
                             })
                             .collect_vec();
 

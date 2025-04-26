@@ -61,15 +61,10 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                     .is_ok_and(|rock_match| !rock_match.is_found())
             })
             .map(|dep| {
-                PackageInstallSpec::new(
-                    dep.clone().into_package_req(),
-                    BuildBehaviour::default(),
-                    *dep.pin(),
-                    *dep.opt(),
-                    tree::EntryType::Entrypoint,
-                    None,
-                    None,
-                )
+                PackageInstallSpec::new(dep.clone().into_package_req(), tree::EntryType::Entrypoint)
+                    .pin(*dep.pin())
+                    .opt(*dep.opt())
+                    .build()
             });
 
         Install::new(&tree, &config)
@@ -86,15 +81,10 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                     .is_ok_and(|rock_match| !rock_match.is_found())
             })
             .map(|dep| {
-                PackageInstallSpec::new(
-                    dep.clone().into_package_req(),
-                    BuildBehaviour::default(),
-                    *dep.pin(),
-                    *dep.opt(),
-                    tree::EntryType::Entrypoint,
-                    None,
-                    None,
-                )
+                PackageInstallSpec::new(dep.clone().into_package_req(), tree::EntryType::Entrypoint)
+                    .pin(*dep.pin())
+                    .opt(*dep.opt())
+                    .build()
             })
             .collect_vec();
 

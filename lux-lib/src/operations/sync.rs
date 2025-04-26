@@ -165,15 +165,12 @@ async fn do_sync(
         .iter()
         .cloned()
         .map(|(entry_type, pkg)| {
-            PackageInstallSpec::new(
-                pkg.clone().into_package_req(),
-                BuildBehaviour::Force,
-                pkg.pinned(),
-                pkg.opt(),
-                entry_type,
-                Some(pkg.constraint()),
-                None,
-            )
+            PackageInstallSpec::new(pkg.clone().into_package_req(), entry_type)
+                .build_behaviour(BuildBehaviour::Force)
+                .pin(pkg.pinned())
+                .opt(pkg.opt())
+                .constraint(pkg.constraint())
+                .build()
         })
         .collect_vec();
     report
@@ -224,15 +221,11 @@ async fn do_sync(
     if !package_sync_spec.to_add.is_empty() {
         // Install missing packages using the default package_db.
         let missing_packages = package_sync_spec.to_add.into_iter().map(|pkg| {
-            PackageInstallSpec::new(
-                pkg.package_req().clone(),
-                BuildBehaviour::Force,
-                *pkg.pin(),
-                *pkg.opt(),
-                tree::EntryType::Entrypoint,
-                None,
-                None,
-            )
+            PackageInstallSpec::new(pkg.package_req().clone(), tree::EntryType::Entrypoint)
+                .build_behaviour(BuildBehaviour::Force)
+                .pin(*pkg.pin())
+                .opt(*pkg.opt())
+                .build()
         });
 
         let added = Install::new(args.tree, args.config)

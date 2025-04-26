@@ -45,16 +45,12 @@ pub fn apply_build_behaviour(
             } else {
                 None
             };
-            build_behaviour.map(|it| {
-                PackageInstallSpec::new(
-                    req,
-                    it,
-                    pin,
-                    OptState::Required,
-                    tree::EntryType::Entrypoint,
-                    None,
-                    None,
-                )
+            build_behaviour.map(|build_behaviour| {
+                PackageInstallSpec::new(req, tree::EntryType::Entrypoint)
+                    .build_behaviour(build_behaviour)
+                    .pin(pin)
+                    .opt(OptState::Required)
+                    .build()
             })
         })
         .collect())

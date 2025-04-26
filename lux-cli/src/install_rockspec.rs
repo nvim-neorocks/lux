@@ -63,15 +63,11 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
                 .is_ok_and(|rock_match| rock_match.is_found())
         })
         .map(|dep| {
-            PackageInstallSpec::new(
-                dep.package_req().clone(),
-                BuildBehaviour::NoForce,
-                pin,
-                OptState::Required,
-                tree::EntryType::DependencyOnly,
-                None,
-                None,
-            )
+            PackageInstallSpec::new(dep.package_req().clone(), tree::EntryType::DependencyOnly)
+                .build_behaviour(BuildBehaviour::NoForce)
+                .pin(pin)
+                .opt(OptState::Required)
+                .build()
         });
 
     Install::new(&tree, &config)

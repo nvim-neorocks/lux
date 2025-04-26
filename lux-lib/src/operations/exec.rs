@@ -1,9 +1,7 @@
 use std::{io, process::Command};
 
 use crate::{
-    build::BuildBehaviour,
     config::{Config, LuaVersion, LuaVersionUnset},
-    lockfile::{OptState, PinnedState},
     lua_rockspec::LuaVersionError,
     operations::Install,
     package::{PackageReq, PackageVersionReqError},
@@ -118,13 +116,9 @@ pub enum InstallCmdError {
 pub async fn install_command(command: &str, config: &Config) -> Result<(), InstallCmdError> {
     let install_spec = PackageInstallSpec::new(
         PackageReq::new(command.into(), None)?,
-        BuildBehaviour::default(),
-        PinnedState::default(),
-        OptState::default(),
         tree::EntryType::Entrypoint,
-        None,
-        None,
-    );
+    )
+    .build();
     Install::new(&config.tree(LuaVersion::from(config)?)?, config)
         .package(install_spec)
         .install()

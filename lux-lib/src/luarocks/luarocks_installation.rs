@@ -13,9 +13,9 @@ use tempdir::TempDir;
 use thiserror::Error;
 
 use crate::{
-    build::{Build, BuildBehaviour, BuildError},
+    build::{Build, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
-    lockfile::{LocalPackage, LocalPackageId, OptState, PinnedState},
+    lockfile::{LocalPackage, LocalPackageId},
     lua_installation::LuaInstallation,
     lua_rockspec::RockspecFormat,
     operations::{get_all_dependencies, PackageInstallSpec, SearchAndDownloadError, UnpackError},
@@ -224,17 +224,7 @@ impl LuaRocksInstallation {
             _ => rocks.build_dependencies().current_platform().to_vec(),
         }
         .into_iter()
-        .map(|dep| {
-            PackageInstallSpec::new(
-                dep.package_req,
-                BuildBehaviour::default(),
-                PinnedState::default(),
-                OptState::default(),
-                tree::EntryType::Entrypoint,
-                None,
-                None,
-            )
-        })
+        .map(|dep| PackageInstallSpec::new(dep.package_req, tree::EntryType::Entrypoint).build())
         .collect_vec();
 
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();

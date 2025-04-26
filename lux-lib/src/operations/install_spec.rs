@@ -1,3 +1,5 @@
+use bon::Builder;
+
 use crate::{
     build::BuildBehaviour,
     lockfile::{LockConstraint, OptState, PinnedState},
@@ -7,37 +9,21 @@ use crate::{
 };
 
 /// Specifies how to install a package
-#[derive(Debug)]
+#[derive(Debug, Builder)]
+#[builder(start_fn = new, finish_fn(name = build, vis = "pub"))]
 pub struct PackageInstallSpec {
+    #[builder(start_fn)]
     pub(crate) package: PackageReq,
-    pub(crate) build_behaviour: BuildBehaviour,
-    pub(crate) pin: PinnedState,
-    pub(crate) opt: OptState,
+    #[builder(start_fn)]
     pub(crate) entry_type: tree::EntryType,
+    #[builder(default)]
+    pub(crate) build_behaviour: BuildBehaviour,
+    #[builder(default)]
+    pub(crate) pin: PinnedState,
+    #[builder(default)]
+    pub(crate) opt: OptState,
     /// Optional constraint, carried over from a previous install,
     /// e.g. defined in a lockfile.
     pub(crate) constraint: Option<LockConstraint>,
     pub(crate) source: Option<RockSourceSpec>,
-}
-
-impl PackageInstallSpec {
-    pub fn new(
-        package: PackageReq,
-        build_behaviour: BuildBehaviour,
-        pin: PinnedState,
-        opt: OptState,
-        entry_type: tree::EntryType,
-        constraint: Option<LockConstraint>,
-        source: Option<RockSourceSpec>,
-    ) -> Self {
-        Self {
-            package,
-            build_behaviour,
-            pin,
-            opt,
-            entry_type,
-            constraint,
-            source,
-        }
-    }
 }

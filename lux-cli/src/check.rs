@@ -1,8 +1,6 @@
 use eyre::{OptionExt, Result};
 use lux_lib::{
-    build::BuildBehaviour,
     config::Config,
-    lockfile::{OptState, PinnedState},
     operations::{Exec, Install, PackageInstallSpec},
     progress::MultiProgress,
     project::Project,
@@ -12,15 +10,8 @@ use lux_lib::{
 pub async fn check(config: Config) -> Result<()> {
     let project = Project::current()?.ok_or_eyre("Not in a project!")?;
 
-    let luacheck = PackageInstallSpec::new(
-        "luacheck".parse()?,
-        BuildBehaviour::default(),
-        PinnedState::default(),
-        OptState::default(),
-        tree::EntryType::Entrypoint,
-        None,
-        None,
-    );
+    let luacheck =
+        PackageInstallSpec::new("luacheck".parse()?, tree::EntryType::Entrypoint).build();
 
     Install::new(&project.tree(&config)?, &config)
         .package(luacheck)

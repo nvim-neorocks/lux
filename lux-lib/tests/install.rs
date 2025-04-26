@@ -1,8 +1,6 @@
 use assert_fs::TempDir;
 use lux_lib::{
-    build::BuildBehaviour,
     config::{ConfigBuilder, LuaVersion},
-    lockfile::{OptState, PinnedState},
     lua_installation::get_installed_lua_version,
     lua_rockspec::{GitSource, RockSourceSpec},
     operations::{Install, PackageInstallSpec},
@@ -12,20 +10,15 @@ use lux_lib::{
 #[tokio::test]
 async fn install_git_package() {
     let dir = TempDir::new().unwrap();
-    let install_spec = PackageInstallSpec::new(
-        "rustaceanvim@6.0.3".parse().unwrap(),
-        BuildBehaviour::default(),
-        PinnedState::default(),
-        OptState::default(),
-        EntryType::Entrypoint,
-        None,
-        Some(RockSourceSpec::Git(GitSource {
-            url: "https://github.com/mrcjkb/rustaceanvim.git"
-                .parse()
-                .unwrap(),
-            checkout_ref: Some("v6.0.3".into()),
-        })),
-    );
+    let install_spec =
+        PackageInstallSpec::new("rustaceanvim@6.0.3".parse().unwrap(), EntryType::Entrypoint)
+            .source(RockSourceSpec::Git(GitSource {
+                url: "https://github.com/mrcjkb/rustaceanvim.git"
+                    .parse()
+                    .unwrap(),
+                checkout_ref: Some("v6.0.3".into()),
+            }))
+            .build();
 
     let lua_version = get_installed_lua_version("lua")
         .ok()

@@ -3,7 +3,6 @@ use std::{io, ops::Deref, process::Command, sync::Arc};
 use crate::{
     build::BuildBehaviour,
     config::Config,
-    lockfile::{OptState, PinnedState},
     package::{PackageName, PackageReq, PackageVersionReqError},
     path::{Paths, PathsError},
     progress::{MultiProgress, Progress},
@@ -202,15 +201,7 @@ pub async fn ensure_busted(
     let busted_req = PackageReq::new("busted".into(), None)?;
 
     if !tree.match_rocks(&busted_req)?.is_found() {
-        let install_spec = PackageInstallSpec::new(
-            busted_req,
-            BuildBehaviour::default(),
-            PinnedState::default(),
-            OptState::default(),
-            tree::EntryType::Entrypoint,
-            None,
-            None,
-        );
+        let install_spec = PackageInstallSpec::new(busted_req, tree::EntryType::Entrypoint).build();
         Install::new(tree, config)
             .package(install_spec)
             .progress(progress)
@@ -246,15 +237,11 @@ async fn ensure_dependencies(
                 None
             };
             build_behaviour.map(|build_behaviour| {
-                PackageInstallSpec::new(
-                    dep.package_req().clone(),
-                    build_behaviour,
-                    *dep.pin(),
-                    *dep.opt(),
-                    tree::EntryType::Entrypoint,
-                    None,
-                    None,
-                )
+                PackageInstallSpec::new(dep.package_req().clone(), tree::EntryType::Entrypoint)
+                    .build_behaviour(build_behaviour)
+                    .pin(*dep.pin())
+                    .opt(*dep.opt())
+                    .build()
             })
         });
 
@@ -279,15 +266,11 @@ async fn ensure_dependencies(
                 None
             };
             build_behaviour.map(|build_behaviour| {
-                PackageInstallSpec::new(
-                    dep.package_req().clone(),
-                    build_behaviour,
-                    *dep.pin(),
-                    *dep.opt(),
-                    tree::EntryType::Entrypoint,
-                    None,
-                    None,
-                )
+                PackageInstallSpec::new(dep.package_req().clone(), tree::EntryType::Entrypoint)
+                    .build_behaviour(build_behaviour)
+                    .pin(*dep.pin())
+                    .opt(*dep.opt())
+                    .build()
             })
         });
 

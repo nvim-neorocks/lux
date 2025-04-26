@@ -128,13 +128,13 @@ Reinstall?
                     let package = unsafe { lockfile.get_unchecked(pkg_id) };
                     PackageInstallSpec::new(
                         package.clone().into_package_req(),
-                        BuildBehaviour::Force,
-                        package.pinned(),
-                        package.opt(),
                         tree::EntryType::DependencyOnly,
-                        Some(package.constraint()),
-                        None,
                     )
+                    .build_behaviour(BuildBehaviour::Force)
+                    .pin(package.pinned())
+                    .opt(package.opt())
+                    .constraint(package.constraint())
+                    .build()
                 })
                 .collect_vec();
             let progress = MultiProgress::new_arc();
