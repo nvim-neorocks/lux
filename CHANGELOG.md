@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `lux-cli` - [0.3.12](https://github.com/nvim-neorocks/lux/compare/v0.3.11...v0.3.12) - 2025-04-27
+
+### Fixed
+- *(cli)* suggest `--no-lock` instead of `--ignore-lockfile`
+
 ## `lux-cli` - [0.3.11](https://github.com/nvim-neorocks/lux/compare/v0.3.10...v0.3.11) - 2025-04-27
 
 ### Fixed
