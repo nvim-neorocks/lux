@@ -493,6 +493,10 @@ impl LocalPackage {
         self.spec.opt()
     }
 
+    pub(crate) fn source(&self) -> &RemotePackageSource {
+        &self.source
+    }
+
     pub fn dependencies(&self) -> Vec<&LocalPackageId> {
         self.spec.dependencies()
     }

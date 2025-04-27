@@ -10,8 +10,9 @@ use url::{ParseError, Url};
 
 use crate::{
     config::Config,
+    git::GitSource,
     lockfile::RemotePackageSourceUrl,
-    lua_rockspec::{GitSource, LuaRockspecError, RemoteLuaRockspec, RockSourceSpec},
+    lua_rockspec::{LuaRockspecError, RemoteLuaRockspec, RockSourceSpec},
     luarocks,
     package::{
         PackageName, PackageReq, PackageSpec, PackageSpecFromPackageReqError, PackageVersion,

@@ -6,7 +6,9 @@ use thiserror::Error;
 
 use crate::{
     lockfile::{OptState, PinnedState},
-    lua_rockspec::{ExternalDependencySpec, PartialOverride, PerPlatform, PlatformOverridable},
+    lua_rockspec::{
+        ExternalDependencySpec, PartialOverride, PerPlatform, PlatformOverridable, RockSourceSpec,
+    },
     package::{PackageName, PackageReq, PackageReqParseError, PackageSpec, PackageVersionReq},
 };
 
@@ -21,16 +23,10 @@ pub struct LuaDependencySpec {
     pub(crate) package_req: PackageReq,
     pub(crate) pin: PinnedState,
     pub(crate) opt: OptState,
+    pub(crate) source: Option<RockSourceSpec>,
 }
 
 impl LuaDependencySpec {
-    pub fn new(package_req: PackageReq, pin: PinnedState, opt: OptState) -> Self {
-        Self {
-            package_req,
-            pin,
-            opt,
-        }
-    }
     pub fn package_req(&self) -> &PackageReq {
         &self.package_req
     }
@@ -39,6 +35,9 @@ impl LuaDependencySpec {
     }
     pub fn opt(&self) -> &OptState {
         &self.opt
+    }
+    pub fn source(&self) -> &Option<RockSourceSpec> {
+        &self.source
     }
     pub fn into_package_req(self) -> PackageReq {
         self.package_req
@@ -60,6 +59,7 @@ impl From<PackageName> for LuaDependencySpec {
             package_req: PackageReq::from(name),
             pin: PinnedState::default(),
             opt: OptState::default(),
+            source: None,
         }
     }
 }
@@ -70,6 +70,7 @@ impl From<PackageReq> for LuaDependencySpec {
             package_req,
             pin: PinnedState::default(),
             opt: OptState::default(),
+            source: None,
         }
     }
 }
@@ -83,6 +84,7 @@ impl FromStr for LuaDependencySpec {
             package_req,
             pin: PinnedState::default(),
             opt: OptState::default(),
+            source: None,
         })
     }
 }
@@ -137,6 +139,7 @@ impl FromLua for LuaDependencySpec {
             package_req,
             pin: PinnedState::default(),
             opt: OptState::default(),
+            source: None,
         })
     }
 }
@@ -151,6 +154,7 @@ impl<'de> Deserialize<'de> for LuaDependencySpec {
             package_req,
             pin: PinnedState::default(),
             opt: OptState::default(),
+            source: None,
         })
     }
 }

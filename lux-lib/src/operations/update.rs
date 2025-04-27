@@ -15,6 +15,7 @@ use crate::{
     progress::{MultiProgress, Progress},
     project::{Project, ProjectError, ProjectTreeError},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
+    remote_package_source::RemotePackageSource,
     rockspec::Rockspec,
     tree::{self, Tree, TreeError},
 };
@@ -308,7 +309,18 @@ fn unpinned_packages(lockfile: &Lockfile<ReadOnly>) -> Vec<(LocalPackage, Packag
     lockfile
         .rocks()
         .values()
-        .filter(|package| package.pinned() == PinnedState::Unpinned)
+        .filter(|package| {
+            package.pinned() == PinnedState::Unpinned
+                && match package.source() {
+                    RemotePackageSource::LuarocksRockspec(_) => true,
+                    RemotePackageSource::LuarocksSrcRock(_) => true,
+                    RemotePackageSource::LuarocksBinaryRock(_) => true,
+                    // We don't support updating git sources for now
+                    RemotePackageSource::RockspecContent(_) => false,
+                    #[cfg(test)]
+                    RemotePackageSource::Test => false,
+                }
+        })
         .map(|package| (package.clone(), package.to_package().into_package_req()))
         .collect_vec()
 }

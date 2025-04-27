@@ -64,6 +64,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                 PackageInstallSpec::new(dep.clone().into_package_req(), tree::EntryType::Entrypoint)
                     .pin(*dep.pin())
                     .opt(*dep.opt())
+                    .maybe_source(dep.source().clone())
                     .build()
             });
 
@@ -84,6 +85,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                 PackageInstallSpec::new(dep.clone().into_package_req(), tree::EntryType::Entrypoint)
                     .pin(*dep.pin())
                     .opt(*dep.opt())
+                    .maybe_source(dep.source().clone())
                     .build()
             })
             .collect_vec();

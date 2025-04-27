@@ -519,6 +519,7 @@ impl Project {
         if let Some(dependencies) = &self.toml().dependencies {
             let packages = dependencies
                 .iter()
+                .filter(|dep| dep.source().is_none()) // We don't support upgrading git sources for now
                 .map(|dep| dep.name())
                 .cloned()
                 .collect_vec();
@@ -528,6 +529,7 @@ impl Project {
         if let Some(dependencies) = &self.toml().build_dependencies {
             let packages = dependencies
                 .iter()
+                .filter(|dep| dep.source().is_none())
                 .map(|dep| dep.name())
                 .cloned()
                 .collect_vec();
@@ -537,6 +539,7 @@ impl Project {
         if let Some(dependencies) = &self.toml().test_dependencies {
             let packages = dependencies
                 .iter()
+                .filter(|dep| dep.source().is_none())
                 .map(|dep| dep.name())
                 .cloned()
                 .collect_vec();

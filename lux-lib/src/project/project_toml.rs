@@ -1,5 +1,7 @@
 //! Structs and utilities for `lux.toml`
 
+use crate::git::shorthand::GitUrlShorthand;
+use crate::git::GitSource;
 use crate::hash::HasIntegrity;
 use crate::lockfile::OptState;
 use crate::lockfile::PinnedState;
@@ -19,6 +21,7 @@ use itertools::Itertools;
 use mlua::ExternalResult;
 use mlua::UserData;
 use nonempty::NonEmpty;
+use serde::de;
 use serde::{Deserialize, Deserializer};
 use ssri::Integrity;
 use thiserror::Error;
@@ -43,6 +46,7 @@ use super::ProjectRoot;
 
 #[derive(Deserialize)]
 #[serde(untagged)]
+#[allow(clippy::large_enum_variant)] // This is ok because it's just a Deserialize helper
 enum DependencyEntry {
     Simple(PackageVersionReq),
     Detailed(DependencyTableEntry),
@@ -55,9 +59,13 @@ struct DependencyTableEntry {
     opt: Option<bool>,
     #[serde(default)]
     pin: Option<bool>,
+    #[serde(default)]
+    git: Option<GitUrlShorthand>,
+    #[serde(default)]
+    rev: Option<String>,
 }
 
-fn parse_map_to_package_vec_opt<'de, D>(
+fn parse_map_to_dependency_vec_opt<'de, D>(
     deserializer: D,
 ) -> Result<Option<Vec<LuaDependencySpec>>, D::Error>
 where
@@ -66,21 +74,52 @@ where
     let packages: Option<HashMap<PackageName, DependencyEntry>> =
         Option::deserialize(deserializer)?;
 
-    Ok(packages.map(|pkgs| {
-        pkgs.into_iter()
-            .map(|(name, spec)| match spec {
-                DependencyEntry::Simple(version_req) => PackageReq { name, version_req }.into(),
-                DependencyEntry::Detailed(entry) => LuaDependencySpec {
-                    package_req: PackageReq {
-                        name,
-                        version_req: entry.version,
-                    },
-                    opt: OptState::from(entry.opt.unwrap_or(false)),
-                    pin: PinnedState::from(entry.pin.unwrap_or(false)),
-                },
-            })
-            .collect()
-    }))
+    match packages {
+        None => Ok(None),
+        Some(packages) => Ok(Some(
+            packages
+                .into_iter()
+                .map(|(name, spec)| match spec {
+                    DependencyEntry::Simple(version_req) => {
+                        Ok(PackageReq { name, version_req }.into())
+                    }
+                    DependencyEntry::Detailed(entry) => {
+                        let source = match (entry.git, entry.rev) {
+                            (None, None) => Ok(None),
+                            (None, Some(_)) => Err(de::Error::custom(format!(
+                                "dependency {} specifies a 'rev', but missing a 'git' field",
+                                &name
+                            ))),
+                            (Some(git), Some(rev)) => Ok(Some(RockSourceSpec::Git(GitSource {
+                                url: git.into(),
+                                checkout_ref: Some(rev),
+                            }))),
+                            (Some(git), None) => Ok(Some(RockSourceSpec::Git(GitSource {
+                                url: git.into(),
+                                checkout_ref: Some(
+                                    entry
+                                        .version
+                                        .clone()
+                                        .to_string()
+                                        .trim_start_matches("=")
+                                        .to_string(),
+                                ),
+                            }))),
+                        }?;
+                        Ok(LuaDependencySpec {
+                            package_req: PackageReq {
+                                name,
+                                version_req: entry.version,
+                            },
+                            opt: OptState::from(entry.opt.unwrap_or(false)),
+                            pin: PinnedState::from(entry.pin.unwrap_or(false)),
+                            source,
+                        })
+                    }
+                })
+                .try_collect()?,
+        )),
+    }
 }
 
 #[derive(Debug, Error)]
@@ -132,13 +171,13 @@ pub struct PartialProjectToml {
     pub(crate) description: Option<RockDescription>,
     #[serde(default)]
     pub(crate) supported_platforms: Option<HashMap<PlatformIdentifier, bool>>,
-    #[serde(default, deserialize_with = "parse_map_to_package_vec_opt")]
+    #[serde(default, deserialize_with = "parse_map_to_dependency_vec_opt")]
     pub(crate) dependencies: Option<Vec<LuaDependencySpec>>,
-    #[serde(default, deserialize_with = "parse_map_to_package_vec_opt")]
+    #[serde(default, deserialize_with = "parse_map_to_dependency_vec_opt")]
     pub(crate) build_dependencies: Option<Vec<LuaDependencySpec>>,
     #[serde(default)]
     pub(crate) external_dependencies: Option<HashMap<String, ExternalDependencySpec>>,
-    #[serde(default, deserialize_with = "parse_map_to_package_vec_opt")]
+    #[serde(default, deserialize_with = "parse_map_to_dependency_vec_opt")]
     pub(crate) test_dependencies: Option<Vec<LuaDependencySpec>>,
     #[serde(default)]
     pub(crate) source: Option<RockSourceInternal>,
@@ -495,7 +534,39 @@ impl LocalProjectToml {
         self.run.as_ref()
     }
 
+    /// Convert this project TOML to a Lua rockspec.
+    /// Fails if there is no valid project root or if there are off-spec dependencies.
     pub fn to_lua_rockspec(&self) -> Result<LocalLuaRockspec, LuaRockspecError> {
+        if let Some(dep) = self
+            .dependencies()
+            .per_platform
+            .iter()
+            .filter_map(|(_, deps)| deps.iter().find(|dep| dep.source().is_some()))
+            .collect_vec()
+            .first()
+        {
+            return Err(LuaRockspecError::OffSpecDependency(dep.name().clone()));
+        }
+        if let Some(dep) = self
+            .build_dependencies()
+            .per_platform
+            .iter()
+            .filter_map(|(_, deps)| deps.iter().find(|dep| dep.source().is_some()))
+            .collect_vec()
+            .first()
+        {
+            return Err(LuaRockspecError::OffSpecBuildDependency(dep.name().clone()));
+        }
+        if let Some(dep) = self
+            .test_dependencies()
+            .per_platform
+            .iter()
+            .filter_map(|(_, deps)| deps.iter().find(|dep| dep.source().is_some()))
+            .collect_vec()
+            .first()
+        {
+            return Err(LuaRockspecError::OffSpecTestDependency(dep.name().clone()));
+        }
         LocalLuaRockspec::new(
             &self.to_lua_rockspec_string(),
             self.internal.project_root.clone(),

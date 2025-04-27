@@ -40,6 +40,12 @@ pub enum LuaRockspecError {
     CopyDirectoriesContainRockspecName(Option<String>),
     #[error("could not parse rockspec: {0}")]
     LuaTable(#[from] LuaTableError),
+    #[error("cannot create Lua rockspec with off-spec dependency: {0}")]
+    OffSpecDependency(PackageName),
+    #[error("cannot create Lua rockspec with off-spec build dependency: {0}")]
+    OffSpecBuildDependency(PackageName),
+    #[error("cannot create Lua rockspec with off-spec test dependency: {0}")]
+    OffSpecTestDependency(PackageName),
 }
 
 #[derive(Clone, Debug)]
@@ -622,6 +628,7 @@ mod tests {
 
     use std::path::PathBuf;
 
+    use crate::git::GitSource;
     use crate::lua_rockspec::PlatformIdentifier;
     use crate::package::PackageSpec;
 

@@ -318,3 +318,40 @@ fn test_build_multiple_treesitter_parsers() {
 
     runtime.block_on(futures::future::join_all(handles));
 }
+
+#[tokio::test]
+async fn build_project_with_git_dependency() {
+    let sample_project: PathBuf = "resources/test/sample-project-git-dependency/".into();
+    let project_root = assert_fs::TempDir::new().unwrap();
+    project_root.copy_from(&sample_project, &["**"]).unwrap();
+
+    let project = Project::from(&project_root).unwrap().unwrap();
+    let project_toml = project.toml().into_local().unwrap();
+
+    let lua_version = get_installed_lua_version("lua")
+        .ok()
+        .and_then(|version| LuaVersion::from_version(version).ok())
+        .or(Some(LuaVersion::Lua51));
+
+    let config = ConfigBuilder::new()
+        .unwrap()
+        .lua_version(lua_version)
+        .build()
+        .unwrap();
+
+    let tree = project.tree(&config).unwrap();
+    let progress = MultiProgress::new();
+    let bar = progress.new_bar();
+
+    Build::new(
+        &project_toml,
+        &tree,
+        tree::EntryType::Entrypoint,
+        &config,
+        &Progress::Progress(bar),
+    )
+    .behaviour(Force)
+    .build()
+    .await
+    .unwrap();
+}

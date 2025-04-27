@@ -66,9 +66,6 @@ pub struct Build<'a, R: Rockspec + HasIntegrity> {
     #[builder(start_fn)]
     progress: &'a Progress<ProgressBar>,
 
-    #[builder(field)]
-    source_url: Option<RemotePackageSourceUrl>,
-
     #[builder(default)]
     pin: PinnedState,
     #[builder(default)]
@@ -78,18 +75,10 @@ pub struct Build<'a, R: Rockspec + HasIntegrity> {
     #[builder(default)]
     behaviour: BuildBehaviour,
 
+    source_url: Option<RemotePackageSourceUrl>,
+
     // TODO(vhyrro): Remove this and enforce that this is provided at a type level.
     source: Option<RemotePackageSource>,
-}
-
-impl<R: Rockspec + HasIntegrity, State> BuildBuilder<'_, R, State>
-where
-    State: build_builder::State,
-{
-    /// Override the source URL with one from a lockfile
-    pub(crate) fn source_url(self, source_url: Option<RemotePackageSourceUrl>) -> Self {
-        Self { source_url, ..self }
-    }
 }
 
 // Overwrite the `build()` function to use our own instead.

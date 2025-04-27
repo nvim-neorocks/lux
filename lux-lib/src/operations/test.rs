@@ -241,6 +241,7 @@ async fn ensure_dependencies(
                     .build_behaviour(build_behaviour)
                     .pin(*dep.pin())
                     .opt(*dep.opt())
+                    .maybe_source(dep.source.clone())
                     .build()
             })
         });
@@ -270,6 +271,7 @@ async fn ensure_dependencies(
                     .build_behaviour(build_behaviour)
                     .pin(*dep.pin())
                     .opt(*dep.opt())
+                    .maybe_source(dep.source().clone())
                     .build()
             })
         });

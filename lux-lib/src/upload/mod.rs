@@ -1,6 +1,6 @@
 use std::env;
 
-use crate::lua_rockspec::{GitSource, LocalRockSource, RemoteRockSource, RockSourceSpec};
+use crate::lua_rockspec::{LocalRockSource, RemoteRockSource, RockSourceSpec};
 use crate::project::project_toml::RemoteProjectTomlValidationError;
 use crate::rockspec::Rockspec;
 use crate::TOOL_VERSION;
@@ -298,6 +298,7 @@ async fn upload_from_project(
 
 mod helpers {
     use super::*;
+    use crate::git::GitSource;
     use crate::package::{PackageName, PackageVersion};
     use crate::upload::RockCheckError;
     use crate::upload::{ToolCheckError, UserCheckError};

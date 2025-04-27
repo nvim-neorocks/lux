@@ -113,6 +113,7 @@ where
                                     .build_behaviour(build_behaviour)
                                     .pin(pin)
                                     .opt(opt)
+                                    .maybe_source(dep.source().clone())
                                     .build()
                             })
                             .collect_vec();

@@ -67,6 +67,7 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
                 .build_behaviour(BuildBehaviour::NoForce)
                 .pin(pin)
                 .opt(OptState::Required)
+                .maybe_source(dep.source().clone())
                 .build()
         });
 

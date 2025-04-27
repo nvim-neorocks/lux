@@ -1,0 +1,10 @@
+package = "sample-project"
+version = "0.1.0"
+lua = "5.1"
+
+[dependencies.rustaceanvim]
+version = "v6.0.0"
+git = "github:mrcjkb/rustaceanvim"
+
+[build]
+type = "builtin"

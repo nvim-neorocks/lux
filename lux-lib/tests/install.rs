@@ -1,8 +1,9 @@
 use assert_fs::TempDir;
 use lux_lib::{
     config::{ConfigBuilder, LuaVersion},
+    git::GitSource,
     lua_installation::get_installed_lua_version,
-    lua_rockspec::{GitSource, RockSourceSpec},
+    lua_rockspec::RockSourceSpec,
     operations::{Install, PackageInstallSpec},
     tree::EntryType,
 };

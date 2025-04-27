@@ -359,7 +359,7 @@ async fn install_rockspec(
         .constraint(constraint)
         .behaviour(behaviour)
         .source(source)
-        .source_url(rockspec_download.source_url)
+        .maybe_source_url(rockspec_download.source_url)
         .build()
         .await
         .map_err(|err| InstallError::BuildError(package, err))?;

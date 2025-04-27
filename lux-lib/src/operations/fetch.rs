@@ -12,9 +12,9 @@ use thiserror::Error;
 
 use crate::build::utils::recursive_copy_dir;
 use crate::config::Config;
+use crate::git::GitSource;
 use crate::hash::HasIntegrity;
 use crate::lockfile::RemotePackageSourceUrl;
-use crate::lua_rockspec::GitSource;
 use crate::lua_rockspec::RockSourceSpec;
 use crate::operations;
 use crate::package::PackageSpec;

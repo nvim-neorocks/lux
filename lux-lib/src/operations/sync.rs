@@ -220,11 +220,12 @@ async fn do_sync(
 
     if !package_sync_spec.to_add.is_empty() {
         // Install missing packages using the default package_db.
-        let missing_packages = package_sync_spec.to_add.into_iter().map(|pkg| {
-            PackageInstallSpec::new(pkg.package_req().clone(), tree::EntryType::Entrypoint)
+        let missing_packages = package_sync_spec.to_add.into_iter().map(|dep| {
+            PackageInstallSpec::new(dep.package_req().clone(), tree::EntryType::Entrypoint)
                 .build_behaviour(BuildBehaviour::Force)
-                .pin(*pkg.pin())
-                .opt(*pkg.opt())
+                .pin(*dep.pin())
+                .opt(*dep.opt())
+                .maybe_source(dep.source.clone())
                 .build()
         });
 
