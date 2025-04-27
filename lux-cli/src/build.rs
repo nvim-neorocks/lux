@@ -117,7 +117,7 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
             .wrap_err(
                 "
 syncing dependencies with the project lockfile failed.
-Use --ignore-lockfile to force a new build.
+Use --no-lock to force a new build.
 ",
             )?;
 
@@ -129,7 +129,7 @@ Use --ignore-lockfile to force a new build.
             .wrap_err(
                 "
 syncing build dependencies with the project lockfile failed.
-Use --ignore-lockfile to force a new build.
+Use --no-lock to force a new build.
 ",
             )?;
     }
