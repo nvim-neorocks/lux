@@ -682,7 +682,10 @@ mod tests {
                 .default
                 .get("FOO")
                 .unwrap(),
-            ExternalDependencySpec::Library("foo".into())
+            ExternalDependencySpec {
+                library: Some("foo".into()),
+                header: None
+            }
         );
 
         let rockspec_content = "
@@ -752,7 +755,10 @@ mod tests {
                 .default
                 .get("FOO")
                 .unwrap(),
-            ExternalDependencySpec::Header("foo.h".into())
+            ExternalDependencySpec {
+                header: Some("foo.h".into()),
+                library: None
+            }
         );
         assert!(rockspec
             .local
@@ -1124,7 +1130,10 @@ mod tests {
                 .default
                 .get("FOO")
                 .unwrap(),
-            ExternalDependencySpec::Library("foo".into())
+            ExternalDependencySpec {
+                library: Some("foo".into()),
+                header: None
+            }
         );
         let per_platform = rockspec.local.external_dependencies.per_platform;
         assert_eq!(
@@ -1132,35 +1141,50 @@ mod tests {
                 .get(&PlatformIdentifier::Windows)
                 .and_then(|it| it.get("FOO"))
                 .unwrap(),
-            ExternalDependencySpec::Library("foo.dll".into())
+            ExternalDependencySpec {
+                library: Some("foo.dll".into()),
+                header: None
+            }
         );
         assert_eq!(
             *per_platform
                 .get(&PlatformIdentifier::Unix)
                 .and_then(|it| it.get("FOO"))
                 .unwrap(),
-            ExternalDependencySpec::Library("foo".into())
+            ExternalDependencySpec {
+                library: Some("foo".into()),
+                header: None
+            }
         );
         assert_eq!(
             *per_platform
                 .get(&PlatformIdentifier::Unix)
                 .and_then(|it| it.get("BAR"))
                 .unwrap(),
-            ExternalDependencySpec::Header("bar.h".into())
+            ExternalDependencySpec {
+                header: Some("bar.h".into()),
+                library: None
+            }
         );
         assert_eq!(
             *per_platform
                 .get(&PlatformIdentifier::Linux)
                 .and_then(|it| it.get("BAR"))
                 .unwrap(),
-            ExternalDependencySpec::Header("bar.h".into())
+            ExternalDependencySpec {
+                header: Some("bar.h".into()),
+                library: None
+            }
         );
         assert_eq!(
             *per_platform
                 .get(&PlatformIdentifier::Linux)
                 .and_then(|it| it.get("FOO"))
                 .unwrap(),
-            ExternalDependencySpec::Library("foo.so".into())
+            ExternalDependencySpec {
+                library: Some("foo.so".into()),
+                header: None
+            }
         );
         let rockspec_content = "
         rockspec_format = '1.0'\n
@@ -1494,6 +1518,39 @@ mod tests {
         assert_eq!(
             rockspec.build().current_platform().install.bin,
             HashMap::from([("wsapi".into(), PathBuf::from("src/launcher/wsapi.cgi"))])
+        );
+    }
+
+    #[tokio::test]
+    pub async fn regression_external_dependencies() {
+        let content =
+            String::from_utf8(std::fs::read("resources/test/luaossl-20220711-0.rockspec").unwrap())
+                .unwrap();
+        let rockspec = RemoteLuaRockspec::new(&content).unwrap();
+        if cfg!(target_family = "unix") {
+            assert_eq!(
+                rockspec
+                    .local
+                    .external_dependencies
+                    .current_platform()
+                    .get("OPENSSL")
+                    .unwrap(),
+                &ExternalDependencySpec {
+                    library: Some("ssl".into()),
+                    header: Some("openssl/ssl.h".into()),
+                }
+            );
+        }
+        let per_platform = rockspec.local.external_dependencies.per_platform;
+        assert_eq!(
+            *per_platform
+                .get(&PlatformIdentifier::Windows)
+                .and_then(|it| it.get("OPENSSL"))
+                .unwrap(),
+            ExternalDependencySpec {
+                library: Some("libeay32".into()),
+                header: Some("openssl/ssl.h".into()),
+            }
         );
     }
 }

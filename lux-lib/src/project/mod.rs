@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use lets_find_up::{find_up_with, FindUpKind, FindUpOptions};
 use mlua::{ExternalResult, UserData};
+use path_slash::PathBufExt;
 use project_toml::{
     LocalProjectTomlValidationError, PartialProjectToml, RemoteProjectTomlValidationError,
 };
@@ -18,8 +19,8 @@ use crate::{
     config::{Config, LuaVersion},
     lockfile::{LockfileError, ProjectLockfile, ReadOnly},
     lua_rockspec::{
-        ExternalDependencySpec, LocalLuaRockspec, LuaRockspecError, LuaVersionError,
-        PartialLuaRockspec, PartialRockspecError, RemoteLuaRockspec,
+        LocalLuaRockspec, LuaRockspecError, LuaVersionError, PartialLuaRockspec,
+        PartialRockspecError, RemoteLuaRockspec,
     },
     remote_package_db::RemotePackageDB,
     rockspec::{
@@ -327,15 +328,12 @@ impl Project {
             }
             DependencyType::External(ref deps) => {
                 for (name, dep) in deps {
-                    match dep {
-                        ExternalDependencySpec::Header(path) => {
-                            table[name]["header"] =
-                                toml_edit::value(path.to_string_lossy().to_string());
-                        }
-                        ExternalDependencySpec::Library(path) => {
-                            table[name]["library"] =
-                                toml_edit::value(path.to_string_lossy().to_string());
-                        }
+                    if let Some(path) = &dep.header {
+                        table[name]["header"] = toml_edit::value(path.to_slash_lossy().to_string());
+                    }
+                    if let Some(path) = &dep.library {
+                        table[name]["library"] =
+                            toml_edit::value(path.to_slash_lossy().to_string());
                     }
                 }
             }
@@ -418,13 +416,11 @@ impl Project {
             }
             DependencyType::External(ref deps) => {
                 for (name, dep) in deps {
-                    match dep {
-                        ExternalDependencySpec::Header(_) => {
-                            table[name]["header"] = Item::None;
-                        }
-                        ExternalDependencySpec::Library(_) => {
-                            table[name]["library"] = Item::None;
-                        }
+                    if dep.header.is_some() {
+                        table[name]["header"] = Item::None;
+                    }
+                    if dep.library.is_some() {
+                        table[name]["library"] = Item::None;
                     }
                 }
             }
@@ -675,7 +671,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        lua_rockspec::RockSourceSpec,
+        lua_rockspec::{ExternalDependencySpec, RockSourceSpec},
         manifest::{Manifest, ManifestMetadata},
         package::PackageReq,
         rockspec::{lua_dependency::LuaDependencySpec, Rockspec},
@@ -721,7 +717,10 @@ mod tests {
             .add(
                 DependencyType::External(HashMap::from([(
                     "lib".into(),
-                    ExternalDependencySpec::Library("path.so".into()),
+                    ExternalDependencySpec {
+                        library: Some("path.so".into()),
+                        header: None,
+                    },
                 )])),
                 &package_db,
             )
@@ -758,7 +757,10 @@ mod tests {
                 .current_platform()
                 .get("lib")
                 .unwrap(),
-            &ExternalDependencySpec::Library("path.so".into())
+            &ExternalDependencySpec {
+                library: Some("path.so".into()),
+                header: None
+            }
         );
     }
 

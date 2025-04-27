@@ -2328,7 +2328,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "futures-util",
- "getrandom 0.3.1",
+ "getrandom 0.2.15",
  "hashbrown 0.15.1",
  "hyper",
  "hyper-util",
