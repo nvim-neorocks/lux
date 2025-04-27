@@ -45,7 +45,7 @@ impl ExternalDependencyInfo {
             .probe(&name.to_lowercase())
             .ok();
         if lib_info.is_none() {
-            if let ExternalDependencySpec::Library(lib) = dependency {
+            if let Some(lib) = &dependency.library {
                 // Strip "lib" prefix and extension if present
                 let file_name = lib.file_name().and_then(|f| f.to_str()).unwrap_or(name);
                 let lib_name = if file_name.starts_with("lib") {
@@ -67,19 +67,17 @@ impl ExternalDependencyInfo {
             }
         }
         if let Some(info) = lib_info {
-            match dependency {
-                ExternalDependencySpec::Header(header) => {
-                    if info
-                        .include_paths
-                        .iter()
-                        .any(|path| path.join(header).exists())
-                    {
-                        return Ok(Self::PkgConfig(info));
-                    }
-                }
-                ExternalDependencySpec::Library(_) => {
+            if let Some(header) = &dependency.header {
+                if info
+                    .include_paths
+                    .iter()
+                    .any(|path| path.join(header).exists())
+                {
                     return Ok(Self::PkgConfig(info));
                 }
+            }
+            if dependency.library.is_some() {
+                return Ok(Self::PkgConfig(info));
             }
         }
         Self::fallback_detect(name, dependency, config)
@@ -101,62 +99,57 @@ impl ExternalDependencyInfo {
         }
         search_prefixes.extend(config.search_prefixes.iter().cloned());
 
-        match dependency {
-            ExternalDependencySpec::Header(header) => {
-                if let Some(inc_dir) = get_incdir(name, config) {
-                    if inc_dir.join(header).exists() {
-                        return Ok(Self::HeaderOnly {
-                            prefix: inc_dir.parent().unwrap_or(&inc_dir).to_path_buf(),
-                            include_dir: inc_dir,
-                        });
-                    }
+        if let Some(header) = &dependency.header {
+            if let Some(inc_dir) = get_incdir(name, config) {
+                if inc_dir.join(header).exists() {
+                    return Ok(Self::HeaderOnly {
+                        prefix: inc_dir.parent().unwrap_or(&inc_dir).to_path_buf(),
+                        include_dir: inc_dir,
+                    });
                 }
-
-                // Search prefixes
-                for prefix in search_prefixes {
-                    let inc_dir = prefix.join(&config.include_subdir);
-                    if inc_dir.join(header).exists() {
-                        return Ok(Self::HeaderOnly {
-                            prefix: prefix.clone(),
-                            include_dir: inc_dir,
-                        });
-                    }
-                }
-
-                Err(ExternalDependencyError::NotFound(name.into()))
             }
-            ExternalDependencySpec::Library(lib) => {
-                // Check for specific directory overrides first
-                if let (Some(inc_dir), Some(lib_dir)) =
-                    (get_incdir(name, config), get_libdir(name, config))
-                {
+
+            // Search prefixes
+            for prefix in &search_prefixes {
+                let inc_dir = prefix.join(&config.include_subdir);
+                if inc_dir.join(header).exists() {
+                    return Ok(Self::HeaderOnly {
+                        prefix: prefix.clone(),
+                        include_dir: inc_dir,
+                    });
+                }
+            }
+        }
+        if let Some(lib) = &dependency.library {
+            // Check for specific directory overrides first
+            if let (Some(inc_dir), Some(lib_dir)) =
+                (get_incdir(name, config), get_libdir(name, config))
+            {
+                if library_exists(&lib_dir, lib, &config.lib_patterns) {
+                    return Ok(Self::Library {
+                        prefix: inc_dir.parent().unwrap_or(&inc_dir).to_path_buf(),
+                        include_dir: inc_dir,
+                        lib_dir,
+                        lib_file: lib.clone(),
+                    });
+                }
+            }
+            for prefix in &search_prefixes {
+                let inc_dir = prefix.join(&config.include_subdir);
+                for lib_subdir in &config.lib_subdirs {
+                    let lib_dir = prefix.join(lib_subdir);
                     if library_exists(&lib_dir, lib, &config.lib_patterns) {
                         return Ok(Self::Library {
-                            prefix: inc_dir.parent().unwrap_or(&inc_dir).to_path_buf(),
+                            prefix: prefix.clone(),
                             include_dir: inc_dir,
                             lib_dir,
                             lib_file: lib.clone(),
                         });
                     }
                 }
-                for prefix in search_prefixes {
-                    let inc_dir = prefix.join(&config.include_subdir);
-                    for lib_subdir in &config.lib_subdirs {
-                        let lib_dir = prefix.join(lib_subdir);
-                        if library_exists(&lib_dir, lib, &config.lib_patterns) {
-                            return Ok(Self::Library {
-                                prefix: prefix.clone(),
-                                include_dir: inc_dir,
-                                lib_dir,
-                                lib_file: lib.clone(),
-                            });
-                        }
-                    }
-                }
-
-                Err(ExternalDependencyError::NotFound(name.into()))
             }
         }
+        Err(ExternalDependencyError::NotFound(name.into()))
     }
 }
 
@@ -213,7 +206,10 @@ mod tests {
         let config = ExternalDependencySearchConfig::default();
         let result = ExternalDependencyInfo::detect(
             "zlib",
-            &ExternalDependencySpec::Header("zlib.h".into()),
+            &ExternalDependencySpec {
+                header: Some("zlib.h".into()),
+                library: None,
+            },
             &config,
         );
         assert!(matches!(result, Ok(ExternalDependencyInfo::PkgConfig(_))));
@@ -225,7 +221,10 @@ mod tests {
         let config = ExternalDependencySearchConfig::default();
         let result = ExternalDependencyInfo::detect(
             "zlib",
-            &ExternalDependencySpec::Library("libz".into()),
+            &ExternalDependencySpec {
+                library: Some("libz".into()),
+                header: None,
+            },
             &config,
         );
         assert!(matches!(result, Ok(ExternalDependencyInfo::PkgConfig(_))));
@@ -237,7 +236,10 @@ mod tests {
         let config = ExternalDependencySearchConfig::default();
         let result = ExternalDependencyInfo::detect(
             "zlib",
-            &ExternalDependencySpec::Library("z".into()),
+            &ExternalDependencySpec {
+                library: Some("z".into()),
+                header: None,
+            },
             &config,
         );
         assert!(matches!(result, Ok(ExternalDependencyInfo::PkgConfig(_))));
@@ -249,7 +251,10 @@ mod tests {
         let config = ExternalDependencySearchConfig::default();
         let result = ExternalDependencyInfo::detect(
             "zlib",
-            &ExternalDependencySpec::Library("zlib".into()),
+            &ExternalDependencySpec {
+                library: Some("zlib".into()),
+                header: None,
+            },
             &config,
         );
         assert!(matches!(result, Ok(ExternalDependencyInfo::PkgConfig(_))));
@@ -272,7 +277,10 @@ mod tests {
 
         let result = ExternalDependencyInfo::fallback_detect(
             "foo",
-            &ExternalDependencySpec::Header("foo.h".into()),
+            &ExternalDependencySpec {
+                header: Some("foo.h".into()),
+                library: None,
+            },
             &config,
         );
 
@@ -301,7 +309,10 @@ mod tests {
 
         let result = ExternalDependencyInfo::fallback_detect(
             "foo",
-            &ExternalDependencySpec::Header("foo.h".into()),
+            &ExternalDependencySpec {
+                header: Some("foo.h".into()),
+                library: None,
+            },
             &config,
         );
 
@@ -339,7 +350,10 @@ mod tests {
 
         let result = ExternalDependencyInfo::fallback_detect(
             "foo",
-            &ExternalDependencySpec::Library("foo".into()),
+            &ExternalDependencySpec {
+                library: Some("foo".into()),
+                header: None,
+            },
             &config,
         );
 
@@ -383,7 +397,10 @@ mod tests {
 
         let result = ExternalDependencyInfo::fallback_detect(
             "foo",
-            &ExternalDependencySpec::Library("foo".into()),
+            &ExternalDependencySpec {
+                library: Some("foo".into()),
+                header: None,
+            },
             &config,
         );
 
@@ -421,7 +438,10 @@ mod tests {
 
         let result = ExternalDependencyInfo::fallback_detect(
             "foo",
-            &ExternalDependencySpec::Library("foo".into()),
+            &ExternalDependencySpec {
+                library: Some("foo".into()),
+                header: None,
+            },
             &config,
         );
 
@@ -442,7 +462,10 @@ mod tests {
 
         let result = ExternalDependencyInfo::fallback_detect(
             "foo",
-            &ExternalDependencySpec::Header("foo.h".into()),
+            &ExternalDependencySpec {
+                header: Some("foo.h".into()),
+                library: None,
+            },
             &config,
         );
 

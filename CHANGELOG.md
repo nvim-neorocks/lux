@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `lux-cli` - [0.3.11](https://github.com/nvim-neorocks/lux/compare/v0.3.10...v0.3.11) - 2025-04-27
+
+### Fixed
+- conflicting external dependency spec parse error ([#632](https://github.com/nvim-neorocks/lux/pull/632))
+
+## `lux-lib` - [0.3.9](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.3.8...lux-lib-v0.3.9) - 2025-04-27
+
+### Fixed
+- conflicting external dependency spec parse error ([#632](https://github.com/nvim-neorocks/lux/pull/632))
+
 ## `lux-cli` - [0.3.10](https://github.com/nvim-neorocks/lux/compare/v0.3.9...v0.3.10) - 2025-04-23
 
 ### Other

@@ -5,7 +5,7 @@ lua = ">=5.1"
 [description]
 summary = ""
 maintainer = "mrcjkb"
-labels = [ "" ]
+labels = [""]
 
 
 [dependencies]
@@ -13,7 +13,7 @@ labels = [ "" ]
 # `busted = ">=2.0"`
 
 [run]
-args = [ "src/main.lua" ]
+args = ["src/main.lua"]
 
 [build]
 type = "builtin"
