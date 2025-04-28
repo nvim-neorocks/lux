@@ -311,7 +311,7 @@ impl Display for PackageVersionReq {
                 if str.starts_with("=") {
                     str = str.replacen("=", "==", 1);
                 } else if str.starts_with("^") {
-                    str = str.replacen("^", "==", 1);
+                    str = str.replacen("^", "~>", 1);
                 }
                 str.fmt(f)
             }
@@ -432,6 +432,12 @@ fn parse_version_req(version_constraints: &str) -> Result<VersionReq, Error> {
         s if s.starts_with("@") => format!("={}", &s[1..]),
         // The semver crate only understands "= version", unlike luarocks which understands "== version".
         s if s.starts_with("==") => s[1..].to_string(),
+        s if s // semver parses no constraint prefix as ^ (equivalent to ~>)
+            .find(|c: char| c.is_alphanumeric())
+            .is_some_and(|idx| idx == 0) =>
+        {
+            format!("={}", &s)
+        }
         s => s,
     };
 
