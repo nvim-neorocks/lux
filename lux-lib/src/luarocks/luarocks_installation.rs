@@ -287,7 +287,8 @@ impl LuaRocksInstallation {
                             pkg,
                             &installed_packages
                                 .get(dependency_id)
-                                .expect("required dependency not found")
+                                // NOTE: This can happen if an install thread panics
+                                .expect("required dependency not found [This is a bug!]")
                                 .0,
                         );
                     });

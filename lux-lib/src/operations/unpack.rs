@@ -160,22 +160,19 @@ fn is_single_tar_directory<R: Read + Seek + Send>(reader: R) -> io::Result<bool>
         })
         .try_collect()?;
 
-    let directory: PathBuf = entries
-        .first()
-        .unwrap()
-        .path()?
-        .components()
-        .take(1)
-        .collect();
+    if entries.is_empty() {
+        Ok(false)
+    } else {
+        let directory: PathBuf = entries[0].path()?.components().take(1).collect();
 
-    Ok(entries.into_iter().all(|entry| {
-        entry
-            .path()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .starts_with(directory.to_str().unwrap())
-    }))
+        Ok(entries.into_iter().all(|entry| {
+            entry.path().is_ok_and(|path| {
+                path.to_str()
+                    .unwrap()
+                    .starts_with(directory.to_str().unwrap())
+            })
+        }))
+    }
 }
 
 fn get_single_archive_entry(dir: &Path) -> Result<Option<(PathBuf, Option<&str>)>, io::Error> {
