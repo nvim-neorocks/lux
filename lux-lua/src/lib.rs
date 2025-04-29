@@ -34,6 +34,19 @@ fn project(lua: &Lua) -> mlua::Result<LuaTable> {
 
 #[mlua::lua_module]
 fn lux(lua: &Lua) -> LuaResult<LuaTable> {
+    #[cfg(not(any(
+        feature = "lua51",
+        feature = "lua52",
+        feature = "lua53",
+        feature = "lua54"
+    )))]
+    compile_error!(
+        "
+        At least one Lua version feature must be enabled. \
+        Please enable one of the following features: \
+        lua51, lua52, lua53, lua54."
+    );
+
     let exports = lua.create_table()?;
 
     exports.set(
