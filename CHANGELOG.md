@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `lux-cli` - [0.3.13](https://github.com/nvim-neorocks/lux/compare/v0.3.12...v0.3.13) - 2025-04-29
+
+### Other
+- update Cargo.lock dependencies
+
+## `lux-lib` - [0.3.10](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.3.9...lux-lib-v0.3.10) - 2025-04-29
+
+### Added
+- *(lux-lib)* more lenient dev version parsing ([#623](https://github.com/nvim-neorocks/lux/pull/623))
+
+### Fixed
+- parse versions without a contraint prefix as == ([#640](https://github.com/nvim-neorocks/lux/pull/640))
+
+### Other
+- *(deps)* bump insta from 1.42.0 to 1.43.0 ([#642](https://github.com/nvim-neorocks/lux/pull/642))
+
 ## `lux-cli` - [0.3.12](https://github.com/nvim-neorocks/lux/compare/v0.3.11...v0.3.12) - 2025-04-27
 
 ### Fixed
