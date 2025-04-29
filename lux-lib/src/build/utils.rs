@@ -1,5 +1,4 @@
 use crate::{
-    build::BuildError,
     config::Config,
     lua_installation::LuaInstallation,
     lua_rockspec::{DeploySpec, LuaModule, ModulePaths},
@@ -11,7 +10,7 @@ use shlex::try_quote;
 use std::{
     io,
     path::{Path, PathBuf},
-    process::{Output, Stdio},
+    process::{ExitStatus, Output, Stdio},
     string::FromUtf8Error,
 };
 use target_lexicon::Triple;
@@ -67,15 +66,40 @@ pub(crate) fn recursive_copy_dir(src: &PathBuf, dest: &Path) -> Result<(), io::E
     }
     Ok(())
 }
-fn validate_output(output: Output) -> Result<(), BuildError> {
+
+#[derive(Error, Debug)]
+pub enum OutputValidationError {
+    #[error("compilation failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
+    CommandFailure {
+        status: ExitStatus,
+        stdout: String,
+        stderr: String,
+    },
+}
+
+fn validate_output(output: Output) -> Result<(), OutputValidationError> {
     if !output.status.success() {
-        return Err(BuildError::CommandFailure {
+        return Err(OutputValidationError::CommandFailure {
             status: output.status,
             stdout: String::from_utf8_lossy(&output.stdout).into(),
             stderr: String::from_utf8_lossy(&output.stderr).into(),
         });
     }
     Ok(())
+}
+
+#[derive(Error, Debug)]
+pub enum CompileCFilesError {
+    #[error("IO operation while compiling C files: {0}")]
+    Io(#[from] io::Error),
+    #[error("failed to compile intermediates from C files: {0}")]
+    CompileIntermediates(cc::Error),
+    #[error("error compiling C files (compilation failed): {0}")]
+    Compilation(#[from] cc::Error),
+    #[error("error compiling C files (output validation failed): {0}")]
+    OutputValidation(#[from] OutputValidationError),
+    #[error("compiling C files succeeded, but the expected library {0} was not created")]
+    LibOutputNotCreated(String),
 }
 
 /// Compiles a set of C files into a single dynamic library and places them under `{target_dir}/{target_file}`.
@@ -86,7 +110,7 @@ pub(crate) fn compile_c_files(
     target_module: &LuaModule,
     target_dir: &Path,
     lua: &LuaInstallation,
-) -> Result<(), BuildError> {
+) -> Result<(), CompileCFilesError> {
     let target = target_dir.join(target_module.to_lib_path());
 
     let parent = target.parent().expect("Couldn't determine parent");
@@ -129,7 +153,7 @@ pub(crate) fn compile_c_files(
 
     let objects = build
         .try_compile_intermediates()
-        .map_err(BuildError::CompileIntermediatesError)?;
+        .map_err(CompileCFilesError::CompileIntermediates)?;
 
     let output_path = parent.join(&file);
 
@@ -161,7 +185,7 @@ pub(crate) fn compile_c_files(
     if output_path.exists() {
         Ok(())
     } else {
-        Err(BuildError::LibOutputNotCreated(
+        Err(CompileCFilesError::LibOutputNotCreated(
             output_path.to_slash_lossy().to_string(),
         ))
     }
@@ -237,6 +261,20 @@ pub(crate) fn default_libflag() -> &'static str {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum CompileCModulesError {
+    #[error("IO operation while compiling C modules: {0}")]
+    Io(#[from] io::Error),
+    #[error("failed to compile intermediates from C modules: {0}")]
+    CompileIntermediates(cc::Error),
+    #[error("error compiling C modules (compilation failed): {0}")]
+    Compilation(#[from] cc::Error),
+    #[error("error compiling C modules (output validation failed): {0}")]
+    OutputValidation(#[from] OutputValidationError),
+    #[error("compiling C modules succeeded, but the expected library {0} was not created")]
+    LibOutputNotCreated(String),
+}
+
 /// Compiles a set of C files (with extra metadata) to a given destination.
 /// # Panics
 /// Panics if no filename for the target path can be determined.
@@ -246,7 +284,7 @@ pub(crate) fn compile_c_modules(
     target_module: &LuaModule,
     target_dir: &Path,
     lua: &LuaInstallation,
-) -> Result<(), BuildError> {
+) -> Result<(), CompileCModulesError> {
     let target = target_dir.join(target_module.to_lib_path());
 
     let parent = target.parent().expect("Couldn't determine parent");
@@ -306,7 +344,7 @@ pub(crate) fn compile_c_modules(
     // See https://github.com/rust-lang/cc-rs/issues/594#issuecomment-2110551057
     let objects = build
         .try_compile_intermediates()
-        .map_err(BuildError::CompileIntermediatesError)?;
+        .map_err(CompileCModulesError::CompileIntermediates)?;
 
     let libdir_args = data.libdirs.iter().map(|libdir| {
         if is_msvc {
@@ -358,7 +396,7 @@ pub(crate) fn compile_c_modules(
     if output_path.exists() {
         Ok(())
     } else {
-        Err(BuildError::LibOutputNotCreated(
+        Err(CompileCModulesError::LibOutputNotCreated(
             output_path.to_slash_lossy().to_string(),
         ))
     }

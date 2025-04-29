@@ -46,7 +46,7 @@ use super::{
 ///
 /// See [the rockspec format](https://github.com/luarocks/luarocks/wiki/Rockspec-format) for more
 /// info.
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct BuildSpec {
     /// Determines the build backend to use.
     pub build_backend: Option<BuildBackendSpec>,
@@ -60,6 +60,17 @@ pub struct BuildSpec {
     // NOTE: This cannot be a diffy::Patch<'a, str>
     // because Lua::from_value requires a DeserializeOwned
     pub patches: HashMap<PathBuf, String>,
+}
+
+impl Default for BuildSpec {
+    fn default() -> Self {
+        Self {
+            build_backend: Some(BuildBackendSpec::default()),
+            install: InstallSpec::default(),
+            copy_directories: Vec::default(),
+            patches: HashMap::default(),
+        }
+    }
 }
 
 impl UserData for BuildSpec {
@@ -203,7 +214,7 @@ impl BuildSpec {
                     queries: internal.queries.unwrap_or_default(),
                 },
             )),
-            BuildType::CopyEverything => Some(BuildBackendSpec::CopyEverything),
+            BuildType::Source => Some(BuildBackendSpec::Source),
         };
         Ok(Self {
             build_backend,
@@ -263,11 +274,12 @@ pub enum BuildBackendSpec {
     LuaRock(String),
     RustMlua(RustMluaBuildSpec),
     TreesitterParser(TreesitterParserBuildSpec),
-    /// Just copy everything, without building
+    /// Build from the source rockspec, if present.
+    /// Otherwise, fall back to the builtin build and copy all directories.
     /// This is currently unimplemented by luarocks, but we don't ever publish rockspecs
     /// that implement this.
     /// It could be implemented as a custom build backend.
-    CopyEverything,
+    Source,
 }
 
 impl IntoLua for BuildBackendSpec {
@@ -280,7 +292,7 @@ impl IntoLua for BuildBackendSpec {
             BuildBackendSpec::LuaRock(s) => s.into_lua(lua),
             BuildBackendSpec::RustMlua(spec) => spec.into_lua(lua),
             BuildBackendSpec::TreesitterParser(spec) => spec.into_lua(lua),
-            BuildBackendSpec::CopyEverything => "copy_everything".into_lua(lua),
+            BuildBackendSpec::Source => "source".into_lua(lua),
         }
     }
 }
@@ -917,8 +929,7 @@ pub(crate) enum BuildType {
     RustMlua,
     #[serde(rename = "treesitter-parser")]
     TreesitterParser,
-    #[serde(rename = "copy-everything")]
-    CopyEverything,
+    Source,
 }
 
 // Special Deserialize case for BuildType:
@@ -951,7 +962,7 @@ impl Display for BuildType {
             BuildType::LuaRock(s) => write!(f, "{}", s),
             BuildType::RustMlua => write!(f, "rust-mlua"),
             BuildType::TreesitterParser => write!(f, "treesitter-parser"),
-            BuildType::CopyEverything => write!(f, "copy-everything"),
+            BuildType::Source => write!(f, "source"),
         }
     }
 }

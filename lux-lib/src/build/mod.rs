@@ -2,7 +2,7 @@ use crate::lockfile::{LockfileError, OptState, RemotePackageSourceUrl};
 use crate::lua_rockspec::LuaVersionError;
 use crate::rockspec::{LuaVersionCompatibility, Rockspec};
 use crate::tree::{self, EntryType, TreeError};
-use std::{io, path::Path, process::ExitStatus};
+use std::{io, path::Path};
 
 use crate::{
     config::Config,
@@ -17,6 +17,7 @@ use crate::{
     tree::{RockLayout, Tree},
 };
 use bon::{builder, Builder};
+use builtin::BuiltinBuildError;
 use cmake::CMakeError;
 use command::CommandError;
 use external_dependency::{ExternalDependencyError, ExternalDependencyInfo};
@@ -28,10 +29,11 @@ use make::MakeError;
 use mlua::FromLua;
 use patch::{Patch, PatchError};
 use rust_mlua::RustError;
+use source::SourceBuildError;
 use ssri::Integrity;
 use thiserror::Error;
 use treesitter_parser::TreesitterBuildError;
-use utils::{recursive_copy_dir, InstallBinaryError};
+use utils::{recursive_copy_dir, CompileCFilesError, InstallBinaryError};
 
 mod builtin;
 mod cmake;
@@ -40,6 +42,7 @@ mod luarocks;
 mod make;
 mod patch;
 mod rust_mlua;
+mod source;
 mod treesitter_parser;
 pub(crate) mod utils;
 
@@ -101,6 +104,22 @@ where
 
 #[derive(Error, Debug)]
 pub enum BuildError {
+    #[error("builtin build failed: {0}")]
+    Builtin(#[from] BuiltinBuildError),
+    #[error("cmake build failed: {0}")]
+    CMake(#[from] CMakeError),
+    #[error("make build failed: {0}")]
+    Make(#[from] MakeError),
+    #[error("command build failed: {0}")]
+    Command(#[from] CommandError),
+    #[error("rust-mlua build failed: {0}")]
+    Rust(#[from] RustError),
+    #[error("treesitter-parser build failed: {0}")]
+    TreesitterBuild(#[from] TreesitterBuildError),
+    #[error("luarocks build failed: {0}")]
+    LuarocksBuild(#[from] LuarocksBuildError),
+    #[error("building from rock source failed: {0}")]
+    SourceBuild(#[from] SourceBuildError),
     #[error("IO operation failed: {0}")]
     Io(#[from] io::Error),
     #[error(transparent)]
@@ -113,32 +132,10 @@ pub enum BuildError {
     ExternalDependencyError(#[from] ExternalDependencyError),
     #[error(transparent)]
     PatchError(#[from] PatchError),
-    #[error("failed to compile intermediates: {0}")]
-    CompileIntermediatesError(cc::Error),
-    #[error("failed to compile build modules: {0}")]
-    CompilationError(#[from] cc::Error),
-    #[error("compilation succeeded, but the expected library {0} was not created")]
-    LibOutputNotCreated(String),
     #[error(transparent)]
-    CMakeError(#[from] CMakeError),
+    CompileCFiles(#[from] CompileCFilesError),
     #[error(transparent)]
-    MakeError(#[from] MakeError),
-    #[error(transparent)]
-    CommandError(#[from] CommandError),
-    #[error(transparent)]
-    RustError(#[from] RustError),
-    #[error(transparent)]
-    TreesitterBuild(#[from] TreesitterBuildError),
-    #[error(transparent)]
-    LuaVersionError(#[from] LuaVersionError),
-    #[error("compilation failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
-    CommandFailure {
-        status: ExitStatus,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(transparent)]
-    LuarocksBuildError(#[from] LuarocksBuildError),
+    LuaVersion(#[from] LuaVersionError),
     #[error("source integrity mismatch.\nExpected: {expected},\nbut got: {actual}")]
     SourceIntegrityMismatch {
         expected: Integrity,
@@ -225,38 +222,8 @@ async fn run_build<R: Rockspec + HasIntegrity>(
             Some(BuildBackendSpec::LuaRock(_)) => {
                 luarocks::build(rockspec, output_paths, lua, config, build_dir, progress).await?
             }
-            Some(BuildBackendSpec::CopyEverything) => {
-                let mut src_dir = build_dir.join("src");
-                if !src_dir.is_dir() {
-                    src_dir = build_dir.join("lua");
-                }
-                recursive_copy_dir(&src_dir, &output_paths.src)?;
-                recursive_copy_doc_dir(output_paths, build_dir)?;
-                for subdirectory in std::fs::read_dir(build_dir)?
-                    .filter_map(Result::ok)
-                    .filter_map(|entry| {
-                        let path = entry.path();
-                        if path.is_dir()
-                            && path.file_name().is_some_and(|name| {
-                                !matches!(
-                                    name.to_string_lossy().to_string().as_str(),
-                                    "lua" | "src" | "doc" | "docs"
-                                )
-                            })
-                        {
-                            path.file_name()
-                                .map(|name| name.to_string_lossy().to_string())
-                        } else {
-                            None
-                        }
-                    })
-                {
-                    recursive_copy_dir(
-                        &build_dir.join(&subdirectory),
-                        &output_paths.etc.join(&subdirectory),
-                    )?;
-                }
-                BuildInfo::default()
+            Some(BuildBackendSpec::Source) => {
+                source::build(output_paths, lua, config, build_dir, progress).await?
             }
             None => BuildInfo::default(),
         },

@@ -302,7 +302,7 @@ package = "{}"
 version = "{}"
 {}
 build = {{
-  type = "copy-everything"
+  type = "source"
 }}"#,
             &rockspec_format,
             package_spec.name(),
@@ -323,7 +323,7 @@ build = {{
             external_dependencies: PerPlatform::default(),
             test_dependencies: PerPlatform::default(),
             build: PerPlatform::new(BuildSpec {
-                build_backend: Some(BuildBackendSpec::CopyEverything),
+                build_backend: Some(BuildBackendSpec::Source),
                 install: InstallSpec::default(),
                 copy_directories: Vec::new(),
                 patches: HashMap::new(),

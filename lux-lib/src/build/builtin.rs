@@ -1,9 +1,11 @@
 use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
+    io,
     path::{Path, PathBuf},
     str::FromStr,
 };
+use thiserror::Error;
 use walkdir::WalkDir;
 
 use crate::{
@@ -12,13 +14,27 @@ use crate::{
     lua_installation::LuaInstallation,
     lua_rockspec::{Build, BuildInfo, BuiltinBuildSpec, DeploySpec, LuaModule, ModuleSpec},
     progress::{Progress, ProgressBar},
-    tree::RockLayout,
+    tree::{RockLayout, TreeError},
 };
 
-use super::BuildError;
+use super::utils::{CompileCFilesError, CompileCModulesError, InstallBinaryError};
+
+#[derive(Error, Debug)]
+pub enum BuiltinBuildError {
+    #[error(transparent)]
+    CompileCFiles(#[from] CompileCFilesError),
+    #[error(transparent)]
+    CompileCModules(#[from] CompileCModulesError),
+    #[error("failed to install binary {0}: {1}")]
+    InstallBinary(String, InstallBinaryError),
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    Tree(#[from] TreeError),
+}
 
 impl Build for BuiltinBuildSpec {
-    type Err = BuildError;
+    type Err = BuiltinBuildError;
 
     async fn run(
         self,
@@ -107,7 +123,7 @@ impl Build for BuiltinBuildSpec {
             let installed_bin_script =
                 utils::install_binary(&source, &target, &tree, lua, &DeploySpec::default(), config)
                     .await
-                    .map_err(|err| BuildError::InstallBinary(target.clone(), err))?;
+                    .map_err(|err| BuiltinBuildError::InstallBinary(target.clone(), err))?;
             binaries.push(
                 installed_bin_script
                     .file_name()
