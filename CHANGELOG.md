@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `lux-cli` - [0.3.14](https://github.com/nvim-neorocks/lux/compare/v0.3.13...v0.3.14) - 2025-05-01
+
+### Added
+- git dependencies for local projects ([#644](https://github.com/nvim-neorocks/lux/pull/644))
+- *(lib/install)* support installing from alternate sources ([#624](https://github.com/nvim-neorocks/lux/pull/624))
+
+### Fixed
+- *(build)* dependencies added as install tree entrypoints ([#651](https://github.com/nvim-neorocks/lux/pull/651))
+- *(build)* transitive dependencies added as dependencies of main package
+
+### Other
+- refactor!(lux-lib): builder for `PackageInstallSpec` ([#629](https://github.com/nvim-neorocks/lux/pull/629))
+
+## `lux-lib` - [0.3.11](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.3.10...lux-lib-v0.3.11) - 2025-05-01
+
+### Added
+- git dependencies for local projects ([#644](https://github.com/nvim-neorocks/lux/pull/644))
+- *(lib/install)* support installing from alternate sources ([#624](https://github.com/nvim-neorocks/lux/pull/624))
+
+### Fixed
+- *(build)* dependencies added as install tree entrypoints ([#651](https://github.com/nvim-neorocks/lux/pull/651))
+- *(build)* unpacking tar archive can panic ([#649](https://github.com/nvim-neorocks/lux/pull/649))
+
+### Other
+- refactor!(lux-lib): builder for `PackageInstallSpec` ([#629](https://github.com/nvim-neorocks/lux/pull/629))
+
 ## `lux-cli` - [0.3.13](https://github.com/nvim-neorocks/lux/compare/v0.3.12...v0.3.13) - 2025-04-29
 
 ### Other
