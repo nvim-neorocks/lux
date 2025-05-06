@@ -9,6 +9,15 @@ clap = { version = "4.5.23", features = ["derive"] }
 clap_complete = "4.5.40"
 clap_mangen = "0.2.24"
 lux-workspace-hack = { version = "0.1", path = "../lux-workspace-hack" }
+toml = "0.8.22"
 
 [dependencies.lux-cli]
 path = "../lux-cli"
+
+[features] # For lux-lua distribution
+default = []
+lua51 = []
+lua52 = []
+lua53 = []
+lua54 = []
+luajit = []

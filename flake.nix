@@ -43,7 +43,14 @@
       in {
         packages = with pkgs; {
           default = lux-cli;
-          inherit lux-cli;
+          inherit
+            lux-cli
+            lux-lua51
+            lux-lua52
+            lux-lua53
+            lux-lua54
+            lux-luajit
+            ;
         };
 
         devShells = let

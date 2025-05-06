@@ -100,6 +100,26 @@ The following table provides a brief comparison:
       To comply with SemVer, we treat anything after the third version component
       (except for the specrev) as a prerelease/build version.
 
+## :package: Packages
+
+Lux includes the following packages and libraries:
+
+- `lux-cli`: The main CLI for interacting with projects and installing Lua packages
+  from the command line.
+- `lux-lua`: The Lux Lua API, which provides:
+  - `lux.loader` for resolving dependencies on `require` at runtime.
+  - A work-in-progress API for embedding Lux into Lua applications.
+  We provide builds of `lux-lua` for Lua 5.1, 5.2, 5.3, 5.4 and Luajit.
+  `lux-cli` uses `lux-lua` for commands like `lx lua`, `lx run` and `lx path`.
+- `lux-lib`: The Lux library for Rust. A dependency of `lux-cli` and `lux-lua`.
+
+> ![NOTE]
+>
+> We do not yet provide a way to install `lux-lua` as a Lua library using Lux.
+> See [#663](https://github.com/nvim-neorocks/lux/issues/663).
+> Lux can detect a lux-lua installation using pkg-config
+> or via the `LUX_LIB_DIR` environment variable.
+
 ## :wrench: Building from source
 
 Dependencies:
@@ -114,6 +134,35 @@ We recommend building with the `vendored-lua` feature enabled:
 ```bash
 cargo build --features vendored-lua
 ```
+
+You can build `lux-lua` for a given Lua version with:
+
+```bash
+cargo xtask51 dist-lua # lux-lua for Lua 5.1
+cargo xtask52 dist-lua # for Lua 5.2
+cargo xtask53 dist-lua # ...
+cargo xtask54 dist-lua
+cargo xtaskjit dist-lua
+```
+
+This will install `lux-lua` to `target/dist/<lua>/lux.so`
+and a pkg-config `.pc` file to `target/dist/lib/lux-lua*.pc`.
+
+## :snowflake: Nix flake
+
+If you would like to use the latest version of lux with Nix,
+you can import our flake.
+It provides an overlay and packages for:
+
+- `lux-cli`: The Lux CLI package.
+- `lux-lua51` The Lux Lua API for Lua 5.1
+- `lux-lua52` The Lux Lua API for Lua 5.2
+- `lux-lua53` The Lux Lua API for Lua 5.3
+- `lux-lua54` The Lux Lua API for Lua 5.4
+- `lux-luajit` The Lux Lua API for Luajit
+
+If you have a `lux-lua` build and `pkg-config` in a Nix devShell,
+Lux will auto-detect `lux-lua`.
 
 ## :bulb: You may also like...
 

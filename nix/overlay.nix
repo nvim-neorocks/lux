@@ -2,6 +2,7 @@
   self,
   crane,
 }: final: prev: let
+  lib = final.lib;
   craneLib = crane.mkLib prev;
 
   cleanCargoSrc = craneLib.cleanCargoSource self;
@@ -56,24 +57,27 @@
 
   mk-lux-lua = {
     buildType ? "release",
-    luaVersion,
+    luaPkg,
+    isLuaJIT,
   }: let
+    luaMajorMinor = lib.take 2 (lib.splitVersion luaPkg.version);
+    luaVersionDir =
+      if isLuaJIT
+      then "jit"
+      else lib.concatStringsSep "." luaMajorMinor;
+    luaSuffix =
+      if isLuaJIT
+      then "jit"
+      else "${lib.concatStringsSep "" luaMajorMinor}";
+    luaFeature = "lua${luaSuffix}";
+
     luxLuaCargo = craneLib.crateNameFromCargoToml {src = "${self}/lux-lua";};
-    canonicalLuaVersion =
-      {
-        lua51 = "5.1";
-        lua52 = "5.2";
-        lua53 = "5.3";
-        lua54 = "5.4";
-      }
-      ."${luaVersion}";
-    luaPkg = final.${"lua" + builtins.replaceStrings ["."] ["_"] canonicalLuaVersion};
   in
     craneLib.buildPackage (individualCrateArgs
       // {
-        pname = "lux-lua-${canonicalLuaVersion}";
+        pname = "lux-lua";
         inherit (luxLuaCargo) version;
-        cargoExtraArgs = "-p ${luxLuaCargo.pname} --no-default-features --features ${luaVersion}";
+        cargoExtraArgs = "-p ${luxLuaCargo.pname} --no-default-features --features ${luaFeature}";
 
         buildInputs = individualCrateArgs.buildInputs ++ [luaPkg];
 
@@ -86,30 +90,20 @@
             RUSTFLAGS = "-L ${luaPkg}/lib -llua";
           };
 
-        installPhase = let
-          libExt = final.stdenv.hostPlatform.extensions.sharedLibrary;
-        in ''
-          mkdir -p $out/${canonicalLuaVersion}
-          cp target/${buildType}/liblux_lua${libExt} $out/${canonicalLuaVersion}/lux.so
+        postBuild = ''
+          cargo xtask${luaSuffix} dist-lua
+        '';
+
+        installPhase = ''
+          runHook preInstall
+          install -D -v target/dist/${luaVersionDir}/* -t $out/${luaVersionDir}
+          install -D -v target/dist/lib/pkgconfig/* -t $out/lib/pkgconfig
+          runHook postInstall
         '';
       });
 
-  lux-lua-all = {buildType ? "release"}:
-    with final;
-      symlinkJoin {
-        name = "lux-lua";
-        paths = lib.map (luaVersion: mk-lux-lua {inherit luaVersion buildType;}) [
-          "lua51"
-          "lua52"
-          "lua53"
-          "lua54"
-        ];
-      };
-
   # can't seem to override the buildType with override or overrideAttrs :(
-  mk-lux-cli = {buildType ? "release"}: let
-    lux-lua = lux-lua-all {inherit buildType;};
-  in
+  mk-lux-cli = {buildType ? "release"}:
     craneLib.buildPackage (individualCrateArgs
       // {
         inherit (luxCliCargo) pname version;
@@ -130,13 +124,30 @@
         '';
 
         meta.mainProgram = "lx";
-
-        # Instruct Lux to search for the lux-specific shared libraries in the lux-lua derivation
-        env.LUX_LIB_DIR = lux-lua;
       });
 in {
   lux-cli = mk-lux-cli {};
   lux-cli-debug = mk-lux-cli {buildType = "debug";};
+  lux-lua51 = mk-lux-lua {
+    luaPkg = final.lua5_1;
+    isLuaJIT = false;
+  };
+  lux-lua52 = mk-lux-lua {
+    luaPkg = final.lua5_2;
+    isLuaJIT = false;
+  };
+  lux-lua53 = mk-lux-lua {
+    luaPkg = final.lua5_3;
+    isLuaJIT = false;
+  };
+  lux-lua54 = mk-lux-lua {
+    luaPkg = final.lua5_3;
+    isLuaJIT = false;
+  };
+  lux-luajit = mk-lux-lua {
+    luaPkg = final.luajit;
+    isLuaJIT = true;
+  };
 
   lux-workspace-hack = craneLib.mkCargoDerivation {
     src = cleanCargoSrc;
