@@ -96,6 +96,7 @@ pub struct Cli {
     pub lua_dir: Option<PathBuf>,
 
     /// Which Lua installation to use.
+    /// Valid versions are: '5.1', '5.2', '5.3', '5.4', 'jit' and 'jit52'.
     #[arg(long, value_name = "ver")]
     pub lua_version: Option<LuaVersion>,
 

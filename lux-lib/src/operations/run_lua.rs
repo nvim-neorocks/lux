@@ -43,8 +43,6 @@ pub enum RunLuaError {
         installed_version: LuaVersion,
         lua_version: LuaVersion,
     },
-    #[error("could not parse Lua version from '{0} -v' output")]
-    ParseLuaVersionError(String),
     #[error("failed to run {lua_cmd}: {source}")]
     LuaCommandFailed {
         lua_cmd: String,
@@ -81,7 +79,14 @@ pub async fn run_lua(
             })?
         }
         Ok(_) => {}
-        Err(_) => Err(RunLuaError::ParseLuaVersionError(lua_cmd.clone()))?,
+        Err(_) => {
+            eprintln!(
+                "⚠️ WARNING: could not parse lua version from '{} -v' output.
+Cannot verify that the expected version is being used.
+                ",
+                &lua_cmd
+            );
+        }
     }
 
     let status = match Command::new(&lua_cmd)

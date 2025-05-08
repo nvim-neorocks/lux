@@ -116,7 +116,7 @@ impl DefaultFromConfig for Option<LuaVersion> {
 }
 
 #[derive(Error, Debug)]
-#[error("lua version not set! Please provide a version through `--lua-version <ver>`")]
+#[error("lua version not set! Please provide a version through `lx --lua-version <ver> <cmd>`\nValid versions are: '5.1', '5.2', '5.3', '5.4', 'jit' and 'jit52'.")]
 pub struct LuaVersionUnset;
 
 impl LuaVersion {
