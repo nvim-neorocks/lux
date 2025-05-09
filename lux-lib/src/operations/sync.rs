@@ -3,14 +3,14 @@ use std::{io, sync::Arc};
 use crate::{
     build::BuildBehaviour,
     config::Config,
-    lockfile::{
-        LocalPackage, LocalPackageLockType, LockfileIntegrityError, PackageSyncSpec,
-        ProjectLockfile, ReadWrite,
-    },
+    lockfile::{LocalPackage, LocalPackageLockType, LockfileIntegrityError},
     luarocks::luarocks_installation::LUAROCKS_VERSION,
     package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress},
-    rockspec::lua_dependency::LuaDependencySpec,
+    project::{
+        project_toml::LocalProjectTomlValidationError, Project, ProjectError, ProjectTreeError,
+    },
+    rockspec::Rockspec,
     tree::{self, Tree, TreeError},
 };
 use bon::{builder, Builder};
@@ -23,19 +23,17 @@ use super::{Install, InstallError, PackageInstallSpec, Remove, RemoveError};
 #[derive(Builder)]
 #[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
 pub struct Sync<'a> {
-    /// The tree to sync
     #[builder(start_fn)]
-    tree: &'a Tree,
-    /// The project lockfile to sync the tree with
-    #[builder(start_fn)]
-    project_lockfile: &'a mut ProjectLockfile<ReadWrite>,
+    project: &'a Project,
     #[builder(start_fn)]
     config: &'a Config,
+
     #[builder(field)]
+    extra_packages: Vec<PackageReq>,
+
+    custom_tree: Option<&'a Tree>,
+
     progress: Option<Arc<Progress<MultiProgress>>>,
-    /// Sync the source lockfile with these package requirements.
-    #[builder(field)]
-    packages: Option<Vec<LuaDependencySpec>>,
     /// Whether to validate the integrity of installed packages.
     validate_integrity: Option<bool>,
 }
@@ -44,26 +42,8 @@ impl<State> SyncBuilder<'_, State>
 where
     State: sync_builder::State,
 {
-    pub fn progress(mut self, progress: Arc<Progress<MultiProgress>>) -> Self {
-        self.progress = Some(progress);
-        self
-    }
-
-    pub fn packages(mut self, packages: Vec<LuaDependencySpec>) -> Self {
-        self.packages = Some(packages);
-        self
-    }
-
-    pub fn add_packages(&mut self, packages: Vec<LuaDependencySpec>) -> &Self {
-        self.packages = Some(packages);
-        self
-    }
-
-    fn add_package(&mut self, package: LuaDependencySpec) -> &Self {
-        match &mut self.packages {
-            Some(packages) => packages.push(package),
-            None => self.packages = Some(vec![package]),
-        }
+    pub fn add_package(mut self, package: PackageReq) -> Self {
+        self.extra_packages.push(package);
         self
     }
 }
@@ -77,22 +57,16 @@ where
     }
 
     pub async fn sync_test_dependencies(mut self) -> Result<SyncReport, SyncError> {
-        let busted = PackageReq::new("busted".into(), None).unwrap().into();
-        self.add_package(busted);
+        let busted = PackageReq::new("busted".into(), None).unwrap();
+        self = self.add_package(busted);
         do_sync(self._build(), &LocalPackageLockType::Test).await
     }
 
     pub async fn sync_build_dependencies(mut self) -> Result<SyncReport, SyncError> {
-        if cfg!(target_family = "unix")
-            && self
-                .packages
-                .as_ref()
-                .is_some_and(|packages| !packages.is_empty())
-        {
-            let luarocks = PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into()))
-                .unwrap()
-                .into();
-            self.add_package(luarocks);
+        if cfg!(target_family = "unix") && !self.extra_packages.is_empty() {
+            let luarocks =
+                PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into())).unwrap();
+            self = self.add_package(luarocks);
         }
         do_sync(self._build(), &LocalPackageLockType::Build).await
     }
@@ -116,25 +90,65 @@ pub enum SyncError {
     Remove(#[from] RemoveError),
     #[error("integrity error for package {0}: {1}\n")]
     Integrity(PackageName, LockfileIntegrityError),
+    #[error(transparent)]
+    ProjectTreeError(#[from] ProjectTreeError),
+    #[error(transparent)]
+    ProjectError(#[from] ProjectError),
+    #[error(transparent)]
+    LocalProjectTomlValidationError(#[from] LocalProjectTomlValidationError),
 }
 
 async fn do_sync(
     args: Sync<'_>,
     lock_type: &LocalPackageLockType,
 ) -> Result<SyncReport, SyncError> {
-    let progress = args.progress.unwrap_or(MultiProgress::new_arc());
-    std::fs::create_dir_all(args.tree.root())?;
-    let dest_lockfile = args.tree.lockfile()?;
-
-    let package_sync_spec = match &args.packages {
-        Some(packages) => args.project_lockfile.package_sync_spec(packages, lock_type),
-        None => PackageSyncSpec::default(),
+    let fallback_tree = match lock_type {
+        LocalPackageLockType::Regular | LocalPackageLockType::Build => {
+            args.project.tree(args.config)?
+        }
+        LocalPackageLockType::Test => args.project.test_tree(args.config)?,
     };
+    let tree = args.custom_tree.unwrap_or(&fallback_tree);
+    std::fs::create_dir_all(tree.root())?;
+
+    let mut project_lockfile = args.project.lockfile()?.write_guard();
+    let dest_lockfile = tree.lockfile()?;
+
+    let progress = args.progress.unwrap_or(MultiProgress::new_arc());
+
+    let packages = match lock_type {
+        LocalPackageLockType::Regular => args
+            .project
+            .toml()
+            .into_local()?
+            .dependencies()
+            .current_platform()
+            .clone(),
+        LocalPackageLockType::Build => args
+            .project
+            .toml()
+            .into_local()?
+            .build_dependencies()
+            .current_platform()
+            .clone(),
+        LocalPackageLockType::Test => args
+            .project
+            .toml()
+            .into_local()?
+            .test_dependencies()
+            .current_platform()
+            .clone(),
+    }
+    .into_iter()
+    .chain(args.extra_packages.into_iter().map_into())
+    .collect_vec();
+
+    let package_sync_spec = project_lockfile.package_sync_spec(&packages, lock_type);
 
     package_sync_spec
         .to_remove
         .iter()
-        .for_each(|pkg| args.project_lockfile.remove(pkg, lock_type));
+        .for_each(|pkg| project_lockfile.remove(pkg, lock_type));
 
     let mut to_add: Vec<(tree::EntryType, LocalPackage)> = Vec::new();
 
@@ -142,12 +156,9 @@ async fn do_sync(
         added: Vec::new(),
         removed: Vec::new(),
     };
-    for (id, local_package) in args.project_lockfile.rocks(lock_type) {
+    for (id, local_package) in project_lockfile.rocks(lock_type) {
         if dest_lockfile.get(id).is_none() {
-            let entry_type = if args
-                .project_lockfile
-                .is_entrypoint(&local_package.id(), lock_type)
-            {
+            let entry_type = if project_lockfile.is_entrypoint(&local_package.id(), lock_type) {
                 tree::EntryType::Entrypoint
             } else {
                 tree::EntryType::DependencyOnly
@@ -156,7 +167,7 @@ async fn do_sync(
         }
     }
     for (id, local_package) in dest_lockfile.rocks() {
-        if args.project_lockfile.get(id, lock_type).is_none() {
+        if project_lockfile.get(id, lock_type).is_none() {
             report.removed.push(local_package.clone());
         }
     }
@@ -177,12 +188,9 @@ async fn do_sync(
         .added
         .extend(to_add.iter().map(|(_, pkg)| pkg).cloned());
 
-    let package_db = args
-        .project_lockfile
-        .local_pkg_lock(lock_type)
-        .clone()
-        .into();
-    Install::new(args.tree, args.config)
+    let package_db = project_lockfile.local_pkg_lock(lock_type).clone().into();
+
+    Install::new(tree, args.config)
         .package_db(package_db)
         .packages(packages_to_install)
         .progress(progress.clone())
@@ -190,7 +198,7 @@ async fn do_sync(
         .await?;
 
     // Read the destination lockfile after installing
-    let dest_lockfile = args.tree.lockfile()?;
+    let dest_lockfile = tree.lockfile()?;
 
     if args.validate_integrity.unwrap_or(true) {
         for (_, package) in &to_add {
@@ -214,7 +222,7 @@ async fn do_sync(
         .await?;
 
     dest_lockfile.map_then_flush(|lockfile| -> Result<(), io::Error> {
-        lockfile.sync(args.project_lockfile.local_pkg_lock(lock_type));
+        lockfile.sync(project_lockfile.local_pkg_lock(lock_type));
         Ok(())
     })?;
 
@@ -229,7 +237,7 @@ async fn do_sync(
                 .build()
         });
 
-        let added = Install::new(args.tree, args.config)
+        let added = Install::new(tree, args.config)
             .packages(missing_packages)
             .progress(progress.clone())
             .install()
@@ -238,9 +246,8 @@ async fn do_sync(
         report.added.extend(added);
 
         // Sync the newly added packages back to the project lockfile
-        let dest_lockfile = args.tree.lockfile()?;
-        args.project_lockfile
-            .sync(dest_lockfile.local_pkg_lock(), lock_type);
+        let dest_lockfile = tree.lockfile()?;
+        project_lockfile.sync(dest_lockfile.local_pkg_lock(), lock_type);
     }
 
     Ok(report)
@@ -248,13 +255,13 @@ async fn do_sync(
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
+    use super::Sync;
+    use crate::{
+        config::ConfigBuilder, lockfile::LocalPackageLockType, package::PackageReq,
+        project::Project,
+    };
     use assert_fs::{prelude::PathCopy, TempDir};
-
-    use crate::config::{ConfigBuilder, LuaVersion};
-
-    use super::*;
+    use std::path::PathBuf;
 
     #[tokio::test]
     async fn test_sync_add_rocks() {
@@ -262,26 +269,24 @@ mod tests {
             println!("Skipping impure test");
             return;
         }
-        let project_lockfile_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/lux.lock");
-        let mut source_lockfile = ProjectLockfile::new(project_lockfile_path.clone())
-            .unwrap()
-            .write_guard();
         let temp_dir = TempDir::new().unwrap();
-        let config = ConfigBuilder::new()
-            .unwrap()
-            .tree(Some(temp_dir.path().into()))
-            .build()
+        temp_dir
+            .copy_from(
+                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("resources/test/sample-project-dependencies"),
+                &["**"],
+            )
             .unwrap();
-        let dest_tree = config.tree(LuaVersion::Lua51).unwrap();
-        let report = Sync::new(&dest_tree, &mut source_lockfile, &config)
+        let project = Project::from_exact(temp_dir.path()).unwrap().unwrap();
+        let config = ConfigBuilder::new().unwrap().build().unwrap();
+        let report = Sync::new(&project, &config)
             .sync_dependencies()
             .await
             .unwrap();
         assert!(report.removed.is_empty());
         assert!(!report.added.is_empty());
 
-        let lockfile_after_sync = ProjectLockfile::new(project_lockfile_path).unwrap();
+        let lockfile_after_sync = project.lockfile().unwrap();
         assert!(!lockfile_after_sync
             .rocks(&LocalPackageLockType::Regular)
             .is_empty());
@@ -293,36 +298,31 @@ mod tests {
             println!("Skipping impure test");
             return;
         }
-        let empty_lockfile_dir = TempDir::new().unwrap();
-        let lockfile_path = empty_lockfile_dir.path().join("lux.lock");
+        let temp_dir = TempDir::new().unwrap();
+        temp_dir
+            .copy_from(
+                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("resources/test/sample-project-dependencies"),
+                &["**"],
+            )
+            .unwrap();
+        let temp_dir = temp_dir.into_persistent();
+        let config = ConfigBuilder::new().unwrap().build().unwrap();
+        let project = Project::from_exact(temp_dir.path()).unwrap().unwrap();
         {
-            let mut empty_lockfile = ProjectLockfile::new(lockfile_path.clone())
-                .unwrap()
-                .write_guard();
-            let temp_dir = TempDir::new().unwrap();
-            let config = ConfigBuilder::new()
-                .unwrap()
-                .tree(Some(temp_dir.path().into()))
-                .build()
-                .unwrap();
-            let dest_tree = config.tree(LuaVersion::Lua51).unwrap();
-            let report = Sync::new(&dest_tree, &mut empty_lockfile, &config)
-                .packages(vec![PackageReq::new("toml-edit".into(), None)
-                    .unwrap()
-                    .into()])
+            let report = Sync::new(&project, &config)
+                .add_package(PackageReq::new("toml-edit".into(), None).unwrap())
                 .sync_dependencies()
                 .await
                 .unwrap();
             assert!(report.removed.is_empty());
             assert!(!report.added.is_empty());
-            assert!(!report
+            assert!(report
                 .added
                 .iter()
-                .filter(|pkg| pkg.name().to_string() == "toml-edit")
-                .collect_vec()
-                .is_empty());
+                .any(|pkg| pkg.name().to_string() == "toml-edit"));
         }
-        let lockfile_after_sync = ProjectLockfile::new(lockfile_path).unwrap();
+        let lockfile_after_sync = project.lockfile().unwrap();
         assert!(!lockfile_after_sync
             .rocks(&LocalPackageLockType::Regular)
             .is_empty());
@@ -344,54 +344,54 @@ mod tests {
                 &["**"],
             )
             .unwrap();
-        let temp_dir = temp_dir.into_persistent();
         let config = ConfigBuilder::new().unwrap().build().unwrap();
-        let project = crate::project::Project::from_exact(temp_dir.path())
-            .unwrap()
-            .unwrap();
-        let tree = project.tree(&config).unwrap();
-        let mut lockfile = project.lockfile().unwrap().write_guard();
-        let report = Sync::new(&tree, &mut lockfile, &config)
-            .packages(vec![PackageReq::new("toml-edit".into(), None)
-                .unwrap()
-                .into()])
-            .sync_dependencies()
-            .await
-            .unwrap();
-        assert!(report.removed.is_empty());
-        assert!(!report.added.is_empty());
-        assert!(report
-            .added
-            .iter()
-            .any(|pkg| pkg.name().to_string() == "toml-edit"));
+        let project = Project::from_exact(temp_dir.path()).unwrap().unwrap();
+        {
+            let report = Sync::new(&project, &config)
+                .add_package(PackageReq::new("toml-edit".into(), None).unwrap())
+                .sync_dependencies()
+                .await
+                .unwrap();
+            assert!(report.removed.is_empty());
+            assert!(!report.added.is_empty());
+            assert!(report
+                .added
+                .iter()
+                .any(|pkg| pkg.name().to_string() == "toml-edit"));
+        }
+        let lockfile_after_sync = project.lockfile().unwrap();
+        assert!(!lockfile_after_sync
+            .rocks(&LocalPackageLockType::Regular)
+            .is_empty());
     }
 
     #[tokio::test]
     async fn test_sync_remove_rocks() {
-        let tree_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-tree");
         let temp_dir = TempDir::new().unwrap();
-        temp_dir.copy_from(&tree_path, &["**"]).unwrap();
-        let empty_lockfile_dir = TempDir::new().unwrap();
-        let lockfile_path = empty_lockfile_dir.path().join("lux.lock");
-        let mut empty_lockfile = ProjectLockfile::new(lockfile_path.clone())
-            .unwrap()
-            .write_guard();
-        let config = ConfigBuilder::new()
-            .unwrap()
-            .tree(Some(temp_dir.path().into()))
-            .build()
+        temp_dir
+            .copy_from(
+                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("resources/test/sample-project-dependencies"),
+                &["**"],
+            )
             .unwrap();
-        let dest_tree = config.tree(LuaVersion::Lua51).unwrap();
-        let report = Sync::new(&dest_tree, &mut empty_lockfile, &config)
+        let config = ConfigBuilder::new().unwrap().build().unwrap();
+        let project = Project::from_exact(temp_dir.path()).unwrap().unwrap();
+        // First sync to create the tree and lockfile
+        Sync::new(&project, &config)
+            .add_package(PackageReq::new("toml-edit".into(), None).unwrap())
+            .sync_dependencies()
+            .await
+            .unwrap();
+        let report = Sync::new(&project, &config)
             .sync_dependencies()
             .await
             .unwrap();
         assert!(!report.removed.is_empty());
         assert!(report.added.is_empty());
 
-        let lockfile_after_sync = ProjectLockfile::new(lockfile_path).unwrap();
-        assert!(lockfile_after_sync
+        let lockfile_after_sync = project.lockfile().unwrap();
+        assert!(!lockfile_after_sync
             .rocks(&LocalPackageLockType::Regular)
             .is_empty());
     }

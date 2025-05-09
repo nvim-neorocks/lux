@@ -101,11 +101,8 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                 .await?;
         }
     } else {
-        let mut project_lockfile = project.lockfile()?.write_guard();
-
-        Sync::new(&tree, &mut project_lockfile, &config)
+        Sync::new(&project, &config)
             .progress(progress.clone())
-            .packages(dependencies)
             .sync_dependencies()
             .await
             .wrap_err(
@@ -115,9 +112,8 @@ Use --no-lock to force a new build.
 ",
             )?;
 
-        Sync::new(luarocks.tree(), &mut project_lockfile, luarocks.config())
+        Sync::new(&project, luarocks.config())
             .progress(progress.clone())
-            .packages(build_dependencies)
             .sync_build_dependencies()
             .await
             .wrap_err(

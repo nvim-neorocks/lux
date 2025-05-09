@@ -50,15 +50,11 @@ pub async fn set_pinned_state(data: ChangePin, config: Config, pin: PinnedState)
                 project
                     .set_pinned_state(lua_dependency::LuaDependencyType::Regular(packages), pin)
                     .await?;
-                if let Some(lockfile) = project.try_lockfile()? {
-                    let mut lockfile = lockfile.write_guard();
-                    let tree = project.tree(&config)?;
-                    operations::Sync::new(&tree, &mut lockfile, &config)
-                        .progress(progress.clone())
-                        .sync_dependencies()
-                        .await
-                        .wrap_err("syncing dependencies with the project lockfile failed.")?;
-                }
+                operations::Sync::new(&project, &config)
+                    .progress(progress.clone())
+                    .sync_dependencies()
+                    .await
+                    .wrap_err("syncing dependencies with the project lockfile failed.")?;
             }
             let build_packages = data.build.unwrap_or_default();
             if !build_packages.is_empty() {
@@ -68,30 +64,24 @@ pub async fn set_pinned_state(data: ChangePin, config: Config, pin: PinnedState)
                         pin,
                     )
                     .await?;
-                if let Some(lockfile) = project.try_lockfile()? {
-                    let luarocks = LuaRocksInstallation::new(&config)?;
-                    let mut lockfile = lockfile.write_guard();
-                    operations::Sync::new(luarocks.tree(), &mut lockfile, luarocks.config())
-                        .progress(progress.clone())
-                        .sync_build_dependencies()
-                        .await
-                        .wrap_err("syncing build dependencies with the project lockfile failed.")?;
-                }
+                let luarocks = LuaRocksInstallation::new(&config)?;
+                operations::Sync::new(&project, luarocks.config())
+                    .progress(progress.clone())
+                    .custom_tree(luarocks.tree())
+                    .sync_build_dependencies()
+                    .await
+                    .wrap_err("syncing build dependencies with the project lockfile failed.")?;
             }
             let test_packages = data.test.unwrap_or_default();
             if !test_packages.is_empty() {
                 project
                     .set_pinned_state(lua_dependency::LuaDependencyType::Test(test_packages), pin)
                     .await?;
-                if let Some(lockfile) = project.try_lockfile()? {
-                    let mut lockfile = lockfile.write_guard();
-                    let tree = project.test_tree(&config)?;
-                    operations::Sync::new(&tree, &mut lockfile, &config)
-                        .progress(progress.clone())
-                        .sync_test_dependencies()
-                        .await
-                        .wrap_err("syncing test dependencies with the project lockfile failed.")?;
-                }
+                operations::Sync::new(&project, &config)
+                    .progress(progress.clone())
+                    .sync_test_dependencies()
+                    .await
+                    .wrap_err("syncing test dependencies with the project lockfile failed.")?;
             }
         }
         None => {
