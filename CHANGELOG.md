@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `lux-cli` - [0.3.15](https://github.com/nvim-neorocks/lux/compare/v0.3.14...v0.3.15) - 2025-05-09
+
+### Added
+- *(cli)* nicer error messages
+
+### Fixed
+- *(cli)* rough UX on luajit
+
+### Other
+- *(deps)* bump tokio from 1.44.0 to 1.45.0 ([#659](https://github.com/nvim-neorocks/lux/pull/659))
+- add git dependencies to comparison table
+
+## `lux-lib` - [0.3.12](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.3.11...lux-lib-v0.3.12) - 2025-05-09
+
+### Added
+- more Lua coverage + Lua tests
+
+### Fixed
+- *(cli)* rough UX on luajit
+
+### Other
+- *(deps)* bump tokio from 1.44.0 to 1.45.0 ([#659](https://github.com/nvim-neorocks/lux/pull/659))
+- add git dependencies to comparison table
+- *(deps)* bump luajit-src from 210.5.11+97813fb to 210.5.12+a4f56a4 ([#656](https://github.com/nvim-neorocks/lux/pull/656))
+
 ## `lux-cli` - [0.3.14](https://github.com/nvim-neorocks/lux/compare/v0.3.13...v0.3.14) - 2025-05-01
 
 ### Added
