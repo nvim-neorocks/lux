@@ -1,14 +1,36 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use eyre::{Context, Result};
 use lux_lib::{
     config::Config,
+    git::shorthand::GitUrlShorthand,
     luarocks::luarocks_installation::LuaRocksInstallation,
     operations::Sync,
+    package::PackageReq,
     progress::{MultiProgress, Progress},
     project::Project,
     rockspec::Rockspec,
 };
+
+/// Used for parsing alternatives between a git URL shorthand and a package requirement.
+// The `FromStr` instance tries to parse a git URL shorthand first (expecting a git host prefix),
+// and then a package requirement.
+#[derive(Debug, Clone)]
+pub enum PackageReqOrGitShorthand {
+    PackageReq(PackageReq),
+    GitShorthand(GitUrlShorthand),
+}
+
+impl FromStr for PackageReqOrGitShorthand {
+    type Err = eyre::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match GitUrlShorthand::parse_with_prefix(s) {
+            Ok(shorthand) => Ok(Self::GitShorthand(shorthand)),
+            Err(_) => Ok(Self::PackageReq(PackageReq::parse(s)?)),
+        }
+    }
+}
 
 pub async fn sync_dependencies_if_locked(
     project: &Project,

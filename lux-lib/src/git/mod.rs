@@ -4,6 +4,7 @@ use mlua::UserData;
 use crate::lua_rockspec::{DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue};
 
 pub mod shorthand;
+pub mod utils;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct GitSource {

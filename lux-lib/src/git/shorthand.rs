@@ -1,7 +1,7 @@
 use std::{fmt::Display, str::FromStr};
 
 use chumsky::{prelude::*, Parser};
-use git_url_parse::GitUrl;
+use git_url_parse::{GitUrl, GitUrlParseError};
 use serde::{de, Deserialize, Deserializer};
 use thiserror::Error;
 
@@ -15,8 +15,18 @@ const CODEBERG: &str = "codeberg";
 pub struct ParseError(Vec<String>);
 
 /// Helper for parsing Git URLs from shorthands, e.g. "gitlab:owner/repo"
-#[derive(Debug)]
-pub(crate) struct GitUrlShorthand(GitUrl);
+#[derive(Debug, Clone)]
+pub struct GitUrlShorthand(GitUrl);
+
+impl GitUrlShorthand {
+    pub fn parse_with_prefix(s: &str) -> Result<Self, ParseError> {
+        prefix_parser()
+            .parse(s)
+            .into_result()
+            .map_err(|err| ParseError(err.into_iter().map(|e| e.to_string()).collect()))
+    }
+    pub fn repo_name() {}
+}
 
 impl FromStr for GitUrlShorthand {
     type Err = ParseError;
@@ -69,6 +79,63 @@ enum GitHost {
     Codeberg,
 }
 
+fn url_from_git_host(
+    host: GitHost,
+    owner: String,
+    repo: String,
+) -> Result<GitUrlShorthand, GitUrlParseError> {
+    let url_str = match host {
+        GitHost::Github => format!("https://github.com/{}/{}.git", owner, repo),
+        GitHost::Gitlab => format!("https://gitlab.com/{}/{}.git", owner, repo),
+        GitHost::Sourcehut => format!("https://git.sr.ht/~{}/{}", owner, repo),
+        GitHost::Codeberg => format!("https://codeberg.org/~{}/{}.git", owner, repo),
+    };
+    let url = url_str.parse()?;
+    Ok(GitUrlShorthand(url))
+}
+
+fn to_tuple<T>(v: Vec<T>) -> (T, T)
+where
+    T: Clone,
+{
+    (v[0].clone(), v[1].clone())
+}
+
+// A parser that expects a prefix
+fn prefix_parser<'a>(
+) -> impl Parser<'a, &'a str, GitUrlShorthand, chumsky::extra::Err<Rich<'a, char>>> {
+    let git_host_prefix = just(GITHUB)
+        .or(just(GITLAB).or(just(SOURCEHUT).or(just(CODEBERG))))
+        .then_ignore(just(":"))
+        .map(|prefix| match prefix {
+            GITHUB => GitHost::Github,
+            GITLAB => GitHost::Gitlab,
+            SOURCEHUT => GitHost::Sourcehut,
+            CODEBERG => GitHost::Codeberg,
+            _ => unreachable!(),
+        })
+        .map_err(|err: Rich<'a, char>| {
+            let span = *err.span();
+            Rich::custom(span, "missing git host prefix. Expected 'github:', 'gitlab:', 'sourcehut:' or 'codeberg:'.")
+        });
+    let owner_repo = none_of('/')
+        .repeated()
+        .collect::<String>()
+        .separated_by(just('/'))
+        .exactly(2)
+        .collect::<Vec<String>>()
+        .map(to_tuple);
+    git_host_prefix
+        .then(owner_repo)
+        .try_map(|(host, (owner, repo)), span| {
+            let url = url_from_git_host(host, owner, repo).map_err(|err| {
+                Rich::custom(span, format!("error parsing git url shorthand: {}", err))
+            })?;
+            Ok(url)
+        })
+}
+
+// A more lenient parser that defaults to github: if there is not prefix
 fn parser<'a>() -> impl Parser<'a, &'a str, GitUrlShorthand, chumsky::extra::Err<Rich<'a, char>>> {
     let git_host_prefix = just(GITHUB)
         .or(just(GITLAB).or(just(SOURCEHUT).or(just(CODEBERG))))
@@ -87,20 +154,14 @@ fn parser<'a>() -> impl Parser<'a, &'a str, GitUrlShorthand, chumsky::extra::Err
         .separated_by(just('/'))
         .exactly(2)
         .collect::<Vec<String>>()
-        .map(|v| (v[0].clone(), v[1].clone()));
+        .map(to_tuple);
     git_host_prefix
         .then(owner_repo)
         .try_map(|(host, (owner, repo)), span| {
-            let url_str = match host {
-                GitHost::Github => format!("https://github.com/{}/{}.git", owner, repo),
-                GitHost::Gitlab => format!("https://gitlab.com/{}/{}.git", owner, repo),
-                GitHost::Sourcehut => format!("https://git.sr.ht/~{}/{}", owner, repo),
-                GitHost::Codeberg => format!("https://codeberg.org/~{}/{}.git", owner, repo),
-            };
-            let url = url_str.parse().map_err(|err| {
+            let url = url_from_git_host(host, owner, repo).map_err(|err| {
                 Rich::custom(span, format!("error parsing git url shorthand: {}", err))
             })?;
-            Ok(GitUrlShorthand(url))
+            Ok(url)
         })
 }
 
@@ -199,5 +260,15 @@ mod tests {
             Some("git@github.com:nvim-neorocks".to_string())
         );
         assert_eq!(url_shorthand.0.name, "lux".to_string());
+    }
+
+    #[tokio::test]
+    async fn parse_with_prefix() {
+        GitUrlShorthand::parse_with_prefix("nvim-neorocks/lux").unwrap_err();
+        GitUrlShorthand::parse_with_prefix("github:nvim-neorocks/lux").unwrap();
+        GitUrlShorthand::parse_with_prefix("gitlab:nvim-neorocks/lux").unwrap();
+        GitUrlShorthand::parse_with_prefix("sourcehut:nvim-neorocks/lux").unwrap();
+        GitUrlShorthand::parse_with_prefix("codeberg:nvim-neorocks/lux").unwrap();
+        GitUrlShorthand::parse_with_prefix("bla:nvim-neorocks/lux").unwrap_err();
     }
 }

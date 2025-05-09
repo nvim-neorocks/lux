@@ -68,14 +68,10 @@ pub enum IntoRemoteRockspecError {
 }
 
 #[derive(Error, Debug)]
+#[error(transparent)]
 pub enum ProjectEditError {
-    #[error(transparent)]
     Io(#[from] tokio::io::Error),
-    #[error(transparent)]
     Toml(#[from] toml_edit::TomlError),
-    #[error("error parsing lux.toml after edit. This is probably a bug.")]
-    TomlDe(#[from] toml::de::Error),
-    #[error(transparent)]
     Git(#[from] GitError),
 }
 
@@ -97,8 +93,6 @@ pub enum PinError {
     },
     #[error(transparent)]
     Toml(#[from] toml_edit::TomlError),
-    #[error("error parsing lux.toml after edit. This is probably a bug.")]
-    TomlDe(#[from] toml::de::Error),
     #[error(transparent)]
     Io(#[from] tokio::io::Error),
 }
@@ -410,9 +404,54 @@ impl Project {
             }
         };
 
-        let toml_content = project_toml.to_string();
-        tokio::fs::write(self.toml_path(), &toml_content).await?;
-        self.toml = PartialProjectToml::new(&toml_content, self.root.clone())?;
+        tokio::fs::write(self.toml_path(), project_toml.to_string()).await?;
+
+        match dependencies {
+            DependencyType::Regular(deps) => {
+                self.toml.dependencies = Some(
+                    self.toml
+                        .dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .chain(deps.iter().cloned().map(|dep| dep.into()))
+                        .collect(),
+                )
+            }
+            DependencyType::Build(deps) => {
+                self.toml.build_dependencies = Some(
+                    self.toml
+                        .build_dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .chain(deps.iter().cloned().map(|dep| dep.into()))
+                        .collect(),
+                )
+            }
+            DependencyType::Test(deps) => {
+                self.toml.test_dependencies = Some(
+                    self.toml
+                        .test_dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .chain(deps.iter().cloned().map(|dep| dep.into()))
+                        .collect(),
+                )
+            }
+            DependencyType::External(deps) => {
+                self.toml.external_dependencies = Some(
+                    self.toml
+                        .external_dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .chain(deps)
+                        .collect(),
+                )
+            }
+        };
 
         Ok(())
     }
@@ -443,11 +482,6 @@ impl Project {
                 }
             }
         }
-
-        let toml_content = project_toml.to_string();
-        tokio::fs::write(self.toml_path(), &toml_content).await?;
-        self.toml = PartialProjectToml::new(&toml_content, self.root.clone())?;
-
         Ok(())
     }
 
@@ -486,9 +520,54 @@ impl Project {
             }
         };
 
-        let toml_content = project_toml.to_string();
-        tokio::fs::write(self.toml_path(), &toml_content).await?;
-        self.toml = PartialProjectToml::new(&toml_content, self.root.clone())?;
+        tokio::fs::write(self.toml_path(), project_toml.to_string()).await?;
+
+        match dependencies {
+            DependencyType::Regular(deps) => {
+                self.toml.dependencies = Some(
+                    self.toml
+                        .dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter(|dep| !&deps.iter().any(|d| d == dep.name()))
+                        .collect(),
+                )
+            }
+            DependencyType::Build(deps) => {
+                self.toml.build_dependencies = Some(
+                    self.toml
+                        .build_dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter(|dep| !&deps.iter().any(|d| d == dep.name()))
+                        .collect(),
+                )
+            }
+            DependencyType::Test(deps) => {
+                self.toml.test_dependencies = Some(
+                    self.toml
+                        .test_dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter(|dep| !&deps.iter().any(|d| d == dep.name()))
+                        .collect(),
+                )
+            }
+            DependencyType::External(deps) => {
+                self.toml.external_dependencies = Some(
+                    self.toml
+                        .external_dependencies
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter(|(dep, _)| !&deps.iter().any(|(d, _)| d == dep))
+                        .collect(),
+                )
+            }
+        };
 
         Ok(())
     }
@@ -522,9 +601,7 @@ impl Project {
             }
         }
 
-        let toml_content = project_toml.to_string();
-        tokio::fs::write(self.toml_path(), &toml_content).await?;
-        self.toml = PartialProjectToml::new(&toml_content, self.root.clone())?;
+        tokio::fs::write(self.toml_path(), project_toml.to_string()).await?;
 
         Ok(())
     }
@@ -644,9 +721,7 @@ impl Project {
             }
         }
 
-        let toml_content = project_toml.to_string();
-        tokio::fs::write(self.toml_path(), &toml_content).await?;
-        self.toml = PartialProjectToml::new(&toml_content, self.root.clone())?;
+        tokio::fs::write(self.toml_path(), project_toml.to_string()).await?;
 
         Ok(())
     }
