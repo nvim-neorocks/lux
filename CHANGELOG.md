@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `lux-cli` - [0.3.16](https://github.com/nvim-neorocks/lux/compare/v0.3.15...v0.3.16) - 2025-05-10
+
+### Added
+- *(cli)* `lx add` for git dependencies ([#667](https://github.com/nvim-neorocks/lux/pull/667))
+
+## `lux-lib` - [0.3.13](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.3.12...lux-lib-v0.3.13) - 2025-05-10
+
+### Added
+- *(cli)* `lx add` for git dependencies ([#667](https://github.com/nvim-neorocks/lux/pull/667))
+
 ## `lux-cli` - [0.3.15](https://github.com/nvim-neorocks/lux/compare/v0.3.14...v0.3.15) - 2025-05-09
 
 ### Added
