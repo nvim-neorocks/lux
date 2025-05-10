@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `lux-cli` - [0.4.0](https://github.com/nvim-neorocks/lux/compare/v0.3.15...v0.4.0) - 2025-05-10
+
+### Added
+- use pkg-config to probe lux-lua
+- *(cli)* `lx add` for git dependencies ([#667](https://github.com/nvim-neorocks/lux/pull/667))
+
+### Other
+- [**breaking**] unify `Sync` by making it take in a `Project`
+
+## `lux-lib` - [0.4.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.3.12...lux-lib-v0.4.0) - 2025-05-10
+
+### Added
+- *(cli)* `lx update` for git dependencies ([#671](https://github.com/nvim-neorocks/lux/pull/671))
+- use pkg-config to probe lux-lua
+- *(cli)* `lx add` for git dependencies ([#667](https://github.com/nvim-neorocks/lux/pull/667))
+
+### Fixed
+- *(project)* use project tree instead of tree provided in configuration
+- *(cli)* fields removed on update
+
+### Other
+- [**breaking**] unify `Sync` by making it take in a `Project`
+
 ## `lux-cli` - [0.3.15](https://github.com/nvim-neorocks/lux/compare/v0.3.14...v0.3.15) - 2025-05-09
 
 ### Added
