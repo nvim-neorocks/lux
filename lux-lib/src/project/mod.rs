@@ -517,7 +517,17 @@ impl Project {
                         .latest_version(dep)
                         .expect("unable to query latest version for package")
                         .to_string();
-                    table[dep.to_string()] = toml_edit::value(dep_version_str);
+                    let mut dep_item = table[dep.to_string()].clone();
+                    match dep_item {
+                        Item::Value(_) => {
+                            table[dep.to_string()] = toml_edit::value(dep_version_str);
+                        }
+                        Item::Table(_) => {
+                            dep_item["version".to_string()] = toml_edit::value(dep_version_str);
+                            table[dep.to_string()] = dep_item;
+                        }
+                        _ => {}
+                    }
                 }
             }
         }
