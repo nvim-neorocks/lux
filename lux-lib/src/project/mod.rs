@@ -77,6 +77,14 @@ pub enum ProjectEditError {
     TomlDe(#[from] toml::de::Error),
     #[error(transparent)]
     Git(#[from] GitError),
+    #[error("unable to query latest version for {0}")]
+    LatestVersionNotFound(PackageName),
+    #[error("expected field to be a value, but got {0}")]
+    ExpectedValue(toml_edit::Item),
+    #[error("expected string, but got {0}")]
+    ExpectedString(toml_edit::Value),
+    #[error(transparent)]
+    GitUrlShorthandParse(#[from] git::shorthand::ParseError),
 }
 
 #[derive(Error, Debug)]
@@ -516,19 +524,46 @@ impl Project {
             LuaDependencyType::Regular(ref deps)
             | LuaDependencyType::Build(ref deps)
             | LuaDependencyType::Test(ref deps) => {
+                let latest_rock_version_str =
+                    |dep: &PackageName| -> Result<String, ProjectEditError> {
+                        Ok(package_db
+                            .latest_version(dep)
+                            .ok_or(ProjectEditError::LatestVersionNotFound(dep.clone()))?
+                            .to_string())
+                    };
                 for dep in deps {
-                    let dep_version_str = package_db
-                        .latest_version(dep)
-                        .expect("unable to query latest version for package")
-                        .to_string();
                     let mut dep_item = table[dep.to_string()].clone();
-                    match dep_item {
+                    match &dep_item {
                         Item::Value(_) => {
+                            let dep_version_str = latest_rock_version_str(dep)?;
                             table[dep.to_string()] = toml_edit::value(dep_version_str);
                         }
-                        Item::Table(_) => {
-                            dep_item["version".to_string()] = toml_edit::value(dep_version_str);
-                            table[dep.to_string()] = dep_item;
+                        Item::Table(tbl) => {
+                            if tbl.contains_key("git") {
+                                let git_value = tbl
+                                    .get("git")
+                                    .expect("expected 'git' field")
+                                    .clone()
+                                    .into_value()
+                                    .map_err(ProjectEditError::ExpectedValue)?;
+                                let git_url_str = git_value
+                                    .as_str()
+                                    .ok_or(ProjectEditError::ExpectedString(git_value.clone()))?;
+                                let shorthand: GitUrlShorthand = git_url_str.parse()?;
+                                let latest_rev =
+                                    git::utils::latest_semver_tag_or_commit_sha(&shorthand.into())?;
+                                let key = if tbl.contains_key("rev") {
+                                    "rev".to_string()
+                                } else {
+                                    "version".to_string()
+                                };
+                                dep_item[key] = toml_edit::value(latest_rev);
+                                table[dep.to_string()] = dep_item;
+                            } else {
+                                let dep_version_str = latest_rock_version_str(dep)?;
+                                dep_item["version".to_string()] = toml_edit::value(dep_version_str);
+                                table[dep.to_string()] = dep_item;
+                            }
                         }
                         _ => {}
                     }
@@ -550,7 +585,6 @@ impl Project {
         if let Some(dependencies) = &self.toml().dependencies {
             let packages = dependencies
                 .iter()
-                .filter(|dep| dep.source().is_none()) // We don't support upgrading git sources for now
                 .map(|dep| dep.name())
                 .cloned()
                 .collect_vec();
@@ -560,7 +594,6 @@ impl Project {
         if let Some(dependencies) = &self.toml().build_dependencies {
             let packages = dependencies
                 .iter()
-                .filter(|dep| dep.source().is_none())
                 .map(|dep| dep.name())
                 .cloned()
                 .collect_vec();
@@ -570,7 +603,6 @@ impl Project {
         if let Some(dependencies) = &self.toml().test_dependencies {
             let packages = dependencies
                 .iter()
-                .filter(|dep| dep.source().is_none())
                 .map(|dep| dep.name())
                 .cloned()
                 .collect_vec();

@@ -1618,7 +1618,7 @@ mod tests {
         let source_spec = RockSourceSpec::Git(source);
         let rockspec =
             RemoteLuaRockspec::from_package_and_source_spec(package_req, source_spec.clone());
-        let generated_rockspec_str = dbg!(rockspec.local.raw_content);
+        let generated_rockspec_str = rockspec.local.raw_content;
         let rockspec2 = RemoteLuaRockspec::new(&generated_rockspec_str).unwrap();
         assert_eq!(rockspec2.local.package, "foo".into());
         assert_eq!(rockspec2.local.version, "1.0.5".parse().unwrap());
