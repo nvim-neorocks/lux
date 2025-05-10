@@ -329,6 +329,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn regression_sync_nonexistent_lock() {
+        // This test checks that we can sync a lockfile that doesn't exist yet, and whether
+        // the sync report is valid.
+        if std::env::var("LUX_SKIP_IMPURE_TESTS").unwrap_or("0".into()) == "1" {
+            println!("Skipping impure test");
+            return;
+        }
+        let temp_dir = TempDir::new().unwrap();
+        temp_dir
+            .copy_from(
+                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("resources/test/sample-project-dependencies"),
+                &["**"],
+            )
+            .unwrap();
+        let temp_dir = temp_dir.into_persistent();
+        let config = ConfigBuilder::new().unwrap().build().unwrap();
+        let project = crate::project::Project::from_exact(temp_dir.path())
+            .unwrap()
+            .unwrap();
+        let tree = project.tree(&config).unwrap();
+        let mut lockfile = project.lockfile().unwrap().write_guard();
+        let report = Sync::new(&tree, &mut lockfile, &config)
+            .packages(vec![PackageReq::new("toml-edit".into(), None)
+                .unwrap()
+                .into()])
+            .sync_dependencies()
+            .await
+            .unwrap();
+        assert!(report.removed.is_empty());
+        assert!(!report.added.is_empty());
+        assert!(report
+            .added
+            .iter()
+            .any(|pkg| pkg.name().to_string() == "toml-edit"));
+    }
+
+    #[tokio::test]
     async fn test_sync_remove_rocks() {
         let tree_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-tree");

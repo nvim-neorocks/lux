@@ -280,6 +280,11 @@ impl Tree {
     pub fn lockfile_path(&self) -> PathBuf {
         self.root().join(LOCKFILE_NAME)
     }
+
+    pub(crate) fn test_tree(&self, config: &Config) -> Result<Tree, TreeError> {
+        let test_tree_root = self.root().join("test_dependencies");
+        Tree::new(test_tree_root, self.version.clone(), config)
+    }
 }
 
 impl mlua::UserData for Tree {
