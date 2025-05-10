@@ -258,9 +258,7 @@ impl Config {
     }
 
     pub fn test_tree(&self, version: LuaVersion) -> Result<Tree, TreeError> {
-        let tree = self.tree(version.clone())?;
-        let test_tree_root = tree.root().join("test_dependencies");
-        Tree::new(test_tree_root, version, self)
+        self.tree(version)?.test_tree(self)
     }
 
     /// The tree in which to install luarocks for use as a compatibility layer

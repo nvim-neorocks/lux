@@ -341,11 +341,15 @@ impl Project {
     }
 
     pub fn tree(&self, config: &Config) -> Result<Tree, ProjectTreeError> {
-        Ok(config.tree(self.lua_version(config)?)?)
+        Ok(Tree::new(
+            self.default_tree_root_dir(),
+            self.lua_version(config)?,
+            config,
+        )?)
     }
 
     pub fn test_tree(&self, config: &Config) -> Result<Tree, ProjectTreeError> {
-        Ok(config.test_tree(self.lua_version(config)?)?)
+        Ok(self.tree(config)?.test_tree(config)?)
     }
 
     pub fn lua_version(&self, config: &Config) -> Result<LuaVersion, LuaVersionError> {
