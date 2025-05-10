@@ -13,8 +13,9 @@ pub async fn check(config: Config) -> Result<()> {
     let luacheck =
         PackageInstallSpec::new("luacheck".parse()?, tree::EntryType::Entrypoint).build();
 
-    Install::new(&project.tree(&config)?, &config)
+    Install::new(&config)
         .package(luacheck)
+        .project(&project)?
         .progress(MultiProgress::new_arc())
         .install()
         .await?;

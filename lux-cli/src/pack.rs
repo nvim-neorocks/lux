@@ -72,12 +72,13 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
                     let temp_dir = TempDir::new("lux-pack")?.into_path();
                     let temp_config = config.with_tree(temp_dir);
                     let tree = temp_config.tree(lua_version.clone())?;
-                    let packages = Install::new(&tree, &temp_config)
+                    let packages = Install::new(&temp_config)
                         .package(
                             PackageInstallSpec::new(package_req, tree::EntryType::Entrypoint)
                                 .build_behaviour(BuildBehaviour::Force)
                                 .build(),
                         )
+                        .tree(tree.clone())
                         .progress(progress)
                         .install()
                         .await?;

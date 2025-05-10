@@ -106,8 +106,8 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
     if test.no_lock.unwrap_or(false) {
         ensure_dependencies(
             &rocks,
-            &project_tree,
-            &test_tree,
+            project_tree.clone(),
+            test_tree.clone(),
             test.config,
             test.progress,
         )
@@ -175,7 +175,7 @@ pub enum InstallTestDependenciesError {
 /// Ensure that busted is installed.
 /// This defaults to the local project tree if cwd is a project root.
 pub async fn ensure_busted(
-    tree: &Tree,
+    tree: Tree,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), InstallTestDependenciesError> {
@@ -183,8 +183,9 @@ pub async fn ensure_busted(
 
     if !tree.match_rocks(&busted_req)?.is_found() {
         let install_spec = PackageInstallSpec::new(busted_req, tree::EntryType::Entrypoint).build();
-        Install::new(tree, config)
+        Install::new(config)
             .package(install_spec)
+            .tree(tree)
             .progress(progress)
             .install()
             .await?;
@@ -197,12 +198,12 @@ pub async fn ensure_busted(
 /// This defaults to the local project tree if cwd is a project root.
 async fn ensure_dependencies(
     rockspec: &impl Rockspec,
-    project_tree: &Tree,
-    test_tree: &Tree,
+    project_tree: Tree,
+    test_tree: Tree,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), InstallTestDependenciesError> {
-    ensure_busted(test_tree, config, progress.clone()).await?;
+    ensure_busted(test_tree.clone(), config, progress.clone()).await?;
     let test_dependencies = rockspec
         .test_dependencies()
         .current_platform()
@@ -225,10 +226,12 @@ async fn ensure_dependencies(
                     .maybe_source(dep.source.clone())
                     .build()
             })
-        });
+        })
+        .collect();
 
-    Install::new(test_tree, config)
+    Install::new(config)
         .packages(test_dependencies)
+        .tree(test_tree)
         .progress(progress.clone())
         .install()
         .await?;
@@ -255,10 +258,12 @@ async fn ensure_dependencies(
                     .maybe_source(dep.source().clone())
                     .build()
             })
-        });
+        })
+        .collect();
 
-    Install::new(project_tree, config)
+    Install::new(config)
         .packages(dependencies)
+        .tree(project_tree)
         .progress(progress)
         .install()
         .await?;

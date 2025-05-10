@@ -23,6 +23,7 @@ use crate::{
     tree::{self, Tree, TreeError},
 };
 
+use bon::Builder;
 use bytes::Bytes;
 use futures::future::join_all;
 use itertools::Itertools;
@@ -36,85 +37,77 @@ use super::{
 /// A rocks package installer, providing fine-grained control
 /// over how packages should be installed.
 /// Can install multiple packages in parallel.
+#[derive(Builder)]
+#[builder(start_fn = new, finish_fn(name = _install, vis = ""))]
 pub struct Install<'a> {
+    #[builder(start_fn)]
     config: &'a Config,
-    tree: &'a Tree,
-    package_db: Option<RemotePackageDB>,
+    #[builder(field)]
     packages: Vec<PackageInstallSpec>,
+    #[builder(setters(name = "_tree", vis = ""))]
+    tree: Tree,
+    package_db: Option<RemotePackageDB>,
     progress: Option<Arc<Progress<MultiProgress>>>,
-    project: Option<&'a Project>,
 }
 
-impl<'a> Install<'a> {
-    /// Construct a new installer.
-    pub fn new(tree: &'a Tree, config: &'a Config) -> Self {
-        Self {
-            config,
-            tree,
-            package_db: None,
-            packages: Vec::new(),
-            progress: None,
-            project: None,
-        }
-    }
-
-    /// Sets the package database to use for searching for packages.
-    /// Instantiated from the config if not set.
-    pub fn package_db(self, package_db: RemotePackageDB) -> Self {
-        Self {
-            package_db: Some(package_db),
-            ..self
-        }
-    }
-
-    /// Specify packages to install, along with each package's build behaviour.
-    pub fn packages<I>(self, packages: I) -> Self
+impl<'a, State> InstallBuilder<'a, State>
+where
+    State: install_builder::State,
+{
+    pub fn tree(self, tree: Tree) -> InstallBuilder<'a, install_builder::SetTree<State>>
     where
-        I: IntoIterator<Item = PackageInstallSpec>,
+        State::Tree: install_builder::IsUnset,
     {
-        Self {
-            packages: self.packages.into_iter().chain(packages).collect_vec(),
-            ..self
-        }
+        self._tree(tree)
     }
 
-    /// Add a package to the set of packages to install.
+    pub fn project(
+        self,
+        project: &'a Project,
+    ) -> Result<InstallBuilder<'a, install_builder::SetTree<State>>, ProjectTreeError>
+    where
+        State::Tree: install_builder::IsUnset,
+    {
+        let config = self.config;
+        Ok(self._tree(project.tree(config)?))
+    }
+
+    pub fn packages(self, packages: Vec<PackageInstallSpec>) -> Self {
+        Self { packages, ..self }
+    }
+
     pub fn package(self, package: PackageInstallSpec) -> Self {
-        self.packages(std::iter::once(package))
-    }
-
-    /// Pass a `MultiProgress` to this installer.
-    /// By default, a new one will be created.
-    pub fn progress(self, progress: Arc<Progress<MultiProgress>>) -> Self {
         Self {
-            progress: Some(progress),
+            packages: self
+                .packages
+                .into_iter()
+                .chain(std::iter::once(package))
+                .collect(),
             ..self
         }
     }
+}
 
-    /// Attach a project to the install phase (also affects the project's `lux.lock`).
-    pub fn project(self, project: &'a Project) -> Self {
-        Self {
-            project: Some(project),
-            ..self
-        }
-    }
-
+impl<State> InstallBuilder<'_, State>
+where
+    State: install_builder::State + install_builder::IsComplete,
+{
     /// Install the packages.
     pub async fn install(self) -> Result<Vec<LocalPackage>, InstallError> {
-        let progress = match self.progress {
+        let install_built = self._install();
+        let progress = match install_built.progress {
             Some(p) => p,
             None => MultiProgress::new_arc(),
         };
-        let package_db = match self.package_db {
+        let package_db = match install_built.package_db {
             Some(db) => db,
             None => {
                 let bar = progress.map(|p| p.new_bar());
-                RemotePackageDB::from_config(self.config, &bar).await?
+                RemotePackageDB::from_config(install_built.config, &bar).await?
             }
         };
 
-        let duplicate_entrypoints = self
+        let duplicate_entrypoints = install_built
             .packages
             .iter()
             .filter(|pkg| pkg.entry_type == tree::EntryType::Entrypoint)
@@ -129,12 +122,12 @@ impl<'a> Install<'a> {
             )));
         }
 
-        install(
-            self.packages,
-            package_db,
-            self.project,
-            self.tree,
-            self.config,
+        install_impl(
+            install_built.packages,
+            Arc::new(package_db),
+            install_built.config,
+            &install_built.tree,
+            install_built.tree.lockfile()?,
             progress,
         )
         .await
@@ -169,30 +162,6 @@ pub enum InstallError {
     ProjectTreeError(#[from] ProjectTreeError),
     #[error("cannot install duplicate entrypoints: {0}")]
     DuplicateEntrypoints(PackageNameList),
-}
-
-async fn install(
-    packages: Vec<PackageInstallSpec>,
-    package_db: RemotePackageDB,
-    project: Option<&Project>,
-    tree: &Tree,
-    config: &Config,
-    progress: Arc<Progress<MultiProgress>>,
-) -> Result<Vec<LocalPackage>, InstallError>
-where
-{
-    let lockfile = tree.lockfile()?;
-    let tree = project.map_or(Ok(tree.clone()), |p| p.tree(config))?;
-
-    install_impl(
-        packages,
-        Arc::new(package_db),
-        config,
-        &tree,
-        lockfile,
-        progress,
-    )
-    .await
 }
 
 // TODO(vhyrro): This function has too many arguments. Refactor it.

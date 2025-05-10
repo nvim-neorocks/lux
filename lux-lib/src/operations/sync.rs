@@ -190,9 +190,10 @@ async fn do_sync(
 
     let package_db = project_lockfile.local_pkg_lock(lock_type).clone().into();
 
-    Install::new(tree, args.config)
+    Install::new(args.config)
         .package_db(package_db)
         .packages(packages_to_install)
+        .tree(tree.clone())
         .progress(progress.clone())
         .install()
         .await?;
@@ -228,17 +229,22 @@ async fn do_sync(
 
     if !package_sync_spec.to_add.is_empty() {
         // Install missing packages using the default package_db.
-        let missing_packages = package_sync_spec.to_add.into_iter().map(|dep| {
-            PackageInstallSpec::new(dep.package_req().clone(), tree::EntryType::Entrypoint)
-                .build_behaviour(BuildBehaviour::Force)
-                .pin(*dep.pin())
-                .opt(*dep.opt())
-                .maybe_source(dep.source.clone())
-                .build()
-        });
+        let missing_packages = package_sync_spec
+            .to_add
+            .into_iter()
+            .map(|dep| {
+                PackageInstallSpec::new(dep.package_req().clone(), tree::EntryType::Entrypoint)
+                    .build_behaviour(BuildBehaviour::Force)
+                    .pin(*dep.pin())
+                    .opt(*dep.opt())
+                    .maybe_source(dep.source.clone())
+                    .build()
+            })
+            .collect();
 
-        let added = Install::new(tree, args.config)
+        let added = Install::new(args.config)
             .packages(missing_packages)
+            .tree(tree.clone())
             .progress(progress.clone())
             .install()
             .await?;

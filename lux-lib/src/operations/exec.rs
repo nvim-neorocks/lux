@@ -119,8 +119,10 @@ pub async fn install_command(command: &str, config: &Config) -> Result<(), Insta
         tree::EntryType::Entrypoint,
     )
     .build();
-    Install::new(&config.tree(LuaVersion::from(config)?)?, config)
+    let tree = config.tree(LuaVersion::from(config)?)?;
+    Install::new(config)
         .package(install_spec)
+        .tree(tree)
         .install()
         .await?;
     Ok(())

@@ -9,7 +9,6 @@ use lux_lib::{
     config::Config,
     luarocks::luarocks_installation::LuaRocksInstallation,
     operations::{Install, PackageInstallSpec, Sync},
-    package::PackageName,
     progress::MultiProgress,
     project::Project,
     rockspec::Rockspec,
@@ -32,14 +31,13 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
     let progress_arc = MultiProgress::new_arc();
     let progress = Arc::clone(&progress_arc);
 
-    let tree = project.tree(&config)?;
     let project_toml = project.toml().into_local()?;
+    let project_tree = project.tree(&config)?;
 
     let dependencies = project_toml
         .dependencies()
         .current_platform()
         .iter()
-        .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
         .cloned()
         .collect_vec();
 
@@ -47,7 +45,6 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         .build_dependencies()
         .current_platform()
         .iter()
-        .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
         .cloned()
         .collect_vec();
 
@@ -57,7 +54,8 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         let dependencies_to_install = dependencies
             .into_iter()
             .filter(|dep| {
-                tree.match_rocks(dep.package_req())
+                project_tree
+                    .match_rocks(dep.package_req())
                     .is_ok_and(|rock_match| !rock_match.is_found())
             })
             .map(|dep| {
@@ -66,11 +64,12 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
                     .opt(*dep.opt())
                     .maybe_source(dep.source().clone())
                     .build()
-            });
+            })
+            .collect();
 
-        Install::new(&tree, &config)
+        Install::new(&config)
             .packages(dependencies_to_install)
-            .project(&project)
+            .project(&project)?
             .progress(progress.clone())
             .install()
             .await?;
@@ -78,7 +77,8 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         let build_dependencies_to_install = build_dependencies
             .into_iter()
             .filter(|dep| {
-                tree.match_rocks(dep.package_req())
+                project_tree
+                    .match_rocks(dep.package_req())
                     .is_ok_and(|rock_match| !rock_match.is_found())
             })
             .map(|dep| {
@@ -93,9 +93,11 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         if !build_dependencies_to_install.is_empty() {
             let bar = progress.map(|p| p.new_bar());
             luarocks.ensure_installed(&bar).await?;
-            Install::new(luarocks.tree(), luarocks.config())
+            // NOTE: Is this doing what we are expecting? Should it just
+            // install into the luarocks tree or should it install into the project?
+            Install::new(luarocks.config())
                 .packages(build_dependencies_to_install)
-                .project(&project)
+                .tree(luarocks.tree().clone())
                 .progress(progress.clone())
                 .install()
                 .await?;
@@ -127,7 +129,7 @@ Use --no-lock to force a new build.
     if !data.only_deps {
         let package = build::Build::new(
             &project_toml,
-            &tree,
+            &project_tree,
             tree::EntryType::Entrypoint,
             &config,
             &progress.map(|p| p.new_bar()),
@@ -136,7 +138,7 @@ Use --no-lock to force a new build.
         .build()
         .await?;
 
-        let lockfile = tree.lockfile()?;
+        let lockfile = project_tree.lockfile()?;
         let dependencies = lockfile
             .rocks()
             .iter()

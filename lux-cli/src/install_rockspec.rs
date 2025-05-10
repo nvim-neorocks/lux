@@ -1,4 +1,4 @@
-use eyre::{eyre, Context};
+use eyre::eyre;
 use itertools::Itertools;
 use std::{path::PathBuf, sync::Arc};
 
@@ -13,7 +13,6 @@ use lux_lib::{
     operations::{Install, PackageInstallSpec},
     package::PackageName,
     progress::MultiProgress,
-    project::Project,
     rockspec::{LuaVersionCompatibility, Rockspec},
     tree,
 };
@@ -30,7 +29,6 @@ pub struct InstallRockspec {
 
 pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<()> {
     let pin = PinnedState::from(data.pin);
-    let project_opt = Project::current()?;
     let path = data.rockspec_path;
 
     if path
@@ -69,18 +67,15 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
                 .opt(OptState::Required)
                 .maybe_source(dep.source().clone())
                 .build()
-        });
+        })
+        .collect();
 
-    Install::new(&tree, &config)
+    Install::new(&config)
         .packages(dependencies_to_install)
+        .tree(tree.clone())
         .progress(progress_arc.clone())
         .install()
         .await?;
-
-    if let Some(project) = project_opt {
-        std::fs::copy(tree.lockfile_path(), project.lockfile_path())
-            .wrap_err("error creating project lockfile.")?;
-    }
 
     if let Some(BuildBackendSpec::LuaRock(build_backend)) =
         &rockspec.build().current_platform().build_backend

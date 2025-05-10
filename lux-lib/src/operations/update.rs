@@ -131,7 +131,7 @@ async fn update_project(
         .await?;
 
     let updated_dependencies = update_dependency_tree(
-        &tree,
+        tree,
         &mut project_lockfile,
         LocalPackageLockType::Regular,
         package_db.clone(),
@@ -150,7 +150,7 @@ async fn update_project(
         .sync_test_dependencies()
         .await?;
     let updated_test_dependencies = update_dependency_tree(
-        &test_tree,
+        test_tree,
         &mut project_lockfile,
         LocalPackageLockType::Test,
         package_db.clone(),
@@ -171,7 +171,7 @@ async fn update_project(
         .sync_build_dependencies()
         .await?;
     let updated_build_dependencies = update_dependency_tree(
-        luarocks.tree(),
+        luarocks.tree().clone(),
         &mut project_lockfile,
         LocalPackageLockType::Build,
         package_db.clone(),
@@ -192,7 +192,7 @@ async fn update_project(
 }
 
 async fn update_dependency_tree(
-    tree: &Tree,
+    tree: Tree,
     project_lockfile: &mut ProjectLockfile<ReadWrite>,
     lock_type: LocalPackageLockType,
     package_db: RemotePackageDB,
@@ -205,10 +205,10 @@ async fn update_dependency_tree(
         .into_iter()
         .filter(|pkg| is_included(pkg, packages))
         .collect_vec();
+    let updated_lockfile = tree.lockfile()?;
     let updated_dependencies =
         update(dependencies, package_db, tree, &lockfile, config, progress).await?;
     if !updated_dependencies.is_empty() {
-        let updated_lockfile = tree.lockfile()?;
         project_lockfile.sync(updated_lockfile.local_pkg_lock(), &lock_type);
     }
     Ok(updated_dependencies)
@@ -239,7 +239,7 @@ async fn update_install_tree(
     update(
         packages,
         package_db,
-        &tree,
+        tree,
         &lockfile,
         args.config,
         args.progress,
@@ -250,7 +250,7 @@ async fn update_install_tree(
 async fn update(
     packages: Vec<(LocalPackage, PackageReq)>,
     package_db: RemotePackageDB,
-    tree: &Tree,
+    tree: Tree,
     lockfile: &Lockfile<ReadOnly>,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
@@ -278,12 +278,14 @@ async fn update(
             .progress(progress.clone())
             .remove()
             .await?;
-        let updated_packages = Install::new(tree, config)
+        let updated_packages = Install::new(config)
             .packages(
                 updatable
                     .iter()
-                    .map(|updatable| mk_install_spec(updatable, lockfile)),
+                    .map(|updatable| mk_install_spec(updatable, lockfile))
+                    .collect(),
             )
+            .tree(tree)
             .package_db(package_db)
             .progress(progress)
             .install()

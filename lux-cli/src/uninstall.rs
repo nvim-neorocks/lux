@@ -143,8 +143,9 @@ Reinstall?
                 .progress(progress.clone())
                 .remove()
                 .await?;
-            operations::Install::new(&tree, &config)
+            operations::Install::new(&config)
                 .packages(reinstall_specs)
+                .tree(tree)
                 .progress(progress)
                 .install()
                 .await?;
