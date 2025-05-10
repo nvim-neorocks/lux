@@ -11,12 +11,11 @@ use crate::{
         ReadWrite,
     },
     luarocks::luarocks_installation::{LuaRocksError, LuaRocksInstallation},
-    package::{PackageName, PackageReq, RockConstraintUnsatisfied},
+    package::{PackageReq, RockConstraintUnsatisfied},
     progress::{MultiProgress, Progress},
     project::{Project, ProjectError, ProjectTreeError},
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
     remote_package_source::RemotePackageSource,
-    rockspec::Rockspec,
     tree::{self, Tree, TreeError},
 };
 
@@ -123,20 +122,11 @@ async fn update_project(
     args: Update<'_>,
     package_db: RemotePackageDB,
 ) -> Result<Vec<LocalPackage>, UpdateError> {
-    let toml = project.toml().into_local().unwrap();
     let mut project_lockfile = project.lockfile()?.write_guard();
     let tree = project.tree(args.config)?;
 
-    let dependencies = toml
-        .dependencies()
-        .current_platform()
-        .iter()
-        .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
-        .cloned()
-        .collect_vec();
-    let dep_report = super::Sync::new(&tree, &mut project_lockfile, args.config)
+    let dep_report = super::Sync::new(&project, args.config)
         .validate_integrity(args.validate_integrity.unwrap_or(false))
-        .packages(dependencies)
         .sync_dependencies()
         .await?;
 
@@ -155,10 +145,8 @@ async fn update_project(
     .chain(dep_report.removed);
 
     let test_tree = project.test_tree(args.config)?;
-    let test_dependencies = toml.test_dependencies().current_platform().clone();
-    let dep_report = super::Sync::new(&test_tree, &mut project_lockfile, args.config)
+    let dep_report = super::Sync::new(&project, args.config)
         .validate_integrity(false)
-        .packages(test_dependencies)
         .sync_test_dependencies()
         .await?;
     let updated_test_dependencies = update_dependency_tree(
@@ -176,11 +164,10 @@ async fn update_project(
     .chain(dep_report.removed);
 
     let luarocks = LuaRocksInstallation::new(args.config)?;
-    let build_dependencies = toml.build_dependencies().current_platform().clone();
 
-    let dep_report = super::Sync::new(luarocks.tree(), &mut project_lockfile, luarocks.config())
+    let dep_report = super::Sync::new(&project, luarocks.config())
         .validate_integrity(false)
-        .packages(build_dependencies)
+        .custom_tree(luarocks.tree())
         .sync_build_dependencies()
         .await?;
     let updated_build_dependencies = update_dependency_tree(
