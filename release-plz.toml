@@ -24,5 +24,11 @@ git_tag_name = "v{{ version }}"
 git_release_name = "v{{ version }}"
 
 [[package]]
+name = "lux-lua"
+git_tag_name = "v{{ version }}"
+git_release_name = "v{{ version }}"
+release = false
+
+[[package]]
 name = "lux-workspace-hack"
 release = false
