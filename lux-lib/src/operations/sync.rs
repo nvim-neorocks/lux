@@ -367,6 +367,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_sync_remove_rocks() {
+        if std::env::var("LUX_SKIP_IMPURE_TESTS").unwrap_or("0".into()) == "1" {
+            println!("Skipping impure test");
+            return;
+        }
         let temp_dir = TempDir::new().unwrap();
         temp_dir
             .copy_from(
