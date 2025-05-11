@@ -41,3 +41,6 @@ jobs:
     - name: Build lux-cli
       run: nix build ".#packages.${{matrix.job.target}}.lux-cli" -Lv --accept-flake-config
       shell: bash
+    - name: Build lux-luajit
+      run: nix build ".#packages.${{matrix.job.target}}.lux-luajit" -Lv --accept-flake-config
+      shell: bash
