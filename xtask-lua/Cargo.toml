@@ -1,5 +1,5 @@
 [package]
-name = "xtask"
+name = "xtask-lua"
 version = "0.1.0"
 edition = "2021"
 publish = false
@@ -11,5 +11,10 @@ clap_mangen = "0.2.24"
 lux-workspace-hack = { version = "0.1", path = "../lux-workspace-hack" }
 toml = "0.8.22"
 
-[dependencies.lux-cli]
-path = "../lux-cli"
+[features] # For lux-lua distribution
+default = []
+lua51 = []
+lua52 = []
+lua53 = []
+lua54 = []
+luajit = []

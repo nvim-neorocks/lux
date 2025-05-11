@@ -65,11 +65,10 @@
       if isLuaJIT
       then "jit"
       else lib.concatStringsSep "." luaMajorMinor;
-    luaSuffix =
+    luaFeature =
       if isLuaJIT
-      then "jit"
-      else "${lib.concatStringsSep "" luaMajorMinor}";
-    luaFeature = "lua${luaSuffix}";
+      then "luajit"
+      else "lua${lib.concatStringsSep "" luaMajorMinor}";
 
     luxLuaCargo = craneLib.crateNameFromCargoToml {src = "${self}/lux-lua";};
   in
@@ -91,7 +90,7 @@
           };
 
         postBuild = ''
-          cargo xtask${luaSuffix} dist-lua
+          cargo xtask-${luaFeature} dist
         '';
 
         installPhase = ''
