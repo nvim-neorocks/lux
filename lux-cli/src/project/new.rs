@@ -358,10 +358,7 @@ type = "builtin"
     } else {
         std::fs::create_dir(&main_dir)?;
         std::fs::write(main_dir.join("main.lua"), r#"print("Hello world!")"#)?;
-        std::fs::write(
-            main_dir.join(".gitignore"),
-            ".lux/"
-        )?;
+        std::fs::write(main_dir.join(".gitignore"), ".lux/")?;
     }
 
     println!("All done!");
