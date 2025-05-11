@@ -4,7 +4,7 @@ on:
     branches:
       - master
 
-name: Integration tests (Linux/MacOS)
+name: Tests (*nix)
 
 jobs:
   test:
@@ -37,4 +37,6 @@ jobs:
           name: neorocks
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: Run tests (Linux/macOS)
-        run: nix develop .#${{ matrix.lua.feature }} --command cargo nextest run --test "*"
+        run: | 
+          nix develop .#${{ matrix.lua.feature }} --command \
+            cargo nextest run --tests --no-fail-fast

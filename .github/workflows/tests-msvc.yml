@@ -4,7 +4,7 @@ on:
     branches:
       - master
 
-name: Integration tests (Windows/MSVC)
+name: Tests (Windows/MSVC)
 
 jobs:
   test:
@@ -59,4 +59,4 @@ jobs:
           CC_ENABLE_DEBUG_OUTPUT: true
           CFLAGS: "/NOLOGO /MT /O2"
         run: |
-          cargo nextest run --test "*" --no-fail-fast --features vendored-lua
+          cargo nextest run --tests --no-fail-fast --features vendored-lua
