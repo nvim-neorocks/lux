@@ -113,21 +113,12 @@ pub struct LuaRocksInstallation {
 }
 
 impl LuaRocksInstallation {
-    pub fn new(config: &Config) -> Result<Self, LuaRocksError> {
-        let config = config.clone().with_tree(config.luarocks_tree().clone());
+    pub fn new(config: &Config, tree: Tree) -> Result<Self, LuaRocksError> {
         let luarocks_installation = Self {
-            tree: config.tree(LuaVersion::from(&config)?)?,
-            config,
+            tree,
+            config: config.clone(),
         };
         Ok(luarocks_installation)
-    }
-
-    pub fn tree(&self) -> &Tree {
-        &self.tree
-    }
-
-    pub fn config(&self) -> &Config {
-        &self.config
     }
 
     #[cfg(target_family = "unix")]
@@ -193,7 +184,7 @@ impl LuaRocksInstallation {
         let luarocks_exe = unpack_dir
             .join("luarocks-3.11.1-windows-64")
             .join(LUAROCKS_EXE);
-        tokio::fs::copy(luarocks_exe, &self.tree().bin().join(LUAROCKS_EXE)).await?;
+        tokio::fs::copy(luarocks_exe, &self.tree.bin().join(LUAROCKS_EXE)).await?;
 
         Ok(())
     }
@@ -352,7 +343,7 @@ variables = {{
         let luarocks_config = temp_dir.path().join("luarocks-config.lua");
         std::fs::write(luarocks_config.clone(), luarocks_config_content)
             .map_err(ExecLuaRocksError::WriteLuarocksConfigError)?;
-        let luarocks_bin = self.tree().bin().join(LUAROCKS_EXE);
+        let luarocks_bin = self.tree.bin().join(LUAROCKS_EXE);
         if !luarocks_bin.is_file() {
             return Err(ExecLuaRocksError::LuarocksBinNotFound(luarocks_bin));
         }

@@ -5,7 +5,6 @@ use eyre::Result;
 use itertools::Itertools;
 use lux_lib::config::{Config, LuaVersion};
 use lux_lib::lockfile::PinnedState;
-use lux_lib::luarocks::luarocks_installation::LuaRocksInstallation;
 use lux_lib::operations;
 use lux_lib::package::PackageName;
 use lux_lib::package::PackageReq;
@@ -64,10 +63,8 @@ pub async fn set_pinned_state(data: ChangePin, config: Config, pin: PinnedState)
                         pin,
                     )
                     .await?;
-                let luarocks = LuaRocksInstallation::new(&config)?;
-                operations::Sync::new(&project, luarocks.config())
+                operations::Sync::new(&project, &config)
                     .progress(progress.clone())
-                    .custom_tree(luarocks.tree())
                     .sync_build_dependencies()
                     .await
                     .wrap_err("syncing build dependencies with the project lockfile failed.")?;
@@ -85,7 +82,7 @@ pub async fn set_pinned_state(data: ChangePin, config: Config, pin: PinnedState)
             }
         }
         None => {
-            let tree = config.tree(LuaVersion::from(&config)?)?;
+            let tree = config.user_tree(LuaVersion::from(&config)?)?;
 
             for package in &data.package {
                 match tree.match_rocks_and(package, |package| pin != package.pinned())? {

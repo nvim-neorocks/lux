@@ -13,8 +13,9 @@ pub struct ListCmd {
     porcelain: bool,
 }
 
+/// List rocks that are installed in the user tree
 pub fn list_installed(list_data: ListCmd, config: Config) -> Result<()> {
-    let tree = config.tree(LuaVersion::from(&config)?)?;
+    let tree = config.user_tree(LuaVersion::from(&config)?)?;
     let available_rocks = tree.list()?;
 
     if list_data.porcelain {

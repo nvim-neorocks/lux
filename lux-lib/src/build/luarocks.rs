@@ -1,5 +1,7 @@
 use crate::rockspec::LuaVersionCompatibility;
 use crate::rockspec::Rockspec;
+use crate::tree::Tree;
+use crate::tree::TreeError;
 use std::{io, path::Path};
 
 use crate::{
@@ -24,6 +26,8 @@ pub enum LuarocksBuildError {
     LuaRocksError(#[from] LuaRocksError),
     #[error("error running 'luarocks make': {0}")]
     ExecLuaRocksError(#[from] ExecLuaRocksError),
+    #[error(transparent)]
+    Tree(#[from] TreeError),
 }
 
 pub(crate) async fn build<R: Rockspec>(
@@ -32,6 +36,7 @@ pub(crate) async fn build<R: Rockspec>(
     lua: &LuaInstallation,
     config: &Config,
     build_dir: &Path,
+    tree: &Tree,
     progress: &Progress<ProgressBar>,
 ) -> Result<BuildInfo, LuarocksBuildError> {
     progress.map(|p| {
@@ -48,7 +53,7 @@ pub(crate) async fn build<R: Rockspec>(
         rockspec.version()
     ));
     std::fs::write(&rockspec_file, rockspec.to_lua_rockspec_string())?;
-    let luarocks = LuaRocksInstallation::new(config)?;
+    let luarocks = LuaRocksInstallation::new(config, tree.build_tree(config)?)?;
     let luarocks_tree = TempDir::new("luarocks-compat-tree")?;
     luarocks.make(&rockspec_file, build_dir, luarocks_tree.path(), lua)?;
     install(rockspec, &luarocks_tree.into_path(), output_paths, config)

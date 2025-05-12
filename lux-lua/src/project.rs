@@ -84,6 +84,9 @@ type = "builtin"
         lua.load(
             r#"
             local config = lux.config.default()
+            local config = config.builder()
+                :lua_version("5.1")
+                :build()
 
             local project = lux.project.new(project_location)
             assert(project, "project should not be nil")

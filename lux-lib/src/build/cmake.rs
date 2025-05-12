@@ -12,7 +12,7 @@ use crate::{
     lua_installation::LuaInstallation,
     lua_rockspec::{Build, BuildInfo, CMakeBuildSpec},
     progress::{Progress, ProgressBar},
-    tree::RockLayout,
+    tree::{RockLayout, Tree},
 };
 
 use super::variables::{self, HasVariables, VariableSubstitutionError};
@@ -60,6 +60,7 @@ impl Build for CMakeBuildSpec {
         no_install: bool,
         lua: &LuaInstallation,
         config: &Config,
+        _tree: &Tree,
         build_dir: &Path,
         _progress: &Progress<ProgressBar>,
     ) -> Result<BuildInfo, Self::Err> {

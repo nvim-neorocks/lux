@@ -1,4 +1,4 @@
-use eyre::{OptionExt, Result};
+use eyre::Result;
 use lux_lib::{
     config::Config,
     operations::{Exec, Install, PackageInstallSpec},
@@ -8,7 +8,7 @@ use lux_lib::{
 };
 
 pub async fn check(config: Config) -> Result<()> {
-    let project = Project::current()?.ok_or_eyre("Not in a project!")?;
+    let project = Project::current_or_err()?;
 
     let luacheck =
         PackageInstallSpec::new("luacheck".parse()?, tree::EntryType::Entrypoint).build();

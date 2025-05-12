@@ -10,12 +10,10 @@ use thiserror::Error;
 use tree::RockLayoutConfig;
 use url::Url;
 
-use crate::rockspec::LuaVersionCompatibility;
 use crate::tree::{Tree, TreeError};
 use crate::{
     build::{utils, variables::HasVariables},
     package::{PackageVersion, PackageVersionReq},
-    project::{Project, ProjectError},
 };
 
 pub mod external_deps;
@@ -177,8 +175,7 @@ pub struct Config {
     namespace: Option<String>,
     lua_dir: Option<PathBuf>,
     lua_version: Option<LuaVersion>,
-    tree: PathBuf,
-    luarocks_tree: PathBuf,
+    user_tree: PathBuf,
     no_project: bool,
     verbose: bool,
     timeout: Duration,
@@ -215,7 +212,10 @@ impl Config {
     }
 
     pub fn with_tree(self, tree: PathBuf) -> Self {
-        Self { tree, ..self }
+        Self {
+            user_tree: tree,
+            ..self
+        }
     }
 
     pub fn server(&self) -> &Url {
@@ -253,17 +253,10 @@ impl Config {
         self.lua_version.as_ref()
     }
 
-    pub fn tree(&self, version: LuaVersion) -> Result<Tree, TreeError> {
-        Tree::new(self.tree.clone(), version, self)
-    }
-
-    pub fn test_tree(&self, version: LuaVersion) -> Result<Tree, TreeError> {
-        self.tree(version)?.test_tree(self)
-    }
-
-    /// The tree in which to install luarocks for use as a compatibility layer
-    pub fn luarocks_tree(&self) -> &PathBuf {
-        &self.luarocks_tree
+    /// The tree in which to install rocks.
+    /// If installing packges for a project, use `Project::tree` instead.
+    pub fn user_tree(&self, version: LuaVersion) -> Result<Tree, TreeError> {
+        Tree::new(self.user_tree.clone(), version, self)
     }
 
     pub fn no_project(&self) -> bool {
@@ -325,8 +318,6 @@ pub enum ConfigError {
     Io(#[from] io::Error),
     #[error(transparent)]
     NoValidHomeDirectory(#[from] NoValidHomeDirectory),
-    #[error(transparent)]
-    Project(#[from] ProjectError),
     #[error("error deserializing lux config: {0}")]
     Deserialize(#[from] toml::de::Error),
     #[error("error parsing URL: {0}")]
@@ -352,9 +343,8 @@ pub struct ConfigBuilder {
     only_sources: Option<String>,
     namespace: Option<String>,
     lua_version: Option<LuaVersion>,
-    tree: Option<PathBuf>,
+    user_tree: Option<PathBuf>,
     lua_dir: Option<PathBuf>,
-    luarocks_tree: Option<PathBuf>,
     cache_dir: Option<PathBuf>,
     data_dir: Option<PathBuf>,
     no_project: Option<bool>,
@@ -429,13 +419,9 @@ impl ConfigBuilder {
         }
     }
 
-    pub fn tree(self, tree: Option<PathBuf>) -> Self {
-        Self { tree, ..self }
-    }
-
-    pub fn luarocks_tree(self, luarocks_tree: Option<PathBuf>) -> Self {
+    pub fn user_tree(self, tree: Option<PathBuf>) -> Self {
         Self {
-            luarocks_tree,
+            user_tree: tree,
             ..self
         }
     }
@@ -470,24 +456,10 @@ impl ConfigBuilder {
     pub fn build(self) -> Result<Config, ConfigError> {
         let data_dir = self.data_dir.unwrap_or(Config::get_default_data_path()?);
         let cache_dir = self.cache_dir.unwrap_or(Config::get_default_cache_path()?);
-        let current_project = Project::current()?;
-        let tree = self.tree.unwrap_or(
-            current_project
-                .as_ref()
-                .map(|project| project.default_tree_root_dir())
-                .unwrap_or(data_dir.join("tree")),
-        );
-        let luarocks_tree = self.luarocks_tree.unwrap_or(
-            current_project
-                .as_ref()
-                .map(|project| project.default_tree_root_dir().join("build_dependencies"))
-                .unwrap_or(data_dir.join(".luarocks")),
-        );
+        let user_tree = self.user_tree.unwrap_or(data_dir.join("tree"));
+
         let lua_version = self
             .lua_version
-            .or(current_project
-                .as_ref()
-                .and_then(|project| project.toml().lua_version()))
             .or(crate::lua_installation::get_installed_lua_version("lua")
                 .ok()
                 .and_then(|version| LuaVersion::from_version(version).ok()));
@@ -501,8 +473,7 @@ impl ConfigBuilder {
             namespace: self.namespace,
             lua_dir: self.lua_dir,
             lua_version,
-            tree,
-            luarocks_tree,
+            user_tree,
             no_project: self.no_project.unwrap_or(false),
             verbose: self.verbose.unwrap_or(false),
             timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(30)),
@@ -528,8 +499,7 @@ impl From<Config> for ConfigBuilder {
             namespace: value.namespace,
             lua_dir: value.lua_dir,
             lua_version: value.lua_version,
-            tree: Some(value.tree),
-            luarocks_tree: Some(value.luarocks_tree),
+            user_tree: Some(value.user_tree),
             no_project: Some(value.no_project),
             verbose: Some(value.verbose),
             timeout: Some(value.timeout),
@@ -634,11 +604,8 @@ impl UserData for Config {
         methods.add_method("namespace", |_, this, ()| Ok(this.namespace().cloned()));
         methods.add_method("lua_dir", |_, this, ()| Ok(this.lua_dir().cloned()));
         methods.add_method("lua_version", |_, this, ()| Ok(this.lua_version().cloned()));
-        methods.add_method("tree", |_, this, lua_version: LuaVersion| {
-            this.tree(lua_version).into_lua_err()
-        });
-        methods.add_method("luarocks_tree", |_, this, ()| {
-            Ok(this.luarocks_tree().clone())
+        methods.add_method("user_tree", |_, this, lua_version: LuaVersion| {
+            this.user_tree(lua_version).into_lua_err()
         });
         methods.add_method("no_project", |_, this, ()| Ok(this.no_project()));
         methods.add_method("verbose", |_, this, ()| Ok(this.verbose()));
@@ -691,13 +658,9 @@ impl UserData for ConfigBuilder {
         methods.add_method("lua_version", |_, this, lua_version: Option<LuaVersion>| {
             Ok(this.clone().lua_version(lua_version))
         });
-        methods.add_method("tree", |_, this, tree: Option<PathBuf>| {
-            Ok(this.clone().tree(tree))
+        methods.add_method("user_tree", |_, this, tree: Option<PathBuf>| {
+            Ok(this.clone().user_tree(tree))
         });
-        methods.add_method(
-            "luarocks_tree",
-            |_, this, luarocks_tree: Option<PathBuf>| Ok(this.clone().luarocks_tree(luarocks_tree)),
-        );
         methods.add_method("no_project", |_, this, no_project: Option<bool>| {
             Ok(this.clone().no_project(no_project))
         });

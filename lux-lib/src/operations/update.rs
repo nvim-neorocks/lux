@@ -10,7 +10,6 @@ use crate::{
         LocalPackage, LocalPackageLockType, Lockfile, PinnedState, ProjectLockfile, ReadOnly,
         ReadWrite,
     },
-    luarocks::luarocks_installation::{LuaRocksError, LuaRocksInstallation},
     package::{PackageReq, RockConstraintUnsatisfied},
     progress::{MultiProgress, Progress},
     project::{Project, ProjectError, ProjectTreeError},
@@ -41,8 +40,6 @@ pub enum UpdateError {
     Tree(#[from] TreeError),
     #[error("error initialising project tree: {0}")]
     ProjectTree(#[from] ProjectTreeError),
-    #[error("error initialising luarocks build backend: {0}")]
-    LuaRocks(#[from] LuaRocksError),
     #[error("error syncing the project tree: {0}")]
     Sync(#[from] SyncError),
 }
@@ -163,19 +160,18 @@ async fn update_project(
     .chain(dep_report.added)
     .chain(dep_report.removed);
 
-    let luarocks = LuaRocksInstallation::new(args.config)?;
+    let build_tree = project.build_tree(args.config)?;
 
-    let dep_report = super::Sync::new(&project, luarocks.config())
+    let dep_report = super::Sync::new(&project, args.config)
         .validate_integrity(false)
-        .custom_tree(luarocks.tree())
         .sync_build_dependencies()
         .await?;
     let updated_build_dependencies = update_dependency_tree(
-        luarocks.tree().clone(),
+        build_tree,
         &mut project_lockfile,
         LocalPackageLockType::Build,
         package_db.clone(),
-        luarocks.config(),
+        args.config,
         args.progress.clone(),
         &args.build_dependencies,
     )
@@ -230,7 +226,7 @@ async fn update_install_tree(
     args: Update<'_>,
     package_db: RemotePackageDB,
 ) -> Result<Vec<LocalPackage>, UpdateError> {
-    let tree = args.config.tree(LuaVersion::from(args.config)?)?;
+    let tree = args.config.user_tree(LuaVersion::from(args.config)?)?;
     let lockfile = tree.lockfile()?;
     let packages = unpinned_packages(&lockfile)
         .into_iter()

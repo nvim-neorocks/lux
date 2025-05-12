@@ -59,7 +59,7 @@ pub enum WhichError {
 
 fn do_search(which: Which<'_>) -> Result<PathBuf, WhichError> {
     let config = which.config;
-    let tree = config.tree(LuaVersion::from(config)?)?;
+    let tree = config.user_tree(LuaVersion::from(config)?)?;
     let lockfile = tree.lockfile()?;
     let local_packages = if which.packages.is_empty() {
         lockfile
@@ -119,7 +119,7 @@ mod test {
         let tree_path = temp.to_path_buf();
         let config = ConfigBuilder::new()
             .unwrap()
-            .tree(Some(tree_path.clone()))
+            .user_tree(Some(tree_path.clone()))
             .lua_version(Some(LuaVersion::Lua51))
             .build()
             .unwrap();

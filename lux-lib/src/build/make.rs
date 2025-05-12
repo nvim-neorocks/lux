@@ -13,7 +13,7 @@ use crate::{
     lua_installation::LuaInstallation,
     lua_rockspec::{Build, BuildInfo, MakeBuildSpec},
     progress::{Progress, ProgressBar},
-    tree::RockLayout,
+    tree::{RockLayout, Tree},
 };
 
 use super::variables::VariableSubstitutionError;
@@ -46,6 +46,7 @@ impl Build for MakeBuildSpec {
         no_install: bool,
         lua: &LuaInstallation,
         config: &Config,
+        _tree: &Tree,
         build_dir: &Path,
         _progress: &Progress<ProgressBar>,
     ) -> Result<BuildInfo, Self::Err> {

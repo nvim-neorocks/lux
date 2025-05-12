@@ -26,7 +26,7 @@ async fn run_busted_test() {
 
     let config = ConfigBuilder::new()
         .unwrap()
-        .tree(Some(tree_root))
+        .user_tree(Some(tree_root))
         .lua_version(lua_version)
         .build()
         .unwrap();
@@ -52,7 +52,7 @@ async fn run_busted_test_no_lock() {
 
     let config = ConfigBuilder::new()
         .unwrap()
-        .tree(Some(tree_root))
+        .user_tree(Some(tree_root))
         .lua_version(lua_version)
         .build()
         .unwrap();

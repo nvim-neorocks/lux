@@ -1,6 +1,6 @@
 [alias]
-tt = "nextest run --tests --no-fail-fast"                  # All
-tl = "nextest run --lib --no-fail-fast"                    # Lib only
+tt = "nextest run --tests --no-fail-fast"                     # All
+tl = "nextest run --lib --no-fail-fast"                       # Lib only
 lx = "run --bin lx --"
 xtask = "run --package xtask --"
 xtask-lua51 = "run --package xtask-lua --features lua51 --"

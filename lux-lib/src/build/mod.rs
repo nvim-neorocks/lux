@@ -172,6 +172,7 @@ async fn run_build<R: Rockspec + HasIntegrity>(
     lua: &LuaInstallation,
     config: &Config,
     build_dir: &Path,
+    tree: &Tree,
     progress: &Progress<ProgressBar>,
 ) -> Result<BuildInfo, BuildError> {
     progress.map(|p| p.set_message("🛠️ Building..."));
@@ -180,39 +181,48 @@ async fn run_build<R: Rockspec + HasIntegrity>(
         match rockspec.build().current_platform().build_backend.to_owned() {
             Some(BuildBackendSpec::Builtin(build_spec)) => {
                 build_spec
-                    .run(output_paths, false, lua, config, build_dir, progress)
+                    .run(output_paths, false, lua, config, tree, build_dir, progress)
                     .await?
             }
             Some(BuildBackendSpec::Make(make_spec)) => {
                 make_spec
-                    .run(output_paths, false, lua, config, build_dir, progress)
+                    .run(output_paths, false, lua, config, tree, build_dir, progress)
                     .await?
             }
             Some(BuildBackendSpec::CMake(cmake_spec)) => {
                 cmake_spec
-                    .run(output_paths, false, lua, config, build_dir, progress)
+                    .run(output_paths, false, lua, config, tree, build_dir, progress)
                     .await?
             }
             Some(BuildBackendSpec::Command(command_spec)) => {
                 command_spec
-                    .run(output_paths, false, lua, config, build_dir, progress)
+                    .run(output_paths, false, lua, config, tree, build_dir, progress)
                     .await?
             }
             Some(BuildBackendSpec::RustMlua(rust_mlua_spec)) => {
                 rust_mlua_spec
-                    .run(output_paths, false, lua, config, build_dir, progress)
+                    .run(output_paths, false, lua, config, tree, build_dir, progress)
                     .await?
             }
             Some(BuildBackendSpec::TreesitterParser(treesitter_parser_spec)) => {
                 treesitter_parser_spec
-                    .run(output_paths, false, lua, config, build_dir, progress)
+                    .run(output_paths, false, lua, config, tree, build_dir, progress)
                     .await?
             }
             Some(BuildBackendSpec::LuaRock(_)) => {
-                luarocks::build(rockspec, output_paths, lua, config, build_dir, progress).await?
+                luarocks::build(
+                    rockspec,
+                    output_paths,
+                    lua,
+                    config,
+                    build_dir,
+                    tree,
+                    progress,
+                )
+                .await?
             }
             Some(BuildBackendSpec::Source) => {
-                source::build(output_paths, lua, config, build_dir, progress).await?
+                source::build(output_paths, lua, config, tree, build_dir, progress).await?
             }
             None => BuildInfo::default(),
         },
@@ -392,6 +402,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
                 &lua,
                 build.config,
                 &build_dir,
+                tree,
                 build.progress,
             )
             .await?;
@@ -470,12 +481,14 @@ mod tests {
         let tree_dir = assert_fs::TempDir::new().unwrap();
         let config = ConfigBuilder::new()
             .unwrap()
-            .tree(Some(tree_dir.to_path_buf()))
+            .user_tree(Some(tree_dir.to_path_buf()))
             .build()
             .unwrap();
         let build_dir = assert_fs::TempDir::new().unwrap();
         build_dir.copy_from(&project_root, &["**"]).unwrap();
-        let tree = config.tree(config.lua_version().cloned().unwrap()).unwrap();
+        let tree = config
+            .user_tree(config.lua_version().cloned().unwrap())
+            .unwrap();
         let dest_dir = assert_fs::TempDir::new().unwrap();
         let rock_layout = RockLayout {
             rock_path: dest_dir.to_path_buf(),
@@ -496,6 +509,7 @@ mod tests {
             &lua,
             &config,
             &build_dir,
+            &tree,
             &progress.map(|p| p.new_bar()),
         )
         .await

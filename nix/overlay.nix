@@ -204,7 +204,7 @@ in {
         cacert
         cargo-nextest
         zlib # used for checking external dependencies
-        lua
+        lua5_1
         nix # we use nix-hash in tests
       ];
 

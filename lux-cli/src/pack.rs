@@ -1,7 +1,7 @@
 use std::{path::PathBuf, str::FromStr};
 
 use clap::Args;
-use eyre::{eyre, OptionExt, Result};
+use eyre::{eyre, Result};
 use lux_lib::{
     build::{Build, BuildBehaviour},
     config::{Config, LuaVersion},
@@ -60,18 +60,18 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
     let package_or_rockspec = match args.package_or_rockspec {
         Some(package_or_rockspec) => package_or_rockspec,
         None => {
-            let project = Project::current()?.ok_or_eyre("Not in a project!")?;
+            let project = Project::current_or_err()?;
             PackageOrRockspec::RockSpec(project.toml_path())
         }
     };
     let result: Result<PathBuf> = match package_or_rockspec {
         PackageOrRockspec::Package(package_req) => {
-            let default_tree = config.tree(lua_version.clone())?;
-            match default_tree.match_rocks(&package_req)? {
+            let user_tree = config.user_tree(lua_version.clone())?;
+            match user_tree.match_rocks(&package_req)? {
                 lux_lib::tree::RockMatches::NotFound(_) => {
                     let temp_dir = TempDir::new("lux-pack")?.into_path();
                     let temp_config = config.with_tree(temp_dir);
-                    let tree = temp_config.tree(lua_version.clone())?;
+                    let tree = temp_config.user_tree(lua_version.clone())?;
                     let packages = Install::new(&temp_config)
                         .package(
                             PackageInstallSpec::new(package_req, tree::EntryType::Entrypoint)
@@ -88,18 +88,18 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
                     Ok(rock_path)
                 }
                 lux_lib::tree::RockMatches::Single(local_package_id) => {
-                    let lockfile = default_tree.lockfile()?;
+                    let lockfile = user_tree.lockfile()?;
                     let package = lockfile.get(&local_package_id).unwrap();
                     let rock_path =
-                        operations::Pack::new(dest_dir, default_tree, package.clone()).pack()?;
+                        operations::Pack::new(dest_dir, user_tree, package.clone()).pack()?;
                     Ok(rock_path)
                 }
                 lux_lib::tree::RockMatches::Many(vec) => {
                     let local_package_id = vec.first().unwrap();
-                    let lockfile = default_tree.lockfile()?;
+                    let lockfile = user_tree.lockfile()?;
                     let package = lockfile.get(local_package_id).unwrap();
                     let rock_path =
-                        operations::Pack::new(dest_dir, default_tree, package.clone()).pack()?;
+                        operations::Pack::new(dest_dir, user_tree, package.clone()).pack()?;
                     Ok(rock_path)
                 }
             }
@@ -120,7 +120,7 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
             let temp_dir = TempDir::new("lux-pack")?.into_path();
             let bar = progress.map(|p| p.new_bar());
             let config = config.with_tree(temp_dir);
-            let tree = config.tree(lua_version)?;
+            let tree = config.user_tree(lua_version)?;
             let package = Build::new(&rockspec, &tree, tree::EntryType::Entrypoint, &config, &bar)
                 .build()
                 .await?;

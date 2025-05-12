@@ -11,7 +11,7 @@ use crate::{
         project_toml::LocalProjectTomlValidationError, Project, ProjectError, ProjectTreeError,
     },
     rockspec::Rockspec,
-    tree::{self, Tree, TreeError},
+    tree::{self, TreeError},
 };
 use bon::{builder, Builder};
 use itertools::Itertools;
@@ -30,8 +30,6 @@ pub struct Sync<'a> {
 
     #[builder(field)]
     extra_packages: Vec<PackageReq>,
-
-    custom_tree: Option<&'a Tree>,
 
     progress: Option<Arc<Progress<MultiProgress>>>,
     /// Whether to validate the integrity of installed packages.
@@ -102,13 +100,11 @@ async fn do_sync(
     args: Sync<'_>,
     lock_type: &LocalPackageLockType,
 ) -> Result<SyncReport, SyncError> {
-    let fallback_tree = match lock_type {
-        LocalPackageLockType::Regular | LocalPackageLockType::Build => {
-            args.project.tree(args.config)?
-        }
+    let tree = match lock_type {
+        LocalPackageLockType::Regular => args.project.tree(args.config)?,
         LocalPackageLockType::Test => args.project.test_tree(args.config)?,
+        LocalPackageLockType::Build => args.project.build_tree(args.config)?,
     };
-    let tree = args.custom_tree.unwrap_or(&fallback_tree);
     std::fs::create_dir_all(tree.root())?;
 
     let mut project_lockfile = args.project.lockfile()?.write_guard();

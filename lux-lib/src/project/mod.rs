@@ -51,6 +51,8 @@ pub enum ProjectError {
     Toml(#[from] toml::de::Error),
     #[error("error when parsing `extra.rockspec`: {0}")]
     Rockspec(#[from] PartialRockspecError),
+    #[error("not in a lux project directory")]
+    NotAProjectDir,
 }
 
 #[derive(Error, Debug)]
@@ -236,6 +238,10 @@ impl Project {
         Self::from(&std::env::current_dir()?)
     }
 
+    pub fn current_or_err() -> Result<Self, ProjectError> {
+        Self::current()?.ok_or(ProjectError::NotAProjectDir)
+    }
+
     pub fn from_exact(start: impl AsRef<Path>) -> Result<Option<Self>, ProjectError> {
         if !start.as_ref().exists() {
             return Ok(None);
@@ -357,15 +363,27 @@ impl Project {
     }
 
     pub fn tree(&self, config: &Config) -> Result<Tree, ProjectTreeError> {
+        self.lua_version_tree(self.lua_version(config)?, config)
+    }
+
+    pub(crate) fn lua_version_tree(
+        &self,
+        lua_version: LuaVersion,
+        config: &Config,
+    ) -> Result<Tree, ProjectTreeError> {
         Ok(Tree::new(
             self.default_tree_root_dir(),
-            self.lua_version(config)?,
+            lua_version,
             config,
         )?)
     }
 
     pub fn test_tree(&self, config: &Config) -> Result<Tree, ProjectTreeError> {
         Ok(self.tree(config)?.test_tree(config)?)
+    }
+
+    pub fn build_tree(&self, config: &Config) -> Result<Tree, ProjectTreeError> {
+        Ok(self.tree(config)?.build_tree(config)?)
     }
 
     pub fn lua_version(&self, config: &Config) -> Result<LuaVersion, LuaVersionError> {

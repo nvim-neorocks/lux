@@ -5,8 +5,9 @@ use lux_lib::{
     progress::{MultiProgress, ProgressBar},
 };
 
+/// Purge the user tree
 pub async fn purge(config: Config) -> Result<()> {
-    let tree = config.tree(LuaVersion::from(&config)?)?;
+    let tree = config.user_tree(LuaVersion::from(&config)?)?;
 
     let len = tree.list()?.len();
 

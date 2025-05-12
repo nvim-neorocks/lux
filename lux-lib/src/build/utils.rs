@@ -571,12 +571,12 @@ mod tests {
         let temp = assert_fs::TempDir::new().unwrap();
         let config = ConfigBuilder::new()
             .unwrap()
-            .tree(Some(temp.to_path_buf()))
+            .user_tree(Some(temp.to_path_buf()))
             .build()
             .unwrap();
         let lua_version = config.lua_version().unwrap();
         let lua = LuaInstallation::new(lua_version, &config);
-        let tree = config.tree(lua_version.clone()).unwrap();
+        let tree = config.user_tree(lua_version.clone()).unwrap();
         let valid_script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("resources/test/sample_lua_bin_script_valid");
         let script_name = "test_script";

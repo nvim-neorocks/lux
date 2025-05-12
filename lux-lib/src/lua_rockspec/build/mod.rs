@@ -34,7 +34,7 @@ use crate::{
     config::Config,
     lua_installation::LuaInstallation,
     progress::{Progress, ProgressBar},
-    tree::RockLayout,
+    tree::{RockLayout, Tree},
 };
 
 use super::{
@@ -982,12 +982,14 @@ pub struct BuildInfo {
 pub trait Build {
     type Err: std::error::Error;
 
+    #[allow(clippy::too_many_arguments)]
     fn run(
         self,
         output_paths: &RockLayout,
         no_install: bool,
         lua: &LuaInstallation,
         config: &Config,
+        tree: &Tree,
         build_dir: &Path,
         progress: &Progress<ProgressBar>,
     ) -> impl Future<Output = Result<BuildInfo, Self::Err>> + Send;

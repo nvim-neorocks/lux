@@ -23,12 +23,12 @@ async fn luarocks_make() {
 
     let config = ConfigBuilder::new()
         .unwrap()
-        .tree(Some(dir.path().into()))
-        .lua_version(lua_version)
-        .luarocks_tree(Some(TempDir::new().unwrap().path().into()))
+        .user_tree(Some(dir.path().into()))
+        .lua_version(lua_version.clone())
         .build()
         .unwrap();
-    let luarocks = LuaRocksInstallation::new(&config).unwrap();
+    let tree = config.user_tree(lua_version.unwrap()).unwrap();
+    let luarocks = LuaRocksInstallation::new(&config, tree).unwrap();
     let progress = Progress::Progress(MultiProgress::new());
     let bar = progress.map(|p| p.add(ProgressBar::from("Installing luarocks".to_string())));
     luarocks.ensure_installed(&bar).await.unwrap();

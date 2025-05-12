@@ -1,4 +1,4 @@
-use eyre::{Context, OptionExt};
+use eyre::Context;
 use itertools::Itertools;
 use std::sync::Arc;
 
@@ -27,7 +27,7 @@ pub struct Build {
 }
 
 pub async fn build(data: Build, config: Config) -> Result<()> {
-    let project = Project::current()?.ok_or_eyre("Not in a project!")?;
+    let project = Project::current_or_err()?;
     let progress_arc = MultiProgress::new_arc();
     let progress = Arc::clone(&progress_arc);
 
@@ -48,7 +48,8 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         .cloned()
         .collect_vec();
 
-    let luarocks = LuaRocksInstallation::new(&config)?;
+    let build_tree = project.build_tree(&config)?;
+    let luarocks = LuaRocksInstallation::new(&config, build_tree.clone())?;
 
     if data.no_lock {
         let dependencies_to_install = dependencies
@@ -93,11 +94,9 @@ pub async fn build(data: Build, config: Config) -> Result<()> {
         if !build_dependencies_to_install.is_empty() {
             let bar = progress.map(|p| p.new_bar());
             luarocks.ensure_installed(&bar).await?;
-            // NOTE: Is this doing what we are expecting? Should it just
-            // install into the luarocks tree or should it install into the project?
-            Install::new(luarocks.config())
+            Install::new(&config)
                 .packages(build_dependencies_to_install)
-                .tree(luarocks.tree().clone())
+                .tree(build_tree)
                 .progress(progress.clone())
                 .install()
                 .await?;
@@ -114,7 +113,7 @@ Use --no-lock to force a new build.
 ",
             )?;
 
-        Sync::new(&project, luarocks.config())
+        Sync::new(&project, &config)
             .progress(progress.clone())
             .sync_build_dependencies()
             .await

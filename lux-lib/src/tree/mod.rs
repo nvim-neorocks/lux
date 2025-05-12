@@ -137,6 +137,7 @@ impl Tree {
         })
     }
 
+    /// The root of the tree
     pub fn root(&self) -> PathBuf {
         self.root.join(self.version.to_string())
     }
@@ -281,9 +282,16 @@ impl Tree {
         self.root().join(LOCKFILE_NAME)
     }
 
-    pub(crate) fn test_tree(&self, config: &Config) -> Result<Tree, TreeError> {
+    /// The tree in which to install test dependencies
+    pub fn test_tree(&self, config: &Config) -> Result<Tree, TreeError> {
         let test_tree_root = self.root().join("test_dependencies");
         Tree::new(test_tree_root, self.version.clone(), config)
+    }
+
+    /// The tree in which to install build dependencies
+    pub fn build_tree(&self, config: &Config) -> Result<Tree, TreeError> {
+        let build_tree_root = self.root().join("build_dependencies");
+        Tree::new(build_tree_root, self.version.clone(), config)
     }
 }
 
@@ -384,10 +392,10 @@ mod tests {
 
         let config = ConfigBuilder::new()
             .unwrap()
-            .tree(Some(tree_path.clone()))
+            .user_tree(Some(tree_path.clone()))
             .build()
             .unwrap();
-        let tree = config.tree(LuaVersion::Lua51).unwrap();
+        let tree = config.user_tree(LuaVersion::Lua51).unwrap();
 
         let mock_hashes = LocalPackageHashes {
             rockspec: "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="
@@ -462,10 +470,10 @@ mod tests {
 
         let config = ConfigBuilder::new()
             .unwrap()
-            .tree(Some(tree_path.clone()))
+            .user_tree(Some(tree_path.clone()))
             .build()
             .unwrap();
-        let tree = config.tree(LuaVersion::Lua51).unwrap();
+        let tree = config.user_tree(LuaVersion::Lua51).unwrap();
         let result = tree.list().unwrap();
         // note: sorted_redaction doesn't work because we have a nested Vec
         let sorted_result: Vec<(PackageName, Vec<PackageVersion>)> = result
@@ -497,10 +505,10 @@ mod tests {
 
         let config = ConfigBuilder::new()
             .unwrap()
-            .tree(Some(tree_path.clone()))
+            .user_tree(Some(tree_path.clone()))
             .build()
             .unwrap();
-        let tree = config.tree(LuaVersion::Lua51).unwrap();
+        let tree = config.user_tree(LuaVersion::Lua51).unwrap();
 
         let mock_hashes = LocalPackageHashes {
             rockspec: "sha256-uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek="

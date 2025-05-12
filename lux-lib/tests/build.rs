@@ -29,7 +29,7 @@ async fn builtin_build() {
 
     let config = ConfigBuilder::new()
         .unwrap()
-        .tree(Some(dir.to_path_buf()))
+        .user_tree(Some(dir.to_path_buf()))
         .lua_version(lua_version)
         .build()
         .unwrap();
@@ -37,7 +37,9 @@ async fn builtin_build() {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
+    let tree = config
+        .user_tree(LuaVersion::from(&config).unwrap())
+        .unwrap();
 
     Build::new(
         &rockspec,
@@ -69,7 +71,7 @@ async fn make_build() {
 
     let config = ConfigBuilder::new()
         .unwrap()
-        .tree(Some(dir.to_path_buf()))
+        .user_tree(Some(dir.to_path_buf()))
         .lua_version(lua_version)
         .build()
         .unwrap();
@@ -77,7 +79,9 @@ async fn make_build() {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
+    let tree = config
+        .user_tree(LuaVersion::from(&config).unwrap())
+        .unwrap();
 
     Build::new(
         &rockspec,
@@ -122,7 +126,7 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
 
     let config = ConfigBuilder::new()
         .unwrap()
-        .tree(Some(dir.to_path_buf()))
+        .user_tree(Some(dir.to_path_buf()))
         .lua_version(lua_version)
         .build()
         .unwrap();
@@ -130,7 +134,9 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
+    let tree = config
+        .user_tree(LuaVersion::from(&config).unwrap())
+        .unwrap();
 
     Build::new(
         &rockspec,
@@ -167,7 +173,7 @@ async fn treesitter_parser_build() {
 
     let config = ConfigBuilder::new()
         .unwrap()
-        .tree(Some(dir.to_path_buf()))
+        .user_tree(Some(dir.to_path_buf()))
         .lua_version(lua_version)
         .build()
         .unwrap();
@@ -175,7 +181,9 @@ async fn treesitter_parser_build() {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
+    let tree = config
+        .user_tree(LuaVersion::from(&config).unwrap())
+        .unwrap();
 
     Build::new(
         &rockspec,
@@ -295,12 +303,14 @@ fn test_build_multiple_treesitter_parsers() {
     for i in 0..4 {
         let config = ConfigBuilder::new()
             .unwrap()
-            .tree(Some(dir.join(format!("{}", i))))
+            .user_tree(Some(dir.join(format!("{}", i))))
             .lua_version(lua_version.clone())
             .build()
             .unwrap();
 
-        let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
+        let tree = config
+            .user_tree(LuaVersion::from(&config).unwrap())
+            .unwrap();
 
         let config = config.clone();
         let tree = tree.clone();

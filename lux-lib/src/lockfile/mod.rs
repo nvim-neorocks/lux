@@ -1463,10 +1463,10 @@ mod tests {
 
         let config = ConfigBuilder::new()
             .unwrap()
-            .tree(Some(temp.to_path_buf()))
+            .user_tree(Some(temp.to_path_buf()))
             .build()
             .unwrap();
-        let tree = config.tree(Lua51).unwrap();
+        let tree = config.user_tree(Lua51).unwrap();
         let lockfile = tree.lockfile().unwrap();
 
         assert_json_snapshot!(lockfile, { ".**" => sorted_redaction() });
@@ -1492,10 +1492,10 @@ mod tests {
 
         let config = ConfigBuilder::new()
             .unwrap()
-            .tree(Some(temp.to_path_buf()))
+            .user_tree(Some(temp.to_path_buf()))
             .build()
             .unwrap();
-        let tree = config.tree(Lua51).unwrap();
+        let tree = config.user_tree(Lua51).unwrap();
         let mut lockfile = tree.lockfile().unwrap().write_guard();
 
         let test_package = PackageSpec::parse("test1".to_string(), "0.1.0".to_string()).unwrap();
@@ -1537,10 +1537,10 @@ mod tests {
 
         let config = ConfigBuilder::new()
             .unwrap()
-            .tree(Some(temp.to_path_buf()))
+            .user_tree(Some(temp.to_path_buf()))
             .build()
             .unwrap();
-        let tree = config.tree(Lua51).unwrap();
+        let tree = config.user_tree(Lua51).unwrap();
 
         let _ = tree.lockfile().unwrap().write_guard(); // Try to create the lockfile but don't actually do anything with it.
     }

@@ -2,6 +2,7 @@ use super::utils::lua_dylib_extension;
 use crate::config::LuaVersionUnset;
 use crate::lua_rockspec::BuildInfo;
 use crate::progress::{Progress, ProgressBar};
+use crate::tree::Tree;
 use crate::{
     config::{Config, LuaVersion},
     lua_installation::LuaInstallation,
@@ -38,6 +39,7 @@ impl Build for RustMluaBuildSpec {
         _no_install: bool,
         _lua: &LuaInstallation,
         config: &Config,
+        _tree: &Tree,
         build_dir: &Path,
         progress: &Progress<ProgressBar>,
     ) -> Result<BuildInfo, Self::Err> {

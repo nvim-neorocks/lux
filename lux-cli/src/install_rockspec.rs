@@ -27,6 +27,7 @@ pub struct InstallRockspec {
     pin: bool,
 }
 
+/// Install a rockspec into the user tree.
 pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<()> {
     let pin = PinnedState::from(data.pin);
     let path = data.rockspec_path;
@@ -41,7 +42,7 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
     let content = std::fs::read_to_string(path)?;
     let rockspec = RemoteLuaRockspec::new(&content)?;
     let lua_version = rockspec.lua_version_matches(&config)?;
-    let tree = config.tree(lua_version)?;
+    let tree = config.user_tree(lua_version)?;
 
     // Ensure all dependencies are installed first
     let dependencies = rockspec
@@ -80,7 +81,8 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
     if let Some(BuildBackendSpec::LuaRock(build_backend)) =
         &rockspec.build().current_platform().build_backend
     {
-        let luarocks = LuaRocksInstallation::new(&config)?;
+        let build_tree = tree.build_tree(&config)?;
+        let luarocks = LuaRocksInstallation::new(&config, build_tree)?;
         let bar = progress.map(|p| p.new_bar());
         luarocks.ensure_installed(&bar).await?;
         luarocks

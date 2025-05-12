@@ -2,13 +2,13 @@ use std::{str::FromStr, sync::Arc};
 
 use eyre::{Context, Result};
 use lux_lib::{
-    config::Config,
+    config::{Config, LuaVersion},
     git::shorthand::GitUrlShorthand,
-    luarocks::luarocks_installation::LuaRocksInstallation,
     operations::Sync,
     package::PackageReq,
     progress::{MultiProgress, Progress},
     project::Project,
+    tree::Tree,
 };
 
 /// Used for parsing alternatives between a git URL shorthand and a package requirement.
@@ -31,6 +31,19 @@ impl FromStr for PackageReqOrGitShorthand {
     }
 }
 
+/// Get the current project's tree, or fall back to
+/// the user tree if not in a project
+pub fn current_project_or_user_tree(config: &Config) -> Result<Tree> {
+    let project = Project::current()?;
+    Ok(match &project {
+        Some(project) => project.tree(config)?,
+        None => {
+            let lua_version = LuaVersion::from(config)?;
+            config.user_tree(lua_version)?
+        }
+    })
+}
+
 pub async fn sync_dependencies_if_locked(
     project: &Project,
     progress: Arc<Progress<MultiProgress>>,
@@ -51,10 +64,8 @@ pub async fn sync_build_dependencies_if_locked(
     progress: Arc<Progress<MultiProgress>>,
     config: &Config,
 ) -> Result<()> {
-    let luarocks = LuaRocksInstallation::new(config)?;
-    Sync::new(project, luarocks.config())
+    Sync::new(project, config)
         .progress(progress.clone())
-        .custom_tree(luarocks.tree())
         .sync_build_dependencies()
         .await
         .wrap_err("syncing build dependencies with the project lockfile failed.")?;

@@ -20,7 +20,7 @@ async fn run_nlua() {
 
     let config = ConfigBuilder::new()
         .unwrap()
-        .tree(Some(dir.into_path()))
+        .user_tree(Some(dir.into_path()))
         .lua_version(lua_version)
         .build()
         .unwrap();

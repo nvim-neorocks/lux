@@ -1,12 +1,14 @@
 use clap::Args;
 use eyre::Result;
 use lux_lib::{
-    config::{Config, LuaVersion},
+    config::Config,
     operations::Download,
     package::PackageReq,
     progress::{MultiProgress, Progress},
     rockspec::Rockspec,
 };
+
+use crate::utils::project::current_project_or_user_tree;
 
 #[derive(Args)]
 pub struct Info {
@@ -14,7 +16,7 @@ pub struct Info {
 }
 
 pub async fn info(data: Info, config: Config) -> Result<()> {
-    let tree = config.tree(LuaVersion::from(&config)?)?;
+    let tree = current_project_or_user_tree(&config)?;
 
     let progress = MultiProgress::new();
     let bar = Progress::Progress(progress.new_bar());

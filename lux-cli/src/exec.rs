@@ -7,7 +7,6 @@ use lux_lib::{
     operations::{self, install_command},
     path::Paths,
     project::Project,
-    rockspec::LuaVersionCompatibility,
 };
 use which::which;
 
@@ -23,11 +22,14 @@ pub struct Exec {
 
 pub async fn exec(run: Exec, config: Config) -> Result<()> {
     let project = Project::current()?;
-    let lua_version = match &project {
-        Some(prj) => prj.toml().lua_version_matches(&config)?,
-        None => LuaVersion::from(&config)?,
+    let tree = match &project {
+        Some(project) => project.tree(&config)?,
+        None => {
+            let lua_version = LuaVersion::from(&config)?;
+            config.user_tree(lua_version)?
+        }
     };
-    let tree = config.tree(lua_version)?;
+
     let paths = Paths::new(&tree)?;
     unsafe {
         // safe as long as this is single-threaded

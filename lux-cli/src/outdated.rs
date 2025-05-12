@@ -6,9 +6,12 @@ use itertools::Itertools;
 use lux_lib::{
     config::{Config, LuaVersion},
     progress::{MultiProgress, Progress},
+    project::Project,
     remote_package_db::RemotePackageDB,
 };
 use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
+
+use crate::utils::project::sync_dependencies_if_locked;
 
 #[derive(Args)]
 pub struct Outdated {
@@ -16,10 +19,23 @@ pub struct Outdated {
     porcelain: bool,
 }
 
+/// List rocks that are outdated
+/// If in a project, this lists rocks in the project tree
 pub async fn outdated(outdated_data: Outdated, config: Config) -> Result<()> {
     let progress = MultiProgress::new();
     let bar = Progress::Progress(progress.new_bar());
-    let tree = config.tree(LuaVersion::from(&config)?)?;
+    let project = Project::current()?;
+    let tree = match &project {
+        Some(project) => {
+            // Make sure dependencies are synced if in a project
+            sync_dependencies_if_locked(project, MultiProgress::new_arc(), &config).await?;
+            project.tree(&config)?
+        }
+        None => {
+            let lua_version = LuaVersion::from(&config)?;
+            config.user_tree(lua_version)?
+        }
+    };
 
     let package_db = RemotePackageDB::from_config(&config, &bar).await?;
 

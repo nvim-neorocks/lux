@@ -28,12 +28,14 @@ async fn install_git_package() {
 
     let config = ConfigBuilder::new()
         .unwrap()
-        .tree(Some(dir.to_path_buf()))
+        .user_tree(Some(dir.to_path_buf()))
         .lua_version(lua_version)
         .build()
         .unwrap();
 
-    let tree = config.tree(LuaVersion::from(&config).unwrap()).unwrap();
+    let tree = config
+        .user_tree(LuaVersion::from(&config).unwrap())
+        .unwrap();
     let installed = Install::new(&config)
         .package(install_spec)
         .tree(tree)

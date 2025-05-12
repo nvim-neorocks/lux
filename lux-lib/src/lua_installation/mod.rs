@@ -156,7 +156,7 @@ impl LuaInstallation {
             if let Ok(tree) = project.tree(config) {
                 return tree.root().join(".lua");
             }
-        } else if let Ok(tree) = config.tree(version.clone()) {
+        } else if let Ok(tree) = config.user_tree(version.clone()) {
             return tree.root().join(".lua");
         }
         config.data_dir().join(".lua").join(version.to_string())

@@ -203,7 +203,8 @@ async fn install_impl(
             if let Some(BuildBackendSpec::LuaRock(build_backend)) =
                 &rockspec.build().current_platform().build_backend
             {
-                let luarocks = LuaRocksInstallation::new(&config)?;
+                let luarocks_tree = tree.build_tree(&config)?;
+                let luarocks = LuaRocksInstallation::new(&config, luarocks_tree)?;
                 luarocks
                     .install_build_dependencies(build_backend, rockspec, progress_arc.clone())
                     .await?;
@@ -237,6 +238,7 @@ async fn install_impl(
                         install_spec.opt,
                         install_spec.entry_type,
                         &config,
+                        &tree,
                         progress_arc,
                     )
                     .await?
@@ -316,7 +318,8 @@ async fn install_rockspec(
     if let Some(BuildBackendSpec::LuaRock(build_backend)) =
         &rockspec.build().current_platform().build_backend
     {
-        let luarocks = LuaRocksInstallation::new(config)?;
+        let luarocks_tree = tree.build_tree(config)?;
+        let luarocks = LuaRocksInstallation::new(config, luarocks_tree)?;
         luarocks.ensure_installed(&bar).await?;
         luarocks
             .install_build_dependencies(build_backend, &rockspec, progress_arc)
@@ -349,6 +352,7 @@ async fn install_binary_rock(
     opt: OptState,
     entry_type: tree::EntryType,
     config: &Config,
+    tree: &Tree,
     progress_arc: Arc<Progress<MultiProgress>>,
 ) -> Result<LocalPackage, InstallError> {
     let progress = Arc::clone(&progress_arc);
@@ -366,6 +370,7 @@ async fn install_binary_rock(
         packed_rock,
         entry_type,
         config,
+        tree,
         &bar,
     )
     .pin(pin)

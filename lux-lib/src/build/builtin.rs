@@ -14,7 +14,7 @@ use crate::{
     lua_installation::LuaInstallation,
     lua_rockspec::{Build, BuildInfo, BuiltinBuildSpec, DeploySpec, LuaModule, ModuleSpec},
     progress::{Progress, ProgressBar},
-    tree::{RockLayout, TreeError},
+    tree::{RockLayout, Tree, TreeError},
 };
 
 use super::utils::{CompileCFilesError, CompileCModulesError, InstallBinaryError};
@@ -42,6 +42,7 @@ impl Build for BuiltinBuildSpec {
         _no_install: bool,
         lua: &LuaInstallation,
         config: &Config,
+        tree: &Tree,
         build_dir: &Path,
         progress: &Progress<ProgressBar>,
     ) -> Result<BuildInfo, Self::Err> {
@@ -111,7 +112,6 @@ impl Build for BuiltinBuildSpec {
             }
         }
 
-        let tree = config.tree(lua.version.clone())?;
         let mut binaries = Vec::new();
         for target in autodetect_src_bin_scripts(build_dir) {
             std::fs::create_dir_all(target.parent().unwrap())?;
@@ -121,7 +121,7 @@ impl Build for BuiltinBuildSpec {
             // If package maintainers want to disable wrapping via the rockspec, they should
             // specify binaries in the rockspec.
             let installed_bin_script =
-                utils::install_binary(&source, &target, &tree, lua, &DeploySpec::default(), config)
+                utils::install_binary(&source, &target, tree, lua, &DeploySpec::default(), config)
                     .await
                     .map_err(|err| BuiltinBuildError::InstallBinary(target.clone(), err))?;
             binaries.push(

@@ -39,17 +39,17 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
 
     let project = Project::current()?;
     let (lua_version, root, tree) = match &project {
-        Some(prj) => (
-            prj.toml().lua_version_matches(&config)?,
-            prj.root().to_path_buf(),
-            prj.tree(&config)?,
+        Some(project) => (
+            project.toml().lua_version_matches(&config)?,
+            project.root().to_path_buf(),
+            project.tree(&config)?,
         ),
         None => {
             let version = LuaVersion::from(&config)?;
             (
                 version.clone(),
                 std::env::current_dir()?,
-                config.tree(version)?,
+                config.user_tree(version)?,
             )
         }
     };
@@ -112,7 +112,6 @@ mod test {
 
     use super::*;
 
-    // FIXME: This can fail locally if there's a lux project in the lux root
     #[serial]
     #[tokio::test]
     async fn test_run_lua() {
@@ -121,12 +120,15 @@ mod test {
             ..RunLua::default()
         };
         let temp: PathBuf = assert_fs::TempDir::new().unwrap().path().into();
+        let cwd = &std::env::current_dir().unwrap();
+        tokio::fs::create_dir_all(&temp).await.unwrap();
+        std::env::set_current_dir(&temp).unwrap();
         let config = ConfigBuilder::new()
             .unwrap()
-            .tree(Some(temp.clone()))
-            .luarocks_tree(Some(temp))
+            .user_tree(Some(temp.clone()))
             .build()
             .unwrap();
-        run_lua(args, config).await.unwrap()
+        run_lua(args, config).await.unwrap();
+        std::env::set_current_dir(cwd).unwrap();
     }
 }

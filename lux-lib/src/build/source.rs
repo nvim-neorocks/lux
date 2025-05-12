@@ -14,7 +14,7 @@ use crate::{
         ProjectRoot, PROJECT_TOML,
     },
     rockspec::Rockspec,
-    tree::RockLayout,
+    tree::{RockLayout, Tree},
 };
 
 use super::{
@@ -54,6 +54,7 @@ pub(crate) async fn build(
     output_paths: &RockLayout,
     lua: &LuaInstallation,
     config: &Config,
+    tree: &Tree,
     build_dir: &Path,
     progress: &Progress<ProgressBar>,
 ) -> Result<BuildInfo, SourceBuildError> {
@@ -81,32 +82,32 @@ pub(crate) async fn build(
     let build_info = match build_spec.build_backend {
         Some(BuildBackendSpec::Builtin(build_spec)) => {
             build_spec
-                .run(output_paths, false, lua, config, build_dir, progress)
+                .run(output_paths, false, lua, config, tree, build_dir, progress)
                 .await?
         }
         Some(BuildBackendSpec::Make(make_spec)) => {
             make_spec
-                .run(output_paths, false, lua, config, build_dir, progress)
+                .run(output_paths, false, lua, config, tree, build_dir, progress)
                 .await?
         }
         Some(BuildBackendSpec::CMake(cmake_spec)) => {
             cmake_spec
-                .run(output_paths, false, lua, config, build_dir, progress)
+                .run(output_paths, false, lua, config, tree, build_dir, progress)
                 .await?
         }
         Some(BuildBackendSpec::Command(command_spec)) => {
             command_spec
-                .run(output_paths, false, lua, config, build_dir, progress)
+                .run(output_paths, false, lua, config, tree, build_dir, progress)
                 .await?
         }
         Some(BuildBackendSpec::RustMlua(rust_mlua_spec)) => {
             rust_mlua_spec
-                .run(output_paths, false, lua, config, build_dir, progress)
+                .run(output_paths, false, lua, config, tree, build_dir, progress)
                 .await?
         }
         Some(BuildBackendSpec::TreesitterParser(treesitter_parser_spec)) => {
             treesitter_parser_spec
-                .run(output_paths, false, lua, config, build_dir, progress)
+                .run(output_paths, false, lua, config, tree, build_dir, progress)
                 .await?
         }
         Some(BuildBackendSpec::LuaRock(build_backend)) => return Err(SourceBuildError::UnsupporedLuarocksBuildBackend(build_backend)),

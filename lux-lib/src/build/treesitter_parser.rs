@@ -3,7 +3,7 @@ use crate::lua_installation::LuaInstallation;
 use crate::lua_rockspec::Build;
 use crate::lua_rockspec::{BuildInfo, TreesitterParserBuildSpec};
 use crate::progress::{Progress, ProgressBar};
-use crate::tree::RockLayout;
+use crate::tree::{RockLayout, Tree};
 use std::io;
 use std::num::ParseIntError;
 use std::path::{Path, PathBuf};
@@ -39,6 +39,7 @@ impl Build for TreesitterParserBuildSpec {
         _no_install: bool,
         _lua: &LuaInstallation,
         _config: &Config,
+        _tree: &Tree,
         build_dir: &Path,
         progress: &Progress<ProgressBar>,
     ) -> Result<BuildInfo, Self::Err> {

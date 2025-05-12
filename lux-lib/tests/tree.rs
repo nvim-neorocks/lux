@@ -18,11 +18,11 @@ fn tree_userdata() {
 
     let config = ConfigBuilder::new()
         .unwrap()
-        .tree(Some(temp.to_path_buf()))
+        .user_tree(Some(temp.to_path_buf()))
         .lua_version(lua_version)
         .build()
         .unwrap();
-    let t = config.tree(LuaVersion::Lua51).unwrap();
+    let t = config.user_tree(LuaVersion::Lua51).unwrap();
     let tree = t.into_lua(&lua).unwrap();
     lua.globals().set("tree", tree).unwrap();
 

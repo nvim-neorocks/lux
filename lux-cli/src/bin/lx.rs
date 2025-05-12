@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
         .extra_servers(cli.extra_servers)
         .only_sources(cli.only_sources)
         .server(cli.server)
-        .tree(cli.tree)
+        .user_tree(cli.tree)
         .timeout(
             cli.timeout
                 .map(|duration| Duration::from_secs(duration as u64)),
