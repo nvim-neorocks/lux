@@ -19,12 +19,17 @@ pub enum VersionReqToVersionError {
     Any,
 }
 
-/// **SemVer version** as defined by <https://semver.org>.
-/// or a **Dev** version, which can be one of "dev", "scm", or "git"
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum PackageVersion {
+    /// **SemVer version** as defined by <https://semver.org>,
+    /// but a bit more lenient for compatibility with luarocks
     SemVer(SemVer),
+    /// A known **Dev** version
     DevVer(DevVer),
+    /// An arbitrary string version.
+    /// Yes, luarocks-site allows arbitrary string versions in the root manifest
+    /// ┻━┻ ︵ヽ(`Д´)ﾉ︵ ┻━┻
+    StringVer(StringVer),
 }
 
 impl PackageVersion {
@@ -35,7 +40,10 @@ impl PackageVersion {
     pub fn into_version_req(&self) -> PackageVersionReq {
         match self {
             PackageVersion::DevVer(DevVer { modrev, .. }) => {
-                PackageVersionReq::Dev(modrev.to_owned())
+                PackageVersionReq::DevVer(modrev.to_owned())
+            }
+            PackageVersion::StringVer(StringVer { modrev, .. }) => {
+                PackageVersionReq::StringVer(modrev.to_owned())
             }
             PackageVersion::SemVer(SemVer { version, .. }) => {
                 let version = version.to_owned();
@@ -91,8 +99,11 @@ impl TryFrom<PackageVersionReq> for PackageVersion {
                     }))
                 }
             }
-            PackageVersionReq::Dev(modrev) => {
+            PackageVersionReq::DevVer(modrev) => {
                 Ok(PackageVersion::DevVer(DevVer { modrev, specrev: 1 }))
+            }
+            PackageVersionReq::StringVer(modrev) => {
+                Ok(PackageVersion::StringVer(StringVer { modrev, specrev: 1 }))
             }
             PackageVersionReq::Any => Err(VersionReqToVersionError::Any),
         }
@@ -121,6 +132,7 @@ impl Serialize for PackageVersion {
         match self {
             PackageVersion::SemVer(version) => version.serialize(serializer),
             PackageVersion::DevVer(version) => version.serialize(serializer),
+            PackageVersion::StringVer(version) => version.serialize(serializer),
         }
     }
 }
@@ -150,6 +162,7 @@ impl Display for PackageVersion {
         match self {
             PackageVersion::SemVer(version) => version.fmt(f),
             PackageVersion::DevVer(version) => version.fmt(f),
+            PackageVersion::StringVer(version) => version.fmt(f),
         }
     }
 }
@@ -165,8 +178,13 @@ impl Ord for PackageVersion {
         match (self, other) {
             (PackageVersion::SemVer(a), PackageVersion::SemVer(b)) => a.cmp(b),
             (PackageVersion::SemVer(..), PackageVersion::DevVer(..)) => Ordering::Less,
+            (PackageVersion::SemVer(..), PackageVersion::StringVer(..)) => Ordering::Greater,
             (PackageVersion::DevVer(..), PackageVersion::SemVer(..)) => Ordering::Greater,
             (PackageVersion::DevVer(a), PackageVersion::DevVer(b)) => a.cmp(b),
+            (PackageVersion::DevVer(..), PackageVersion::StringVer(..)) => Ordering::Greater,
+            (PackageVersion::StringVer(a), PackageVersion::StringVer(b)) => a.cmp(b),
+            (PackageVersion::StringVer(..), PackageVersion::SemVer(..)) => Ordering::Less,
+            (PackageVersion::StringVer(..), PackageVersion::DevVer(..)) => Ordering::Less,
         }
     }
 }
@@ -176,16 +194,26 @@ impl FromStr for PackageVersion {
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         let (modrev, specrev) = split_specrev(text)?;
-        match parse_version(modrev) {
-            Ok(version) => Ok(PackageVersion::SemVer(SemVer {
-                component_count: cmp::min(text.chars().filter(|c| *c == '.').count() + 1, 3),
-                version,
+        match modrev {
+            "scm" => Ok(PackageVersion::DevVer(DevVer {
+                modrev: DevVersion::Scm,
                 specrev,
             })),
-            Err(_) => Ok(PackageVersion::DevVer(DevVer {
-                modrev: modrev.into(),
+            "dev" => Ok(PackageVersion::DevVer(DevVer {
+                modrev: DevVersion::Dev,
                 specrev,
             })),
+            modrev => match parse_version(modrev) {
+                Ok(version) => Ok(PackageVersion::SemVer(SemVer {
+                    component_count: cmp::min(text.chars().filter(|c| *c == '.').count() + 1, 3),
+                    version,
+                    specrev,
+                })),
+                Err(_) => Ok(PackageVersion::StringVer(StringVer {
+                    modrev: modrev.into(),
+                    specrev,
+                })),
+            },
         }
     }
 }
@@ -250,9 +278,31 @@ impl PartialOrd for SemVer {
     }
 }
 
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DevVersion {
+    Dev,
+    Scm,
+}
+
+impl Display for DevVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Dev => "dev".fmt(f),
+            Self::Scm => "scm".fmt(f),
+        }
+    }
+}
+
+impl IntoLua for DevVersion {
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        self.to_string().into_lua(lua)
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct DevVer {
-    modrev: String,
+    modrev: DevVersion,
     specrev: u16,
 }
 
@@ -289,6 +339,45 @@ impl PartialOrd for DevVer {
     }
 }
 
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+pub struct StringVer {
+    modrev: String,
+    specrev: u16,
+}
+
+impl Display for StringVer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = format!("{}-{}", self.modrev, self.specrev);
+        str.fmt(f)
+    }
+}
+
+impl Serialize for StringVer {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.to_string().serialize(serializer)
+    }
+}
+
+impl Ord for StringVer {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // NOTE: We compare specrevs first for dev versions
+        let result = self.specrev.cmp(&other.specrev);
+        if result == Ordering::Equal {
+            return self.modrev.cmp(&other.modrev);
+        }
+        result
+    }
+}
+
+impl PartialOrd for StringVer {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 #[derive(Error, Debug)]
 #[error(transparent)]
 pub struct PackageVersionReqError(#[from] Error);
@@ -299,8 +388,10 @@ pub struct PackageVersionReqError(#[from] Error);
 pub enum PackageVersionReq {
     /// A PackageVersionReq that matches a SemVer version.
     SemVer(VersionReq),
-    /// A PackageVersionReq that matches only dev versions.
-    Dev(String),
+    /// A PackageVersionReq that matches only known dev versions.
+    DevVer(DevVersion),
+    /// A PackageVersionReq that matches a arbitrary string version.
+    StringVer(String),
     /// A PackageVersionReq that has no version constraint.
     Any,
 }
@@ -319,7 +410,8 @@ impl IntoLua for PackageVersionReq {
             PackageVersionReq::SemVer(version_req) => {
                 table.set("semver", version_req.to_string())?
             }
-            PackageVersionReq::Dev(dev) => table.set("dev", dev)?,
+            PackageVersionReq::DevVer(dev) => table.set("dev", dev)?,
+            PackageVersionReq::StringVer(dev) => table.set("stringver", dev)?,
             PackageVersionReq::Any => table.set("any", true)?,
         }
 
@@ -339,15 +431,15 @@ impl PackageVersionReq {
 
     pub fn matches(&self, version: &PackageVersion) -> bool {
         match (self, version) {
-            (PackageVersionReq::SemVer(version_req), PackageVersion::SemVer(semver)) => {
-                version_req.matches(&semver.version)
+            (PackageVersionReq::SemVer(req), PackageVersion::SemVer(ver)) => {
+                req.matches(&ver.version)
             }
-            (PackageVersionReq::SemVer(..), PackageVersion::DevVer(..)) => false,
-            (PackageVersionReq::Dev(..), PackageVersion::SemVer(..)) => false,
-            (PackageVersionReq::Dev(name_req), PackageVersion::DevVer(devver)) => {
-                name_req.ends_with(&devver.modrev)
+            (PackageVersionReq::DevVer(req), PackageVersion::DevVer(ver)) => req == &ver.modrev,
+            (PackageVersionReq::StringVer(req), PackageVersion::StringVer(ver)) => {
+                req == &ver.modrev
             }
             (PackageVersionReq::Any, _) => true,
+            _ => false,
         }
     }
 
@@ -368,7 +460,8 @@ impl Display for PackageVersionReq {
                 }
                 str.fmt(f)
             }
-            PackageVersionReq::Dev(name_req) => write!(f, "=={}", name_req.as_str()),
+            PackageVersionReq::DevVer(name_req) => write!(f, "=={}", &name_req),
+            PackageVersionReq::StringVer(name_req) => write!(f, "=={}", &name_req),
             PackageVersionReq::Any => f.write_str("any"),
         }
     }
@@ -395,7 +488,11 @@ impl FromStr for PackageVersionReq {
 
         match parse_version_req(&text) {
             Ok(_) => Ok(PackageVersionReq::SemVer(parse_version_req(&text)?)),
-            Err(_) => Ok(PackageVersionReq::Dev(trimmed.to_string())),
+            Err(_) => match trimmed {
+                "scm" => Ok(PackageVersionReq::DevVer(DevVersion::Scm)),
+                "dev" => Ok(PackageVersionReq::DevVer(DevVersion::Dev)),
+                ver => Ok(PackageVersionReq::StringVer(ver.to_string())),
+            },
         }
     }
 }
@@ -463,7 +560,7 @@ fn split_specrev(version_str: &str) -> Result<(&str, u16), SpecrevParseError> {
 }
 
 fn is_known_dev_version_str(text: &str) -> bool {
-    matches!(text, "dev" | "scm" | "git")
+    matches!(text, "dev" | "scm")
 }
 
 /// Parses a Version from a string, automatically supplying any missing details (i.e. missing
@@ -623,20 +720,20 @@ mod tests {
         assert_eq!(
             PackageVersion::parse("dev-1").unwrap(),
             PackageVersion::DevVer(DevVer {
-                modrev: "dev".into(),
+                modrev: DevVersion::Dev,
                 specrev: 1
             })
         );
         assert_eq!(
             PackageVersion::parse("scm-1").unwrap(),
             PackageVersion::DevVer(DevVer {
-                modrev: "scm".into(),
+                modrev: DevVersion::Scm,
                 specrev: 1
             })
         );
         assert_eq!(
             PackageVersion::parse("git-1").unwrap(),
-            PackageVersion::DevVer(DevVer {
+            PackageVersion::StringVer(StringVer {
                 modrev: "git".into(),
                 specrev: 1
             })
@@ -644,7 +741,7 @@ mod tests {
         assert_eq!(
             PackageVersion::parse("scm-1").unwrap(),
             PackageVersion::DevVer(DevVer {
-                modrev: "scm".into(),
+                modrev: DevVersion::Scm,
                 specrev: 1
             })
         );
@@ -654,47 +751,47 @@ mod tests {
     async fn parse_dev_version_req() {
         assert_eq!(
             PackageVersionReq::parse("dev").unwrap(),
-            PackageVersionReq::Dev("dev".into())
+            PackageVersionReq::DevVer(DevVersion::Dev)
         );
         assert_eq!(
             PackageVersionReq::parse("scm").unwrap(),
-            PackageVersionReq::Dev("scm".into())
+            PackageVersionReq::DevVer(DevVersion::Scm)
         );
         assert_eq!(
             PackageVersionReq::parse("git").unwrap(),
-            PackageVersionReq::Dev("git".into())
+            PackageVersionReq::StringVer("git".into())
         );
         assert_eq!(
             PackageVersionReq::parse("==dev").unwrap(),
-            PackageVersionReq::Dev("dev".into())
+            PackageVersionReq::DevVer(DevVersion::Dev)
         );
         assert_eq!(
             PackageVersionReq::parse("==git").unwrap(),
-            PackageVersionReq::Dev("git".into())
+            PackageVersionReq::StringVer("git".into())
         );
         assert_eq!(
             PackageVersionReq::parse("== dev").unwrap(),
-            PackageVersionReq::Dev("dev".into())
+            PackageVersionReq::DevVer(DevVersion::Dev)
         );
         assert_eq!(
             PackageVersionReq::parse("== scm").unwrap(),
-            PackageVersionReq::Dev("scm".into())
+            PackageVersionReq::DevVer(DevVersion::Scm)
         );
         assert_eq!(
             PackageVersionReq::parse("@dev").unwrap(),
-            PackageVersionReq::Dev("dev".into())
+            PackageVersionReq::DevVer(DevVersion::Dev)
         );
         assert_eq!(
             PackageVersionReq::parse("@git").unwrap(),
-            PackageVersionReq::Dev("git".into())
+            PackageVersionReq::StringVer("git".into())
         );
         assert_eq!(
             PackageVersionReq::parse("@ dev").unwrap(),
-            PackageVersionReq::Dev("dev".into())
+            PackageVersionReq::DevVer(DevVersion::Dev)
         );
         assert_eq!(
             PackageVersionReq::parse("@ scm").unwrap(),
-            PackageVersionReq::Dev("scm".into())
+            PackageVersionReq::DevVer(DevVersion::Scm)
         );
         assert_eq!(
             PackageVersionReq::parse(">1-1,<1.2-2").unwrap(),
