@@ -1,6 +1,7 @@
 use std::env;
 
 use crate::lua_rockspec::{LocalRockSource, RemoteRockSource, RockSourceSpec};
+use crate::package::PackageVersion;
 use crate::project::project_toml::RemoteProjectTomlValidationError;
 use crate::rockspec::Rockspec;
 use crate::TOOL_VERSION;
@@ -117,6 +118,10 @@ pub enum UploadError {
     ApiKeyUnspecified(#[from] ApiKeyUnspecified),
     ValidationError(#[from] RemoteProjectTomlValidationError),
     NonDeterministicGitSource(#[from] NonDeterministicGitSourceError),
+    #[error(
+        "unsupported version: `{0}`.\nLux can upload packages with a SemVer version, 'dev' or 'scm'"
+    )]
+    UnsupportedVersion(String),
 }
 
 #[derive(Clone, Debug, Error)]
@@ -227,6 +232,10 @@ async fn upload_from_project(
     let client = Client::builder().https_only(true).build()?;
 
     let rockspec = project.toml().into_remote()?;
+
+    if let PackageVersion::StringVer(ver) = rockspec.version() {
+        return Err(UploadError::UnsupportedVersion(ver.to_string()));
+    }
 
     // Disallow uploading non-deterministic rockspecs
     helpers::verify_rockspec_determinism(rockspec.source().current_platform())?;
