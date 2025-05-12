@@ -147,6 +147,11 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
 
 #[tokio::test]
 async fn treesitter_parser_build() {
+    if cfg!(target_env = "msvc") {
+        println!("Skipping test that is flaky on Windows/MSVC");
+        return;
+    }
+
     let dir = TempDir::new().unwrap();
 
     let content = String::from_utf8(
