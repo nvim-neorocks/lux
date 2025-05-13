@@ -68,6 +68,7 @@ jobs:
       - run: echo "RUSTFLAGS=${RUSTFLAGS} -C target-feature=+crt-static" >> "${GITHUB_ENV}"
         if: endsWith(matrix.target, 'windows-msvc')
       - uses: taiki-e/upload-rust-binary-action@v1
+        # TODO: also build `lux-lua`
         with:
           bin: lx
           target: ${{ matrix.target }}
