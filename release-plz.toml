@@ -1,8 +1,16 @@
 [workspace]
 # set the path of all the crates to the changelog to the root of the repository
-changelog_path = "CHANGELOG.md"
+changelog_path = "./CHANGELOG.md"
 
 [changelog]
+header = """# Changelog
+
+All notable changes to this project will be documented in this file.
+
+This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+"""
 body = """
 
 ## `{{ package }}` - [{{ version | trim_start_matches(pat="v") }}]{%- if release_link -%}({{ release_link }}){% endif %} - {{ timestamp | date(format="%Y-%m-%d") }}
@@ -25,4 +33,5 @@ git_release_name = "v{{ version }}"
 
 [[package]]
 name = "lux-workspace-hack"
+changelog_update = false
 release = false
