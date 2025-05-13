@@ -102,18 +102,28 @@ The following table provides a brief comparison:
 
 ## :package: Packages
 
+<a href="https://repology.org/project/lux-cli/versions">
+    <img src="https://repology.org/badge/vertical-allrepos/lux-cli.svg?header=lux-cli" alt="lux-cli packaging status" align="right">
+</a>
+
+<a href="https://repology.org/project/lux-lua-unclassified/versions">
+    <img src="https://repology.org/badge/vertical-allrepos/lux-lua-unclassified.svg?header=lux-lua" alt="lux-lua packaging status" align="right">
+</a>
+
 Lux includes the following packages and libraries:
 
 - `lux-cli`: The main CLI for interacting with projects and installing Lua packages
   from the command line.
+
 - `lux-lua`: The Lux Lua API, which provides:
   - `lux.loader` for resolving dependencies on `require` at runtime.
   - A work-in-progress API for embedding Lux into Lua applications.
   We provide builds of `lux-lua` for Lua 5.1, 5.2, 5.3, 5.4 and Luajit.
   `lux-cli` uses `lux-lua` for commands like `lx lua`, `lx run` and `lx path`.
+
 - `lux-lib`: The Lux library for Rust. A dependency of `lux-cli` and `lux-lua`.
 
-> ![NOTE]
+> [!NOTE]
 >
 > We do not yet provide a way to install `lux-lua` as a Lua library using Lux.
 > See [#663](https://github.com/nvim-neorocks/lux/issues/663).
