@@ -13,9 +13,8 @@ use crate::{
     lua_rockspec::{Build, BuildInfo, CMakeBuildSpec},
     progress::{Progress, ProgressBar},
     tree::{RockLayout, Tree},
+    variables::{self, HasVariables, VariableSubstitutionError},
 };
-
-use super::variables::{self, HasVariables, VariableSubstitutionError};
 
 const CMAKE_BUILD_FILE: &str = "build.lux";
 

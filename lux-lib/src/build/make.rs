@@ -14,9 +14,8 @@ use crate::{
     lua_rockspec::{Build, BuildInfo, MakeBuildSpec},
     progress::{Progress, ProgressBar},
     tree::{RockLayout, Tree},
+    variables::VariableSubstitutionError,
 };
-
-use super::variables::VariableSubstitutionError;
 
 #[derive(Error, Debug)]
 pub enum MakeError {

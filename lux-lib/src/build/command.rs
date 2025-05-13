@@ -12,9 +12,10 @@ use crate::{
     lua_rockspec::{Build, BuildInfo, CommandBuildSpec},
     progress::{Progress, ProgressBar},
     tree::{RockLayout, Tree},
+    variables::VariableSubstitutionError,
 };
 
-use super::{utils, variables::VariableSubstitutionError};
+use super::utils;
 
 #[derive(Error, Debug)]
 pub enum CommandError {

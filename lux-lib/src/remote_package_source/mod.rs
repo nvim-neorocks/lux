@@ -17,6 +17,7 @@ pub(crate) enum RemotePackageSource {
     LuarocksSrcRock(Url),
     LuarocksBinaryRock(Url),
     RockspecContent(String),
+    Local,
     #[cfg(test)]
     Test,
 }
@@ -32,6 +33,7 @@ impl IntoLua for RemotePackageSource {
             RemotePackageSource::RockspecContent(content) => {
                 table.set("rockspec_content", content)?
             }
+            RemotePackageSource::Local => table.set("local", true)?,
             #[cfg(test)]
             RemotePackageSource::Test => unreachable!(),
         };
@@ -47,6 +49,7 @@ impl RemotePackageSource {
             | Self::LuarocksSrcRock(url)
             | Self::LuarocksBinaryRock(url) => url,
             Self::RockspecContent(_) => panic!("tried to get URL from RockspecContent"),
+            RemotePackageSource::Local => panic!("tried to get URL from Local"),
             #[cfg(test)]
             Self::Test => unimplemented!(),
         }
@@ -68,6 +71,7 @@ impl Display for RemotePackageSource {
             RemotePackageSource::RockspecContent(content) => {
                 format!("rockspec{}{}", PLUS, content).fmt(f)
             }
+            RemotePackageSource::Local => "local".fmt(f),
             #[cfg(test)]
             RemotePackageSource::Test => "test+foo_bar".fmt(f),
         }

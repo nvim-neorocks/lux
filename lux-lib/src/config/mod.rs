@@ -13,8 +13,9 @@ use url::Url;
 use crate::operations::LuaBinary;
 use crate::tree::{Tree, TreeError};
 use crate::{
-    build::{utils, variables::HasVariables},
+    build::utils,
     package::{PackageVersion, PackageVersionReq},
+    variables::HasVariables,
 };
 
 pub mod external_deps;
