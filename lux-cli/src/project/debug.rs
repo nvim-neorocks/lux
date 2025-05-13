@@ -18,10 +18,10 @@ pub fn debug_project(args: DebugProject) -> Result<()> {
     let project = Project::current()?;
 
     if let Some(project) = project {
-        let rocks = project.toml();
+        let toml = project.toml();
 
-        println!("Project name: {}", rocks.package());
-        println!("Project version: {}", rocks.version());
+        println!("Project name: {}", toml.package());
+        println!("Project version: {}", toml.version()?);
 
         println!("Project location: {}", project.root().display());
 

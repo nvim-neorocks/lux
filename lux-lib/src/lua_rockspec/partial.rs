@@ -1,22 +1,21 @@
 use std::collections::HashMap;
 
 use mlua::{Lua, LuaSerdeExt, UserData, Value};
+use serde::de::Error;
 
 use crate::{
-    lua_rockspec::RockspecFormat,
-    package::{PackageName, PackageVersion},
-    rockspec::lua_dependency::LuaDependencySpec,
+    lua_rockspec::RockspecFormat, package::PackageName, rockspec::lua_dependency::LuaDependencySpec,
 };
 
 use super::{
     parse_lua_tbl_or_default, BuildSpecInternal, DeploySpec, ExternalDependencySpec,
-    PlatformSupport, RockDescription, RockSourceInternal, TestSpecInternal,
+    PlatformSupport, RockDescription, TestSpecInternal,
 };
 
+#[derive(Debug)]
 pub struct PartialLuaRockspec {
     pub(crate) rockspec_format: Option<RockspecFormat>,
     pub(crate) package: Option<PackageName>,
-    pub(crate) version: Option<PackageVersion>,
     pub(crate) build: Option<BuildSpecInternal>,
     pub(crate) deploy: Option<DeploySpec>,
     pub(crate) description: Option<RockDescription>,
@@ -25,7 +24,6 @@ pub struct PartialLuaRockspec {
     pub(crate) build_dependencies: Option<Vec<LuaDependencySpec>>,
     pub(crate) external_dependencies: Option<HashMap<String, ExternalDependencySpec>>,
     pub(crate) test_dependencies: Option<Vec<LuaDependencySpec>>,
-    pub(crate) source: Option<RockSourceInternal>,
     pub(crate) test: Option<TestSpecInternal>,
 }
 
@@ -40,10 +38,20 @@ impl PartialLuaRockspec {
 
         let globals = lua.globals();
 
+        if globals.contains_key("version")? {
+            return Err(mlua::Error::custom(
+                "field `version` should not be declared in extra.rockspec.",
+            ));
+        }
+        if globals.contains_key("source")? {
+            return Err(mlua::Error::custom(
+                "field `source` should not be declared in extra.rockspec.",
+            ));
+        }
+
         let rockspec = PartialLuaRockspec {
             rockspec_format: globals.get("rockspec_format").unwrap_or_default(),
             package: globals.get("package").unwrap_or_default(),
-            version: globals.get("version").unwrap_or_default(),
             description: parse_lua_tbl_or_default(&lua, "description").unwrap_or_default(),
             supported_platforms: parse_lua_tbl_or_default(&lua, "supported_platforms")
                 .unwrap_or_default(),
@@ -58,9 +66,6 @@ impl PartialLuaRockspec {
                 .unwrap_or_default(),
             external_dependencies: lua
                 .from_value(globals.get("external_dependencies").unwrap_or(Value::Nil))
-                .unwrap_or_default(),
-            source: lua
-                .from_value(globals.get("source").unwrap_or(Value::Nil))
                 .unwrap_or_default(),
             build: lua
                 .from_value(globals.get("build").unwrap_or(Value::Nil))
@@ -84,13 +89,6 @@ mod tests {
     #[test]
     fn parse_partial_rockspec() {
         let partial_rockspec = r#"
-            version = "2.0.0"
-        "#;
-
-        PartialLuaRockspec::new(partial_rockspec).unwrap();
-
-        let partial_rockspec = r#"
-            version = "2.0.0"
             package = "my-package"
         "#;
 
@@ -100,7 +98,6 @@ mod tests {
         let full_rockspec = r#"
             rockspec_format = "3.0"
             package = "my-package"
-            version = "1.0.0"
 
             description = {
                 summary = "A summary",
@@ -133,13 +130,6 @@ mod tests {
                 "busted 1.0",
             }
 
-            source = {
-                url = "https://example.com",
-                hash = "sha256-di00mD8txN7rjaVpvxzNbnQsAh6H16zUtJZapH7U4HU=",
-                file = "my-package-1.0.0.tar.gz",
-                dir = "my-package-1.0.0",
-            }
-
             test = {
                 type = "command",
                 script = "test.lua",
@@ -158,15 +148,28 @@ mod tests {
 
         assert!(rockspec.rockspec_format.is_some());
         assert!(rockspec.package.is_some());
-        assert!(rockspec.version.is_some());
         assert!(rockspec.description.is_some());
         assert!(rockspec.supported_platforms.is_some());
         assert!(rockspec.dependencies.is_some());
         assert!(rockspec.build_dependencies.is_some());
         assert!(rockspec.external_dependencies.is_some());
         assert!(rockspec.test_dependencies.is_some());
-        assert!(rockspec.source.is_some());
         assert!(rockspec.build.is_some());
         assert!(rockspec.test.is_some());
+
+        // We don't allow version and source in extra.rockspec
+        let partial_rockspec = r#"
+            version = "2.0.0"
+        "#;
+
+        PartialLuaRockspec::new(partial_rockspec).unwrap_err();
+
+        let partial_rockspec = r#"
+            source = {
+                url = "https://example.com",
+            }
+        "#;
+
+        PartialLuaRockspec::new(partial_rockspec).unwrap_err();
     }
 }

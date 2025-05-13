@@ -59,6 +59,10 @@ impl PackageVersion {
             }
         }
     }
+
+    pub(crate) fn default_dev_version() -> Self {
+        Self::DevVer(DevVer::default())
+    }
 }
 
 impl TryFrom<PackageVersionReq> for PackageVersion {
@@ -278,9 +282,10 @@ impl PartialOrd for SemVer {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DevVersion {
+    #[default]
     Dev,
     Scm,
 }
@@ -304,6 +309,15 @@ impl IntoLua for DevVersion {
 pub struct DevVer {
     modrev: DevVersion,
     specrev: u16,
+}
+
+impl Default for DevVer {
+    fn default() -> Self {
+        Self {
+            modrev: Default::default(),
+            specrev: 1,
+        }
+    }
 }
 
 impl Display for DevVer {

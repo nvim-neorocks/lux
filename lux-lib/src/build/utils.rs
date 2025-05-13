@@ -3,6 +3,7 @@ use crate::{
     lua_installation::LuaInstallation,
     lua_rockspec::{DeploySpec, LuaModule, ModulePaths},
     tree::{RockLayout, Tree},
+    variables::{self, Environment, VariableSubstitutionError},
 };
 use itertools::Itertools;
 use path_slash::PathExt;
@@ -21,10 +22,7 @@ use tokio::process::Command;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
-use super::{
-    external_dependency::ExternalDependencyInfo,
-    variables::{self, Environment, VariableSubstitutionError},
-};
+use super::external_dependency::ExternalDependencyInfo;
 
 /// Copies a lua source file to a specific destination. The destination is described by a
 /// `module.path` syntax (equivalent to the syntax provided to Lua's `require()` function).

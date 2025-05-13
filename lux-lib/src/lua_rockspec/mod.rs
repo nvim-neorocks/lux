@@ -7,7 +7,9 @@ mod rock_source;
 mod serde_util;
 mod test_spec;
 
-use std::{collections::HashMap, fmt::Display, io, path::PathBuf, str::FromStr};
+use std::{
+    collections::HashMap, convert::Infallible, fmt::Display, io, path::PathBuf, str::FromStr,
+};
 
 use mlua::{FromLua, IntoLua, Lua, LuaSerdeExt, UserData, Value};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -28,7 +30,7 @@ use crate::{
     config::{LuaVersion, LuaVersionUnset},
     hash::HasIntegrity,
     package::{PackageName, PackageSpec, PackageVersion},
-    project::ProjectRoot,
+    project::{project_toml::ProjectTomlError, ProjectRoot},
     rockspec::{lua_dependency::LuaDependencySpec, Rockspec},
 };
 
@@ -46,6 +48,8 @@ pub enum LuaRockspecError {
     OffSpecBuildDependency(PackageName),
     #[error("cannot create Lua rockspec with off-spec test dependency: {0}")]
     OffSpecTestDependency(PackageName),
+    #[error(transparent)]
+    ProjectToml(#[from] ProjectTomlError),
 }
 
 #[derive(Clone, Debug)]
@@ -97,7 +101,8 @@ impl UserData for LocalLuaRockspec {
         methods.add_method("format", |_, this, _: ()| Ok(this.rockspec_format.clone()));
 
         methods.add_method("to_lua_rockspec_string", |_, this, _: ()| {
-            Ok(this.to_lua_rockspec_string())
+            this.to_lua_remote_rockspec_string()
+                .map_err(|err| mlua::Error::RuntimeError(err.to_string()))
         });
     }
 }
@@ -158,6 +163,8 @@ impl LocalLuaRockspec {
 }
 
 impl Rockspec for LocalLuaRockspec {
+    type Error = Infallible;
+
     fn package(&self) -> &PackageName {
         &self.package
     }
@@ -226,14 +233,14 @@ impl Rockspec for LocalLuaRockspec {
         &self.rockspec_format
     }
 
-    fn to_lua_rockspec_string(&self) -> String {
-        self.raw_content.clone()
+    fn to_lua_remote_rockspec_string(&self) -> Result<String, Self::Error> {
+        Ok(self.raw_content.clone())
     }
 }
 
 impl HasIntegrity for LocalLuaRockspec {
     fn hash(&self) -> io::Result<Integrity> {
-        Ok(Integrity::from(self.to_lua_rockspec_string()))
+        Ok(Integrity::from(&self.raw_content))
     }
 }
 
@@ -274,7 +281,8 @@ impl UserData for RemoteLuaRockspec {
         });
 
         methods.add_method("to_lua_rockspec_string", |_, this, _: ()| {
-            Ok(this.to_lua_rockspec_string())
+            this.to_lua_remote_rockspec_string()
+                .map_err(|err| mlua::Error::RuntimeError(err.to_string()))
         });
     }
 }
@@ -347,6 +355,8 @@ build = {{
 }
 
 impl Rockspec for RemoteLuaRockspec {
+    type Error = Infallible;
+
     fn package(&self) -> &PackageName {
         self.local.package()
     }
@@ -415,8 +425,8 @@ impl Rockspec for RemoteLuaRockspec {
         self.local.format()
     }
 
-    fn to_lua_rockspec_string(&self) -> String {
-        self.local.raw_content.clone()
+    fn to_lua_remote_rockspec_string(&self) -> Result<String, Self::Error> {
+        Ok(self.local.raw_content.clone())
     }
 }
 
@@ -430,7 +440,7 @@ pub enum LuaVersionError {
 
 impl HasIntegrity for RemoteLuaRockspec {
     fn hash(&self) -> io::Result<Integrity> {
-        Ok(Integrity::from(self.to_lua_rockspec_string()))
+        Ok(Integrity::from(&self.local.raw_content))
     }
 }
 

@@ -1,6 +1,5 @@
 use std::env;
 
-use crate::lua_rockspec::{RemoteRockSource, RockSourceSpec};
 use crate::package::PackageVersion;
 use crate::project::project_toml::RemoteProjectTomlValidationError;
 use crate::rockspec::Rockspec;
@@ -117,16 +116,13 @@ pub enum UploadError {
     UserCheck(#[from] UserCheckError),
     ApiKeyUnspecified(#[from] ApiKeyUnspecified),
     ValidationError(#[from] RemoteProjectTomlValidationError),
-    NonDeterministicGitSource(#[from] NonDeterministicGitSourceError),
     #[error(
         "unsupported version: `{0}`.\nLux can upload packages with a SemVer version, 'dev' or 'scm'"
     )]
     UnsupportedVersion(String),
+    #[error("{0}")] // We don't know the concrete error type
+    Rockspec(String),
 }
-
-#[derive(Clone, Debug, Error)]
-#[error("refusing to upload nondeterministic rockspec with git source. Supply a `tag` parameter or an integrity hash.")]
-pub struct NonDeterministicGitSourceError;
 
 pub struct ApiKey(String);
 
@@ -237,9 +233,6 @@ async fn upload_from_project(
         return Err(UploadError::UnsupportedVersion(ver.to_string()));
     }
 
-    // Disallow uploading non-deterministic rockspecs
-    helpers::verify_rockspec_determinism(rockspec.source().current_platform())?;
-
     helpers::ensure_tool_version(&client, config.server()).await?;
     helpers::ensure_user_exists(&client, api_key, config.server()).await?;
 
@@ -255,7 +248,9 @@ async fn upload_from_project(
         return Err(UploadError::RockExists(config.server().clone()));
     }
 
-    let rockspec_content = rockspec.to_lua_rockspec_string();
+    let rockspec_content = rockspec
+        .to_lua_remote_rockspec_string()
+        .map_err(|err| UploadError::Rockspec(err.to_string()))?;
 
     #[cfg(target_env = "msvc")]
     let signed: Option<String> = None;
@@ -307,7 +302,6 @@ async fn upload_from_project(
 
 mod helpers {
     use super::*;
-    use crate::git::GitSource;
     use crate::package::{PackageName, PackageVersion};
     use crate::upload::RockCheckError;
     use crate::upload::{ToolCheckError, UserCheckError};
@@ -382,79 +376,5 @@ mod helpers {
             .text()
             .await?
             != "{}")
-    }
-
-    pub(crate) fn verify_rockspec_determinism(
-        source: &RemoteRockSource,
-    ) -> Result<(), NonDeterministicGitSourceError> {
-        match source {
-            RemoteRockSource {
-                source_spec:
-                    RockSourceSpec::Git(GitSource {
-                        checkout_ref: Some(_),
-                        ..
-                    }),
-                ..
-            } => {}
-            RemoteRockSource {
-                source_spec: RockSourceSpec::Git(_),
-                ..
-            } => return Err(NonDeterministicGitSourceError),
-            _ => {}
-        }
-
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{
-        project::{project_toml::PartialProjectToml, ProjectRoot},
-        rockspec::Rockspec,
-    };
-
-    use super::helpers;
-
-    #[test]
-    fn upload_check_deterministic_rockspecs() {
-        let rockspec_content = r#"
-            package = "test-package"
-            version = "1.0.0"
-            lua = ">=5.1"
-
-            [source]
-            url = "git+https://exaple.com/repo.git"
-
-            [build]
-            type = "builtin"
-        "#;
-
-        let rockspec = PartialProjectToml::new(rockspec_content, ProjectRoot::default())
-            .unwrap()
-            .into_remote()
-            .unwrap();
-
-        helpers::verify_rockspec_determinism(rockspec.source().current_platform()).unwrap_err();
-
-        let rockspec_content = r#"
-            package = "test-package"
-            version = "1.0.0"
-            lua = ">=5.1"
-
-            [source]
-            url = "git+https://exaple.com/repo.git"
-            tag = "v0.1.0"
-
-            [build]
-            type = "builtin"
-        "#;
-
-        let rockspec = PartialProjectToml::new(rockspec_content, ProjectRoot::default())
-            .unwrap()
-            .into_remote()
-            .unwrap();
-
-        helpers::verify_rockspec_determinism(rockspec.source().current_platform()).unwrap();
     }
 }

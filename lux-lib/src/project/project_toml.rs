@@ -32,8 +32,8 @@ use crate::{
         BuildSpec, BuildSpecInternal, BuildSpecInternalError, DisplayAsLuaKV, ExternalDependencies,
         ExternalDependencySpec, FromPlatformOverridable, LuaVersionError, PartialLuaRockspec,
         PerPlatform, PlatformIdentifier, PlatformSupport, PlatformValidationError,
-        RemoteRockSource, RockDescription, RockSourceError, RockSourceInternal, RockspecFormat,
-        TestSpec, TestSpecError, TestSpecInternal,
+        RemoteRockSource, RockDescription, RockSourceError, RockspecFormat, TestSpec,
+        TestSpecError, TestSpecInternal,
     },
     package::{
         BuildDependencies, Dependencies, PackageName, PackageReq, PackageVersion,
@@ -42,7 +42,13 @@ use crate::{
     rockspec::{latest_lua_version, LuaVersionCompatibility, Rockspec},
 };
 
+use super::gen::GenerateSourceError;
+use super::gen::RockSourceTemplate;
+use super::r#gen::GenerateVersionError;
+use super::r#gen::PackageVersionTemplate;
 use super::ProjectRoot;
+
+pub const PROJECT_TOML: &str = "lux.toml";
 
 #[derive(Deserialize)]
 #[serde(untagged)]
@@ -123,6 +129,14 @@ where
 }
 
 #[derive(Debug, Error)]
+pub enum ProjectTomlError {
+    #[error("error generating rockspec source:\n{0}")]
+    GenerateSource(#[from] GenerateSourceError),
+    #[error("error generating rockspec version:\n{0}")]
+    GenerateVersion(#[from] GenerateVersionError),
+}
+
+#[derive(Debug, Error)]
 pub enum LocalProjectTomlValidationError {
     #[error("no lua version provided")]
     NoLuaVersion,
@@ -144,12 +158,18 @@ pub enum LocalProjectTomlValidationError {
     DuplicateBuildDependencies(PackageNameList),
     #[error("dependencies field cannot contain lua - please provide the version in the top-level lua field")]
     DependenciesContainLua,
+    #[error("error generating rockspec source:\n{0}")]
+    GenerateSource(#[from] GenerateSourceError),
+    #[error("error generating rockspec version:\n{0}")]
+    GenerateVersion(#[from] GenerateVersionError),
 }
 
 #[derive(Debug, Error)]
 pub enum RemoteProjectTomlValidationError {
-    #[error("no source url provided")]
-    NoSource,
+    #[error("error generating rockspec source:\n{0}")]
+    GenerateSource(#[from] GenerateSourceError),
+    #[error("error generating rockspec version:\n{0}")]
+    GenerateVersion(#[from] GenerateVersionError),
     #[error(transparent)]
     LocalProjectTomlValidationError(#[from] LocalProjectTomlValidationError),
 }
@@ -160,7 +180,8 @@ pub enum RemoteProjectTomlValidationError {
 #[derive(Clone, Debug, Deserialize)]
 pub struct PartialProjectToml {
     pub(crate) package: PackageName,
-    pub(crate) version: PackageVersion,
+    #[serde(default, rename = "version")]
+    pub(crate) version_template: PackageVersionTemplate,
     pub(crate) build: BuildSpecInternal,
     pub(crate) rockspec_format: Option<RockspecFormat>,
     #[serde(default)]
@@ -179,14 +200,14 @@ pub struct PartialProjectToml {
     pub(crate) external_dependencies: Option<HashMap<String, ExternalDependencySpec>>,
     #[serde(default, deserialize_with = "parse_map_to_dependency_vec_opt")]
     pub(crate) test_dependencies: Option<Vec<LuaDependencySpec>>,
-    #[serde(default)]
-    pub(crate) source: Option<RockSourceInternal>,
+    #[serde(default, rename = "source")]
+    pub(crate) source_template: RockSourceTemplate,
     #[serde(default)]
     pub(crate) test: Option<TestSpecInternal>,
     #[serde(default)]
     pub(crate) deploy: Option<DeploySpec>,
 
-    // Used to bind the project TOML to a project root
+    /// Used to bind the project TOML to a project root
     #[serde(skip, default = "ProjectRoot::new")]
     pub(crate) project_root: ProjectRoot,
 }
@@ -194,7 +215,6 @@ pub struct PartialProjectToml {
 impl UserData for PartialProjectToml {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("package", |_, this, _: ()| Ok(this.package().clone()));
-        methods.add_method("version", |_, this, _: ()| Ok(this.version().clone()));
         methods.add_method("to_local", |_, this, _: ()| {
             this.into_local().into_lua_err()
         });
@@ -205,6 +225,14 @@ impl UserData for PartialProjectToml {
         //methods.add_method("merge", |_, this, other: PartialLuaRockspec| {
         //    this.merge(other).into_lua_err()
         //});
+    }
+}
+
+impl HasIntegrity for PartialProjectToml {
+    fn hash(&self) -> io::Result<Integrity> {
+        let toml_file = self.project_root.join(PROJECT_TOML);
+        let content = std::fs::read_to_string(&toml_file)?;
+        Ok(Integrity::from(&content))
     }
 }
 
@@ -264,7 +292,9 @@ impl PartialProjectToml {
             internal: project_toml.clone(),
 
             package: project_toml.package,
-            version: project_toml.version,
+            version: project_toml
+                .version_template
+                .try_generate(&self.project_root)?,
             lua: project_toml
                 .lua
                 .ok_or(LocalProjectTomlValidationError::NoLuaVersion)?,
@@ -301,16 +331,10 @@ impl PartialProjectToml {
             deploy: PerPlatform::new(project_toml.deploy.clone().unwrap_or_default()),
             rockspec_format: project_toml.rockspec_format.clone(),
 
-            source: PerPlatform::new(
-                self.source
-                    .clone()
-                    .map(RemoteRockSource::from_platform_overridable)
-                    .transpose()?
-                    .unwrap_or(RemoteRockSource {
-                        local: LocalRockSource::default(),
-                        source_spec: RockSourceSpec::File(self.project_root.to_path_buf()),
-                    }),
-            ),
+            source: PerPlatform::new(RemoteRockSource {
+                local: LocalRockSource::default(),
+                source_spec: RockSourceSpec::File(self.project_root.to_path_buf()),
+            }),
         };
 
         let rockspec_file_name = format!("{}-{}.rockspec", validated.package, validated.version);
@@ -344,16 +368,16 @@ impl PartialProjectToml {
     /// it ready to be serialized into a rockspec.
     /// A source must be provided for the rockspec to be valid.
     pub fn into_remote(&self) -> Result<RemoteProjectToml, RemoteProjectTomlValidationError> {
+        let version = self.version_template.try_generate(&self.project_root)?;
+        let source =
+            self.source_template
+                .try_generate(&self.project_root, &self.package, &version)?;
         let source = PerPlatform::new(
-            self.source
-                .clone()
-                .map(RemoteRockSource::from_platform_overridable)
-                .ok_or(RemoteProjectTomlValidationError::NoSource)?
-                .map_err(|err| {
-                    RemoteProjectTomlValidationError::LocalProjectTomlValidationError(
-                        LocalProjectTomlValidationError::RockSourceError(err),
-                    )
-                })?,
+            RemoteRockSource::from_platform_overridable(source).map_err(|err| {
+                RemoteProjectTomlValidationError::LocalProjectTomlValidationError(
+                    LocalProjectTomlValidationError::RockSourceError(err),
+                )
+            })?,
         );
         let local = self.into_local()?;
 
@@ -368,8 +392,9 @@ impl PartialProjectToml {
         &self.package
     }
 
-    pub fn version(&self) -> &PackageVersion {
-        &self.version
+    /// Returns the current package version, which may be generated from a template
+    pub fn version(&self) -> Result<PackageVersion, GenerateVersionError> {
+        self.version_template.try_generate(&self.project_root)
     }
 
     /// Merge the `ProjectToml` struct with an unvalidated `LuaRockspec`.
@@ -377,7 +402,7 @@ impl PartialProjectToml {
     pub fn merge(self, other: PartialLuaRockspec) -> Self {
         PartialProjectToml {
             package: other.package.unwrap_or(self.package),
-            version: other.version.unwrap_or(self.version),
+            version_template: self.version_template,
             lua: other
                 .dependencies
                 .as_ref()
@@ -411,7 +436,7 @@ impl PartialProjectToml {
             build_dependencies: other.build_dependencies.or(self.build_dependencies),
             test_dependencies: other.test_dependencies.or(self.test_dependencies),
             external_dependencies: other.external_dependencies.or(self.external_dependencies),
-            source: other.source.or(self.source),
+            source_template: self.source_template,
             test: other.test.or(self.test),
             deploy: other.deploy.or(self.deploy),
             rockspec_format: other.rockspec_format.or(self.rockspec_format),
@@ -439,7 +464,9 @@ impl LuaVersionCompatibility for PartialProjectToml {
             Err(LuaVersionError::LuaVersionUnsupported(
                 version,
                 self.package.clone(),
-                self.version.clone(),
+                self.version_template
+                    .try_generate(&self.project_root)
+                    .unwrap_or(PackageVersion::default_dev_version()),
             ))
         }
     }
@@ -568,13 +595,15 @@ impl LocalProjectToml {
             return Err(LuaRockspecError::OffSpecTestDependency(dep.name().clone()));
         }
         LocalLuaRockspec::new(
-            &self.to_lua_rockspec_string(),
+            &self.to_lua_remote_rockspec_string()?,
             self.internal.project_root.clone(),
         )
     }
 }
 
 impl Rockspec for LocalProjectToml {
+    type Error = ProjectTomlError;
+
     fn package(&self) -> &PackageName {
         &self.package
     }
@@ -643,7 +672,9 @@ impl Rockspec for LocalProjectToml {
         &mut self.deploy
     }
 
-    fn to_lua_rockspec_string(&self) -> String {
+    fn to_lua_remote_rockspec_string(&self) -> Result<String, Self::Error> {
+        let project_root = &self.internal.project_root;
+        let version = self.internal.version_template.try_generate(project_root)?;
         let starter = format!(
             r#"
 rockspec_format = "{}"
@@ -651,7 +682,7 @@ package = "{}"
 version = "{}""#,
             self.rockspec_format.as_ref().unwrap_or(&"3.0".into()),
             self.package,
-            self.version
+            &version
         );
 
         let mut template = Vec::new();
@@ -698,9 +729,11 @@ version = "{}""#,
             _ => {}
         }
 
-        if let Some(ref source) = self.internal.source {
-            template.push(source.display_lua());
-        }
+        let source =
+            self.internal
+                .source_template
+                .try_generate(project_root, &self.package, &version)?;
+        template.push(source.display_lua());
 
         if let Some(ref test) = self.internal.test {
             template.push(test.display_lua());
@@ -708,9 +741,9 @@ version = "{}""#,
 
         template.push(self.internal.build.display_lua());
 
-        std::iter::once(starter)
+        Ok(std::iter::once(starter)
             .chain(template.into_iter().map(|kv| kv.to_string()))
-            .join("\n\n")
+            .join("\n\n"))
     }
 }
 
@@ -723,9 +756,10 @@ pub enum ProjectTomlIntegrityError {
 
 impl HasIntegrity for LocalProjectToml {
     fn hash(&self) -> io::Result<Integrity> {
-        self.to_lua_rockspec()
-            .expect("unable to convert local project to rockspec")
-            .hash()
+        match self.to_lua_rockspec() {
+            Ok(lua_rockspec) => lua_rockspec.hash(),
+            Err(_) => self.internal.hash(),
+        }
     }
 }
 
@@ -737,11 +771,13 @@ pub struct RemoteProjectToml {
 
 impl RemoteProjectToml {
     pub fn to_lua_rockspec(&self) -> Result<RemoteLuaRockspec, LuaRockspecError> {
-        RemoteLuaRockspec::new(&self.to_lua_rockspec_string())
+        RemoteLuaRockspec::new(&self.to_lua_remote_rockspec_string()?)
     }
 }
 
 impl Rockspec for RemoteProjectToml {
+    type Error = ProjectTomlError;
+
     fn package(&self) -> &PackageName {
         self.local.package()
     }
@@ -810,7 +846,14 @@ impl Rockspec for RemoteProjectToml {
         self.local.deploy_mut()
     }
 
-    fn to_lua_rockspec_string(&self) -> String {
+    fn to_lua_remote_rockspec_string(&self) -> Result<String, Self::Error> {
+        let project_root = &self.local.internal.project_root;
+        let version = self
+            .local
+            .internal
+            .version_template
+            .try_generate(project_root)?;
+
         let starter = format!(
             r#"
 rockspec_format = "{}"
@@ -818,7 +861,7 @@ package = "{}"
 version = "{}""#,
             self.local.rockspec_format.as_ref().unwrap_or(&"3.0".into()),
             self.local.package,
-            self.local.version
+            &version
         );
 
         let mut template = Vec::new();
@@ -865,9 +908,12 @@ version = "{}""#,
             _ => {}
         }
 
-        if let Some(ref source) = self.local.internal.source {
-            template.push(source.display_lua());
-        }
+        let source = self.local.internal.source_template.try_generate(
+            project_root,
+            &self.local.internal.package,
+            &version,
+        )?;
+        template.push(source.display_lua());
 
         if let Some(ref test) = self.local.internal.test {
             template.push(test.display_lua());
@@ -875,9 +921,9 @@ version = "{}""#,
 
         template.push(self.local.internal.build.display_lua());
 
-        std::iter::once(starter)
+        Ok(std::iter::once(starter)
             .chain(template.into_iter().map(|kv| kv.to_string()))
-            .join("\n\n")
+            .join("\n\n"))
     }
 }
 
@@ -916,7 +962,8 @@ impl UserData for LocalProjectToml {
         methods.add_method("format", |_, this, _: ()| Ok(this.format().clone()));
         methods.add_method("source", |_, this, _: ()| Ok(this.source().clone()));
         methods.add_method("to_lua_rockspec_string", |_, this, _: ()| {
-            Ok(this.to_lua_rockspec_string())
+            this.to_lua_remote_rockspec_string()
+                .map_err(|err| mlua::Error::RuntimeError(err.to_string()))
         });
         methods.add_method("to_lua_rockspec", |_, this, _: ()| {
             this.to_lua_rockspec().into_lua_err()
@@ -951,7 +998,8 @@ impl UserData for RemoteProjectToml {
         methods.add_method("format", |_, this, _: ()| Ok(this.format().clone()));
         methods.add_method("source", |_, this, _: ()| Ok(this.source().clone()));
         methods.add_method("to_lua_rockspec_string", |_, this, _: ()| {
-            Ok(this.to_lua_rockspec_string())
+            this.to_lua_remote_rockspec_string()
+                .map_err(|err| mlua::Error::RuntimeError(err.to_string()))
         });
         methods.add_method("to_lua_rockspec", |_, this, _: ()| {
             this.to_lua_rockspec().into_lua_err()
@@ -1096,7 +1144,6 @@ mod tests {
 
         [source]
         url = "https://example.com"
-        hash = "sha256-di00mD8txN7rjaVpvxzNbnQsAh6H16zUtJZapH7U4HU="
         file = "my-package-1.0.0.tar.gz"
         dir = "my-package-1.0.0"
 
@@ -1117,6 +1164,12 @@ mod tests {
             rockspec_format = "1.0"
             package = "my-package"
             version = "1.0.0"
+
+            source = {
+                url = "https://example.com",
+                file = "my-package-1.0.0.tar.gz",
+                dir = "my-package-1.0.0",
+            }
 
             description = {
                 summary = "A summary",
@@ -1253,7 +1306,6 @@ mod tests {
 
         [source]
         url = "https://example.com"
-        hash = "sha256-di00mD8txN7rjaVpvxzNbnQsAh6H16zUtJZapH7U4HU="
         file = "my-package-1.0.0.tar.gz"
         dir = "my-package-1.0.0"
 
@@ -1273,7 +1325,6 @@ mod tests {
         let mergable_rockspec_content = r#"
             rockspec_format = "1.0"
             package = "my-package-overwritten"
-            version = "2.0.0"
 
             description = {
                 summary = "A summary overwritten",
@@ -1307,13 +1358,6 @@ mod tests {
                 "busted >1.0",
             }
 
-            source = {
-                url = "https://example.com/overwritten",
-                hash = "sha256-QL5OCZFBGixecdEoriGck4iG83tjM09ewYbWVSbcfa4=",
-                file = "my-package-1.0.0.tar.gz.overwritten",
-                dir = "my-package-1.0.0.overwritten",
-            }
-
             test = {
                 type = "command",
                 script = "overwritten.lua",
@@ -1325,9 +1369,21 @@ mod tests {
             }
         "#;
 
+        let remote_rockspec_content = format!(
+            r#"{}
+            version = "1.0.0"
+            source = {{
+                url = "https://example.com",
+                file = "my-package-1.0.0.tar.gz",
+                dir = "my-package-1.0.0",
+            }}
+        "#,
+            &mergable_rockspec_content
+        );
+
         let project_toml = PartialProjectToml::new(project_toml, ProjectRoot::default()).unwrap();
         let partial_rockspec = PartialLuaRockspec::new(mergable_rockspec_content).unwrap();
-        let expected_rockspec = RemoteLuaRockspec::new(mergable_rockspec_content).unwrap();
+        let expected_rockspec = RemoteLuaRockspec::new(&remote_rockspec_content).unwrap();
 
         let merged = project_toml.merge(partial_rockspec).into_remote().unwrap();
 
@@ -1412,5 +1468,46 @@ mod tests {
 
             PartialProjectToml::new(&project_toml, ProjectRoot::default()).unwrap_err();
         }
+    }
+
+    #[test]
+    fn generate_non_deterministic_git_source() {
+        let rockspec_content = r#"
+            package = "test-package"
+            version = "1.0.0"
+            lua = ">=5.1"
+
+            [source]
+            url = "git+https://exaple.com/repo.git"
+
+            [build]
+            type = "builtin"
+        "#;
+
+        PartialProjectToml::new(rockspec_content, ProjectRoot::default())
+            .unwrap()
+            .into_remote()
+            .unwrap_err();
+    }
+
+    #[test]
+    fn generate_deterministic_git_source() {
+        let rockspec_content = r#"
+            package = "test-package"
+            version = "1.0.0"
+            lua = ">=5.1"
+
+            [source]
+            url = "git+https://exaple.com/repo.git"
+            tag = "v0.1.0"
+
+            [build]
+            type = "builtin"
+        "#;
+
+        PartialProjectToml::new(rockspec_content, ProjectRoot::default())
+            .unwrap()
+            .into_remote()
+            .unwrap();
     }
 }

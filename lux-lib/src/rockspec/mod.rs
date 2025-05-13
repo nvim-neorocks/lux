@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt::Display,
     ops::{Deref, DerefMut},
     path::PathBuf,
 };
@@ -20,6 +21,8 @@ use crate::{
 };
 
 pub trait Rockspec {
+    type Error: Display + std::fmt::Debug;
+
     fn package(&self) -> &PackageName;
     fn version(&self) -> &PackageVersion;
     fn description(&self) -> &RockDescription;
@@ -55,7 +58,7 @@ pub trait Rockspec {
     }
 
     /// Converts the rockspec to a string that can be uploaded to a luarocks server.
-    fn to_lua_rockspec_string(&self) -> String;
+    fn to_lua_remote_rockspec_string(&self) -> Result<String, Self::Error>;
 }
 
 pub trait LuaVersionCompatibility {

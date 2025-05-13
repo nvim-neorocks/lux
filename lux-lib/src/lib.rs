@@ -20,6 +20,7 @@ pub mod which;
 
 pub(crate) mod lua;
 pub(crate) mod remote_package_source;
+pub(crate) mod variables;
 
 /// An internal string describing the server-side API version that we support.
 /// Whenever we connect to a server (like `luarocks.org`), we ensure that these

@@ -197,7 +197,7 @@ async fn update_dependency_tree(
     packages: &Option<Vec<PackageReq>>,
 ) -> Result<Vec<LocalPackage>, UpdateError> {
     let lockfile = tree.lockfile()?;
-    let dependencies = unpinned_packages(&lockfile)
+    let dependencies = updatable_packages(&lockfile)
         .into_iter()
         .filter(|pkg| is_included(pkg, packages))
         .collect_vec();
@@ -230,7 +230,7 @@ async fn update_install_tree(
         .config
         .user_tree(LuaVersion::from(args.config)?.clone())?;
     let lockfile = tree.lockfile()?;
-    let packages = unpinned_packages(&lockfile)
+    let packages = updatable_packages(&lockfile)
         .into_iter()
         .filter(|pkg| is_included(pkg, &args.packages))
         .collect_vec();
@@ -292,7 +292,7 @@ async fn update(
     }
 }
 
-fn unpinned_packages(lockfile: &Lockfile<ReadOnly>) -> Vec<(LocalPackage, PackageReq)> {
+fn updatable_packages(lockfile: &Lockfile<ReadOnly>) -> Vec<(LocalPackage, PackageReq)> {
     lockfile
         .rocks()
         .values()
@@ -302,8 +302,10 @@ fn unpinned_packages(lockfile: &Lockfile<ReadOnly>) -> Vec<(LocalPackage, Packag
                     RemotePackageSource::LuarocksRockspec(_) => true,
                     RemotePackageSource::LuarocksSrcRock(_) => true,
                     RemotePackageSource::LuarocksBinaryRock(_) => true,
-                    // We don't support updating git sources for now
+                    // We don't support updating git sources or local packages
+                    // Git sources can be updated with the --toml flag
                     RemotePackageSource::RockspecContent(_) => false,
+                    RemotePackageSource::Local => false,
                     #[cfg(test)]
                     RemotePackageSource::Test => false,
                 }
