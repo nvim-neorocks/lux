@@ -134,6 +134,8 @@ pub enum BuildError {
     FetchSrcError(#[from] FetchSrcError),
     #[error("failed to install binary {0}: {1}")]
     InstallBinary(String, InstallBinaryError),
+    #[error("{0}")] // We don't know the concrete error type
+    Rockspec(String),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -335,9 +337,15 @@ async fn do_build<R: Rockspec + HasIntegrity>(
         &PackageSpec::new(rockspec.package().clone(), rockspec.version().clone()),
         build.constraint,
         rockspec.binaries(),
-        build.source.unwrap_or_else(|| {
-            RemotePackageSource::RockspecContent(rockspec.to_lua_rockspec_string())
-        }),
+        build
+            .source
+            .map(Result::Ok)
+            .unwrap_or_else(|| {
+                rockspec
+                    .to_lua_rockspec_string()
+                    .map(RemotePackageSource::RockspecContent)
+            })
+            .map_err(|err| BuildError::Rockspec(err.to_string()))?,
         Some(source_metadata.source_url),
         hashes,
     );
@@ -429,7 +437,9 @@ async fn do_build<R: Rockspec + HasIntegrity>(
 
             std::fs::write(
                 output_paths.rockspec_path(),
-                rockspec.to_lua_rockspec_string(),
+                rockspec
+                    .to_lua_rockspec_string()
+                    .map_err(|err| BuildError::Rockspec(err.to_string()))?,
             )?;
 
             Ok(package)

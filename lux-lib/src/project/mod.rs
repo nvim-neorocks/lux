@@ -38,6 +38,7 @@ use crate::{
 };
 
 pub mod project_toml;
+pub(crate) mod gen;
 
 pub const PROJECT_TOML: &str = "lux.toml";
 pub const EXTRA_ROCKSPEC: &str = "extra.rockspec";
