@@ -331,15 +331,6 @@ async fn do_build<R: Rockspec + HasIntegrity>(
         source: source_metadata.hash,
     };
 
-    if let Some(expected) = &rockspec.source().current_platform().integrity {
-        if expected.matches(&hashes.source).is_none() {
-            return Err(BuildError::SourceIntegrityMismatch {
-                expected: expected.clone(),
-                actual: hashes.source,
-            });
-        }
-    }
-
     let mut package = LocalPackage::from(
         &PackageSpec::new(rockspec.package().clone(), rockspec.version().clone()),
         build.constraint,

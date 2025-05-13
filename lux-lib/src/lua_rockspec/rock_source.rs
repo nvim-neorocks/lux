@@ -2,7 +2,6 @@ use git_url_parse::{GitUrl, GitUrlParseError};
 use mlua::{FromLua, IntoLua, Lua, UserData, Value};
 use reqwest::Url;
 use serde::{de, Deserialize, Deserializer};
-use ssri::Integrity;
 use std::{convert::Infallible, fs, io, ops::Deref, path::PathBuf, str::FromStr};
 use thiserror::Error;
 
@@ -15,7 +14,6 @@ use super::{
 
 #[derive(Default, Deserialize, Clone, Debug, PartialEq)]
 pub struct LocalRockSource {
-    pub integrity: Option<Integrity>,
     pub archive_name: Option<String>,
     pub unpack_dir: Option<PathBuf>,
 }
@@ -38,9 +36,6 @@ impl From<RockSourceSpec> for RemoteRockSource {
 impl UserData for RemoteRockSource {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("source_spec", |_, this, _: ()| Ok(this.source_spec.clone()));
-        methods.add_method("integrity", |_, this, _: ()| {
-            Ok(this.local.integrity.clone().map(|i| i.to_string()))
-        });
         methods.add_method("archive_name", |_, this, _: ()| {
             Ok(this.local.archive_name.clone())
         });
@@ -73,7 +68,6 @@ impl FromPlatformOverridable<RockSourceInternal, Self> for LocalRockSource {
 
     fn from_platform_overridable(internal: RockSourceInternal) -> Result<Self, Self::Err> {
         Ok(LocalRockSource {
-            integrity: internal.hash,
             archive_name: internal.file,
             unpack_dir: internal.dir,
         })
@@ -202,8 +196,6 @@ impl DisplayAsLuaKV for RockSourceSpec {
 pub(crate) struct RockSourceInternal {
     #[serde(default)]
     pub(crate) url: Option<String>,
-    #[serde(default, deserialize_with = "integrity_opt_from_hash_str")]
-    pub(crate) hash: Option<Integrity>,
     pub(crate) file: Option<String>,
     pub(crate) dir: Option<PathBuf>,
     pub(crate) tag: Option<String>,
@@ -216,7 +208,6 @@ impl PartialOverride for RockSourceInternal {
     fn apply_overrides(&self, override_spec: &Self) -> Result<Self, Self::Err> {
         Ok(Self {
             url: override_opt(override_spec.url.as_ref(), self.url.as_ref()),
-            hash: override_opt(override_spec.hash.as_ref(), self.hash.as_ref()),
             file: override_opt(override_spec.file.as_ref(), self.file.as_ref()),
             dir: override_opt(override_spec.dir.as_ref(), self.dir.as_ref()),
             tag: match &override_spec.branch {
@@ -239,12 +230,6 @@ impl DisplayAsLuaKV for RockSourceInternal {
             result.push(DisplayLuaKV {
                 key: "url".to_string(),
                 value: DisplayLuaValue::String(url.clone()),
-            });
-        }
-        if let Some(hash) = &self.hash {
-            result.push(DisplayLuaKV {
-                key: "hash".to_string(),
-                value: DisplayLuaValue::String(hash.to_string()),
             });
         }
         if let Some(file) = &self.file {
@@ -371,18 +356,6 @@ impl<'de> Deserialize<'de> for SourceUrl {
     {
         SourceUrl::from_str(&String::deserialize(deserializer)?).map_err(de::Error::custom)
     }
-}
-
-fn integrity_opt_from_hash_str<'de, D>(deserializer: D) -> Result<Option<Integrity>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let str_opt: Option<String> = Option::deserialize(deserializer)?;
-    let integrity_opt = match str_opt {
-        Some(s) => Some(s.parse().map_err(de::Error::custom)?),
-        None => None,
-    };
-    Ok(integrity_opt)
 }
 
 fn starts_with_any(str: &str, prefixes: Vec<&str>) -> bool {

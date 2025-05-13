@@ -1,6 +1,6 @@
 use std::env;
 
-use crate::lua_rockspec::{LocalRockSource, RemoteRockSource, RockSourceSpec};
+use crate::lua_rockspec::{RemoteRockSource, RockSourceSpec};
 use crate::package::PackageVersion;
 use crate::project::project_toml::RemoteProjectTomlValidationError;
 use crate::rockspec::Rockspec;
@@ -389,13 +389,6 @@ mod helpers {
     ) -> Result<(), NonDeterministicGitSourceError> {
         match source {
             RemoteRockSource {
-                local:
-                    LocalRockSource {
-                        integrity: Some(_), ..
-                    },
-                source_spec: RockSourceSpec::Git(_),
-            } => {}
-            RemoteRockSource {
                 source_spec:
                     RockSourceSpec::Git(GitSource {
                         checkout_ref: Some(_),
@@ -443,26 +436,6 @@ mod tests {
             .unwrap();
 
         helpers::verify_rockspec_determinism(rockspec.source().current_platform()).unwrap_err();
-
-        let rockspec_content = r#"
-            package = "test-package"
-            version = "1.0.0"
-            lua = ">=5.1"
-
-            [source]
-            url = "git+https://exaple.com/repo.git"
-            hash = "sha256-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-
-            [build]
-            type = "builtin"
-        "#;
-
-        let rockspec = PartialProjectToml::new(rockspec_content, ProjectRoot::default())
-            .unwrap()
-            .into_remote()
-            .unwrap();
-
-        helpers::verify_rockspec_determinism(rockspec.source().current_platform()).unwrap();
 
         let rockspec_content = r#"
             package = "test-package"
