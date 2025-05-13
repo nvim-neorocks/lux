@@ -15,9 +15,9 @@ use crate::lua_rockspec::ExternalDependencySpec;
 use crate::operations::{LuaBinary, LuaBinaryError};
 use crate::project::Project;
 use crate::{
-    build::variables::HasVariables,
     config::{Config, LuaVersion},
     package::PackageVersion,
+    variables::HasVariables,
 };
 
 pub struct LuaInstallation {

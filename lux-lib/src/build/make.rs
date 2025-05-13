@@ -16,9 +16,10 @@ use crate::{
     lua_rockspec::{Build, BuildInfo, MakeBuildSpec},
     progress::{Progress, ProgressBar},
     tree::{RockLayout, Tree},
+    variables::VariableSubstitutionError,
 };
 
-use super::{external_dependency::ExternalDependencyInfo, variables::VariableSubstitutionError};
+use super::external_dependency::ExternalDependencyInfo;
 
 #[derive(Error, Debug)]
 pub enum MakeError {
