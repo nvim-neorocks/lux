@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## `lux-cli` - [0.4.5](https://github.com/nvim-neorocks/lux/compare/v0.4.4...v0.4.5) - 2025-05-13
+
+### Added
+- *(cli)* autogenerate a .gitignore file ([#684](https://github.com/nvim-neorocks/lux/pull/684))
+
+## `lux-lib` - [0.5.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.4.1...lux-lib-v0.5.0) - 2025-05-13
+
+### Fixed
+- [**breaking**] treat unknown string versions as `< SemVer` ([#689](https://github.com/nvim-neorocks/lux/pull/689))
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
 ## `lux-cli` - [0.4.1](https://github.com/nvim-neorocks/lux/compare/v0.4.0...v0.4.1) - 2025-05-11
 
 ### Other
