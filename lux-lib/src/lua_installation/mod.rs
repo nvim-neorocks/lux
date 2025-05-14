@@ -9,6 +9,7 @@ use target_lexicon::Triple;
 use thiserror::Error;
 
 use crate::build::utils::{format_path, lua_lib_extension};
+use crate::operations::{LuaBinary, LuaBinaryError};
 use crate::project::Project;
 use crate::{
     build::variables::HasVariables,
@@ -276,21 +277,29 @@ impl HasVariables for LuaInstallation {
 }
 
 #[derive(Error, Debug)]
-pub enum GetLuaVersionError {
+pub enum DetectLuaVersionError {
+    #[error("error detecting Lua version: {0}")]
+    LuaBinary(#[from] LuaBinaryError),
     #[error("failed to run {0}: {1}")]
-    RunLuaCommandError(String, io::Error),
+    RunLuaCommand(String, io::Error),
     #[error("failed to parse Lua version from output: {0}")]
-    ParseLuaVersionError(String),
+    ParseLuaVersion(String),
     #[error(transparent)]
-    PackageVersionParseError(#[from] crate::package::PackageVersionParseError),
+    PackageVersionParse(#[from] crate::package::PackageVersionParseError),
     #[error(transparent)]
-    LuaVersionError(#[from] crate::config::LuaVersionError),
+    LuaVersion(#[from] crate::config::LuaVersionError),
 }
 
-pub fn get_installed_lua_version(lua_cmd: &str) -> Result<PackageVersion, GetLuaVersionError> {
-    let output = match Command::new(lua_cmd).arg("-v").output() {
+pub fn detect_installed_lua_version(
+    lua: LuaBinary,
+) -> Result<PackageVersion, DetectLuaVersionError> {
+    let lua_cmd: PathBuf = lua.try_into()?;
+    let output = match Command::new(&lua_cmd).arg("-v").output() {
         Ok(output) => Ok(output),
-        Err(err) => Err(GetLuaVersionError::RunLuaCommandError(lua_cmd.into(), err)),
+        Err(err) => Err(DetectLuaVersionError::RunLuaCommand(
+            lua_cmd.to_string_lossy().to_string(),
+            err,
+        )),
     }?;
     let output_vec = if output.stderr.is_empty() {
         output.stdout
@@ -302,14 +311,16 @@ pub fn get_installed_lua_version(lua_cmd: &str) -> Result<PackageVersion, GetLua
     parse_lua_version_from_output(&lua_output)
 }
 
-fn parse_lua_version_from_output(lua_output: &str) -> Result<PackageVersion, GetLuaVersionError> {
+fn parse_lua_version_from_output(
+    lua_output: &str,
+) -> Result<PackageVersion, DetectLuaVersionError> {
     let lua_version_str = lua_output
         .trim_start_matches("Lua")
         .trim_start_matches("JIT")
         .split_whitespace()
         .next()
         .map(|s| s.to_string())
-        .ok_or(GetLuaVersionError::ParseLuaVersionError(
+        .ok_or(DetectLuaVersionError::ParseLuaVersion(
             lua_output.to_string(),
         ))?;
     Ok(PackageVersion::parse(&lua_version_str)?)
@@ -417,7 +428,7 @@ mod test {
         // FIXME: This fails when run in the nix checkPhase
         assert!(lua_installation.bin.is_some());
         let pkg_version =
-            get_installed_lua_version(&lua_installation.bin.unwrap().to_string_lossy()).unwrap();
+            detect_installed_lua_version(lua_installation.bin.unwrap().into()).unwrap();
         assert_eq!(&LuaVersion::from_version(pkg_version).unwrap(), lua_version);
     }
 

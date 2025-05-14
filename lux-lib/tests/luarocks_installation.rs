@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use assert_fs::assert::PathAssert;
 use assert_fs::prelude::{PathChild, PathCopy};
 use assert_fs::TempDir;
-use lux_lib::lua_installation::get_installed_lua_version;
+use lux_lib::lua_installation::detect_installed_lua_version;
+use lux_lib::operations::LuaBinary;
 use lux_lib::progress::{MultiProgress, Progress, ProgressBar};
 use lux_lib::{
     config::{ConfigBuilder, LuaVersion},
@@ -16,7 +17,7 @@ use predicates::prelude::predicate;
 async fn luarocks_make() {
     let dir = TempDir::new().unwrap();
 
-    let lua_version = get_installed_lua_version("lua")
+    let lua_version = detect_installed_lua_version(LuaBinary::default())
         .ok()
         .and_then(|version| LuaVersion::from_version(version).ok())
         .or(Some(LuaVersion::Lua51));

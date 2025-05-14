@@ -2,9 +2,9 @@ use assert_fs::TempDir;
 use lux_lib::{
     config::{ConfigBuilder, LuaVersion},
     git::GitSource,
-    lua_installation::get_installed_lua_version,
+    lua_installation::detect_installed_lua_version,
     lua_rockspec::RockSourceSpec,
-    operations::{Install, PackageInstallSpec},
+    operations::{Install, LuaBinary, PackageInstallSpec},
     tree::EntryType,
 };
 
@@ -21,7 +21,7 @@ async fn install_git_package() {
             }))
             .build();
 
-    let lua_version = get_installed_lua_version("lua")
+    let lua_version = detect_installed_lua_version(LuaBinary::default())
         .ok()
         .and_then(|version| LuaVersion::from_version(version).ok())
         .or(Some(LuaVersion::Lua51));

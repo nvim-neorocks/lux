@@ -10,6 +10,7 @@ use thiserror::Error;
 use tree::RockLayoutConfig;
 use url::Url;
 
+use crate::operations::LuaBinary;
 use crate::tree::{Tree, TreeError};
 use crate::{
     build::{utils, variables::HasVariables},
@@ -442,11 +443,13 @@ impl ConfigBuilder {
         let cache_dir = self.cache_dir.unwrap_or(Config::get_default_cache_path()?);
         let user_tree = self.user_tree.unwrap_or(data_dir.join("tree"));
 
-        let lua_version = self
-            .lua_version
-            .or(crate::lua_installation::get_installed_lua_version("lua")
-                .ok()
-                .and_then(|version| LuaVersion::from_version(version).ok()));
+        let lua_version =
+            self.lua_version
+                .or(
+                    crate::lua_installation::detect_installed_lua_version(LuaBinary::default())
+                        .ok()
+                        .and_then(|version| LuaVersion::from_version(version).ok()),
+                );
         Ok(Config {
             enable_development_packages: self.enable_development_packages.unwrap_or(false),
             server: self

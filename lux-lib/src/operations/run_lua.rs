@@ -2,10 +2,14 @@
 //!
 //! The interfaces exposed here ensure that the correct version of Lua is being used.
 
-use std::{fmt, io, path::Path};
+use std::{
+    fmt, io,
+    path::{Path, PathBuf},
+};
 
 use thiserror::Error;
 use tokio::process::Command;
+use which::which;
 
 use crate::{
     config::LuaVersion,
@@ -14,11 +18,21 @@ use crate::{
     tree::Tree,
 };
 
+#[derive(Clone, Default)]
 pub enum LuaBinary {
     /// The regular Lua interpreter.
+    #[default]
     Lua,
     /// Custom Lua interpreter.
     Custom(String),
+}
+
+#[derive(Debug, Error)]
+pub enum LuaBinaryError {
+    #[error("neither `lua` nor `luajit` found on the PATH")]
+    LuaBinaryNotFound,
+    #[error("{0} not found on the PATH")]
+    CustomBinaryNotFound(String),
 }
 
 impl fmt::Display for LuaBinary {
@@ -30,8 +44,36 @@ impl fmt::Display for LuaBinary {
     }
 }
 
+impl From<PathBuf> for LuaBinary {
+    fn from(value: PathBuf) -> Self {
+        Self::Custom(value.to_string_lossy().to_string())
+    }
+}
+
+impl TryFrom<LuaBinary> for PathBuf {
+    type Error = LuaBinaryError;
+
+    fn try_from(value: LuaBinary) -> Result<Self, Self::Error> {
+        match value {
+            LuaBinary::Lua => match which("lua") {
+                Ok(path) => Ok(path),
+                Err(_) => match which("luajit") {
+                    Ok(path) => Ok(path),
+                    Err(_) => Err(LuaBinaryError::LuaBinaryNotFound),
+                },
+            },
+            LuaBinary::Custom(bin) => match which(&bin) {
+                Ok(path) => Ok(path),
+                Err(_) => Err(LuaBinaryError::CustomBinaryNotFound(bin)),
+            },
+        }
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum RunLuaError {
+    #[error("error running lua: {0}")]
+    LuaBinary(#[from] LuaBinaryError),
     #[error(
         "{} -v (= {}) does not match expected Lua version {}",
         lua_cmd,
@@ -62,18 +104,17 @@ pub async fn run_lua(
     root: &Path,
     tree: &Tree,
     expected_version: LuaVersion,
-    binary_name: LuaBinary,
+    lua_cmd: LuaBinary,
     args: &Vec<String>,
 ) -> Result<(), RunLuaError> {
-    let lua_cmd = binary_name.to_string();
     let paths = Paths::new(tree)?;
 
-    match lua_installation::get_installed_lua_version(&lua_cmd)
+    match lua_installation::detect_installed_lua_version(lua_cmd.clone())
         .and_then(|ver| Ok(LuaVersion::from_version(ver)?))
     {
         Ok(installed_version) if installed_version != expected_version => {
             Err(RunLuaError::LuaVersionMismatch {
-                lua_cmd: lua_cmd.clone(),
+                lua_cmd: lua_cmd.to_string(),
                 installed_version,
                 lua_version: expected_version,
             })?
@@ -89,6 +130,8 @@ Cannot verify that the expected version is being used.
         }
     }
 
+    let lua_cmd: PathBuf = lua_cmd.try_into()?;
+
     let status = match Command::new(&lua_cmd)
         .current_dir(root)
         .args(args)
@@ -100,7 +143,7 @@ Cannot verify that the expected version is being used.
     {
         Ok(status) => Ok(status),
         Err(err) => Err(RunLuaError::LuaCommandFailed {
-            lua_cmd: lua_cmd.clone(),
+            lua_cmd: lua_cmd.to_string_lossy().to_string(),
             source: err,
         }),
     }?;
@@ -108,7 +151,7 @@ Cannot verify that the expected version is being used.
         Ok(())
     } else {
         Err(RunLuaError::LuaCommandNonZeroExitCode {
-            lua_cmd,
+            lua_cmd: lua_cmd.to_string_lossy().to_string(),
             exit_code: status.code(),
         })
     }
