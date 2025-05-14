@@ -38,7 +38,7 @@ async fn builtin_build() {
     let bar = progress.new_bar();
 
     let tree = config
-        .user_tree(LuaVersion::from(&config).unwrap())
+        .user_tree(LuaVersion::from(&config).unwrap().clone())
         .unwrap();
 
     Build::new(
@@ -80,7 +80,7 @@ async fn make_build() {
     let bar = progress.new_bar();
 
     let tree = config
-        .user_tree(LuaVersion::from(&config).unwrap())
+        .user_tree(LuaVersion::from(&config).unwrap().clone())
         .unwrap();
 
     Build::new(
@@ -106,7 +106,8 @@ async fn cmake_build() {
 async fn command_build() {
     // The rockspec appears to be broken when using luajit headers on macos
     let config = ConfigBuilder::new().unwrap().build().unwrap();
-    if cfg!(target_os = "macos") && config.lua_version() == Some(&LuaVersion::LuaJIT) {
+    let lua_version = LuaVersion::from(&config).unwrap_or(&LuaVersion::Lua51);
+    if cfg!(target_os = "macos") && *lua_version == LuaVersion::LuaJIT {
         println!("luaposix is broken on macos/luajit! Skipping...");
         return;
     }
@@ -135,7 +136,7 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
     let bar = progress.new_bar();
 
     let tree = config
-        .user_tree(LuaVersion::from(&config).unwrap())
+        .user_tree(LuaVersion::from(&config).unwrap().clone())
         .unwrap();
 
     Build::new(
@@ -182,7 +183,7 @@ async fn treesitter_parser_build() {
     let bar = progress.new_bar();
 
     let tree = config
-        .user_tree(LuaVersion::from(&config).unwrap())
+        .user_tree(LuaVersion::from(&config).unwrap().clone())
         .unwrap();
 
     Build::new(
@@ -309,7 +310,7 @@ fn test_build_multiple_treesitter_parsers() {
             .unwrap();
 
         let tree = config
-            .user_tree(LuaVersion::from(&config).unwrap())
+            .user_tree(LuaVersion::from(&config).unwrap().clone())
             .unwrap();
 
         let config = config.clone();

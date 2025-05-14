@@ -32,7 +32,7 @@ pub async fn outdated(outdated_data: Outdated, config: Config) -> Result<()> {
             project.tree(&config)?
         }
         None => {
-            let lua_version = LuaVersion::from(&config)?;
+            let lua_version = LuaVersion::from(&config)?.clone();
             config.user_tree(lua_version)?
         }
     };

@@ -217,7 +217,7 @@ mod test {
     use io::Read;
 
     use crate::{
-        config::{ConfigBuilder, LuaVersion},
+        config::ConfigBuilder,
         operations::{unpack_rockspec, DownloadedPackedRockBytes, Pack, Remove},
         progress::MultiProgress,
     };
@@ -267,7 +267,7 @@ mod test {
         let progress = MultiProgress::new();
         let bar = progress.new_bar();
         let tree = config
-            .user_tree(LuaVersion::from(&config).unwrap())
+            .user_tree(config.lua_version().unwrap().clone())
             .unwrap();
         let local_package = BinaryRockInstall::new(
             &rockspec,

@@ -25,7 +25,7 @@ pub async fn exec(run: Exec, config: Config) -> Result<()> {
     let tree = match &project {
         Some(project) => project.tree(&config)?,
         None => {
-            let lua_version = LuaVersion::from(&config)?;
+            let lua_version = LuaVersion::from(&config)?.clone();
             config.user_tree(lua_version)?
         }
     };

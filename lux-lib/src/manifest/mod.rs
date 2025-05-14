@@ -11,6 +11,7 @@ use tokio::{fs, io};
 use url::Url;
 use zip::ZipArchive;
 
+use crate::config::LuaVersionUnset;
 use crate::package::{RemotePackageType, RemotePackageTypeFilterSpec};
 use crate::progress::{Progress, ProgressBar};
 use crate::{
@@ -35,6 +36,8 @@ pub enum ManifestFromServerError {
     ZipRead(Url, zip::result::ZipError),
     #[error("failed to unzip manifest file {0}:\n{1}")]
     ZipExtract(Url, zip::result::ZipError),
+    #[error(transparent)]
+    LuaVersion(#[from] LuaVersionUnset),
 }
 
 async fn get_manifest(
@@ -80,7 +83,7 @@ async fn manifest_from_cache_or_server(
     config: &Config,
     bar: &Progress<ProgressBar>,
 ) -> Result<String, ManifestFromServerError> {
-    let manifest_version = manifest_version_str(config);
+    let manifest_version = LuaVersion::from(config)?.version_compatibility_str();
     let url = mk_manifest_url(server_url, &manifest_version, config)?;
 
     // Stores a path to the manifest cache (this allows us to operate on a manifest without
@@ -129,33 +132,12 @@ pub(crate) async fn manifest_from_server_only(
     config: &Config,
     bar: &Progress<ProgressBar>,
 ) -> Result<String, ManifestFromServerError> {
-    let manifest_version = manifest_version_str(config);
+    let manifest_version = LuaVersion::from(config)?.version_compatibility_str();
     let url = mk_manifest_url(server_url, &manifest_version, config)?;
     let cache = mk_manifest_cache(&url, config).await?;
     let client = Client::new();
     bar.map(|bar| bar.set_message(format!("📥 Downloading manifest from {}", &url)));
     get_manifest(url, manifest_version.clone(), &cache, &client).await
-}
-
-fn manifest_version_str(config: &Config) -> String {
-    config
-        .lua_version()
-        .filter(|lua_version| {
-            // There's no manifest-luajit
-            matches!(
-                lua_version,
-                LuaVersion::Lua51 | LuaVersion::Lua52 | LuaVersion::Lua53 | LuaVersion::Lua54
-            )
-        })
-        .or(config
-            .lua_version()
-            .and_then(|lua_version| match lua_version {
-                LuaVersion::LuaJIT => Some(&LuaVersion::Lua51),
-                LuaVersion::LuaJIT52 => Some(&LuaVersion::Lua52),
-                _ => None,
-            }))
-        .map(|ver| ver.to_string())
-        .unwrap_or_default()
 }
 
 fn mk_manifest_url(

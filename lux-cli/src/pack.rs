@@ -54,7 +54,7 @@ pub struct Pack {
 }
 
 pub async fn pack(args: Pack, config: Config) -> Result<()> {
-    let lua_version = LuaVersion::from(&config)?;
+    let lua_version = LuaVersion::from(&config)?.clone();
     let dest_dir = std::env::current_dir()?;
     let progress = MultiProgress::new_arc();
     let package_or_rockspec = match args.package_or_rockspec {

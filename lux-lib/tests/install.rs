@@ -34,7 +34,7 @@ async fn install_git_package() {
         .unwrap();
 
     let tree = config
-        .user_tree(LuaVersion::from(&config).unwrap())
+        .user_tree(LuaVersion::from(&config).unwrap().clone())
         .unwrap();
     let installed = Install::new(&config)
         .package(install_spec)

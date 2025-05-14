@@ -20,7 +20,7 @@ pub struct Uninstall {
 
 /// Uninstall one or multiple rocks from the user tree
 pub async fn uninstall(uninstall_args: Uninstall, config: Config) -> Result<()> {
-    let tree = config.user_tree(LuaVersion::from(&config)?)?;
+    let tree = config.user_tree(LuaVersion::from(&config)?.clone())?;
 
     let package_matches = uninstall_args
         .packages
