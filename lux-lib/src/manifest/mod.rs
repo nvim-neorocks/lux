@@ -31,8 +31,10 @@ pub enum ManifestFromServerError {
     InvalidHeader(#[from] ToStrError),
     #[error("error parsing manifest URL: {0}")]
     Url(#[from] url::ParseError),
-    #[error("failed to unzip manifest file")]
-    Zip(#[from] zip::result::ZipError),
+    #[error("failed to read manifest archive {0}:\n{1}")]
+    ZipRead(Url, zip::result::ZipError),
+    #[error("failed to unzip manifest file {0}:\n{1}")]
+    ZipExtract(Url, zip::result::ZipError),
 }
 
 async fn get_manifest(
@@ -41,12 +43,15 @@ async fn get_manifest(
     target: &Path,
     client: &Client,
 ) -> Result<String, ManifestFromServerError> {
-    let new_manifest_content = client.get(url).send().await?.bytes().await?;
-    let mut archive = ZipArchive::new(std::io::Cursor::new(new_manifest_content))?;
+    let manifest_bytes = client.get(url.clone()).send().await?.bytes().await?;
+    let mut archive = ZipArchive::new(std::io::Cursor::new(manifest_bytes))
+        .map_err(|err| ManifestFromServerError::ZipRead(url.clone(), err))?;
 
     let temp = tempdir::TempDir::new("lux-manifest")?;
 
-    archive.extract_unwrapped_root_dir(&temp, zip::read::root_dir_common_filter)?;
+    archive
+        .extract_unwrapped_root_dir(&temp, zip::read::root_dir_common_filter)
+        .map_err(|err| ManifestFromServerError::ZipExtract(url.clone(), err))?;
 
     let mut extracted_manifest =
         File::open(temp.path().join(format!("manifest-{}", manifest_version))).await?;

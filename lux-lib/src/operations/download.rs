@@ -320,8 +320,10 @@ pub enum SearchAndDownloadError {
     Rockspec(#[from] LuaRockspecError),
     #[error("error initialising remote package DB: {0}")]
     RemotePackageDB(#[from] RemotePackageDBError),
-    #[error("failed to read packed rock: {0}")]
-    Zip(#[from] zip::result::ZipError),
+    #[error("failed to read packed rock {0}:\n{1}")]
+    ZipRead(String, zip::result::ZipError),
+    #[error("failed to extract packed rock {0}:\n{1}")]
+    ZipExtract(String, zip::result::ZipError),
     #[error("{0} not found in the packed rock.")]
     RockspecNotFoundInPackedRock(String),
     #[error(transparent)]
@@ -440,13 +442,16 @@ pub(crate) async fn unpack_rockspec(
 ) -> Result<RemoteLuaRockspec, SearchAndDownloadError> {
     let cursor = Cursor::new(&rock.bytes);
     let rockspec_file_name = format!("{}-{}.rockspec", rock.name, rock.version);
-    let mut zip = zip::ZipArchive::new(cursor)?;
+    let mut zip = zip::ZipArchive::new(cursor)
+        .map_err(|err| SearchAndDownloadError::ZipRead(rock.file_name.clone(), err))?;
     let rockspec_index = (0..zip.len())
         .find(|&i| zip.by_index(i).unwrap().name().eq(&rockspec_file_name))
         .ok_or(SearchAndDownloadError::RockspecNotFoundInPackedRock(
             rockspec_file_name,
         ))?;
-    let mut rockspec_file = zip.by_index(rockspec_index)?;
+    let mut rockspec_file = zip
+        .by_index(rockspec_index)
+        .map_err(|err| SearchAndDownloadError::ZipExtract(rock.file_name.clone(), err))?;
     let mut content = String::new();
     rockspec_file.read_to_string(&mut content)?;
     let rockspec = RemoteLuaRockspec::new(&content)?;
