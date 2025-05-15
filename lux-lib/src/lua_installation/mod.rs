@@ -234,8 +234,9 @@ impl LuaInstallation {
     pub(crate) fn lua_binary(&self, config: &Config) -> Option<String> {
         config.variables().get("LUA").cloned().or(self
             .bin
-            .as_ref()
-            .map(|bin| bin.clone().to_slash_lossy().to_string()))
+            .clone()
+            .or(LuaBinary::default().try_into().ok())
+            .map(|bin| bin.to_slash_lossy().to_string()))
     }
 }
 
@@ -268,7 +269,11 @@ impl HasVariables for LuaInstallation {
         let result = match input {
             "LUA_INCDIR" => Some(format_path(&self.include_dir)),
             "LUA_LIBDIR" => Some(format_path(&self.lib_dir)),
-            "LUA" => Some(format_path(&self.bin.clone().unwrap_or("lua".into()))),
+            "LUA" => self
+                .bin
+                .clone()
+                .or(LuaBinary::default().try_into().ok())
+                .map(|lua| format_path(&lua)),
             "LUALIB" => self.lua_lib().or(Some("".into())),
             _ => None,
         }?;
