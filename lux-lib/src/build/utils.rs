@@ -23,7 +23,7 @@ use std::os::unix::fs::PermissionsExt;
 
 use super::{
     external_dependency::ExternalDependencyInfo,
-    variables::{self, VariableSubstitutionError},
+    variables::{self, Environment, VariableSubstitutionError},
 };
 
 /// Copies a lua source file to a specific destination. The destination is described by a
@@ -574,7 +574,16 @@ pub(crate) fn substitute_variables(
     external_dependencies: &HashMap<String, ExternalDependencyInfo>,
     config: &Config,
 ) -> Result<String, VariableSubstitutionError> {
-    variables::substitute(&[output_paths, lua, external_dependencies, config], input)
+    variables::substitute(
+        &[
+            output_paths,
+            lua,
+            external_dependencies,
+            &Environment {},
+            config,
+        ],
+        input,
+    )
 }
 
 pub(crate) fn format_path(path: &Path) -> String {
