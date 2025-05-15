@@ -13,6 +13,15 @@ pub(crate) trait HasVariables {
     fn get_variable(&self, input: &str) -> Option<String>;
 }
 
+/// Helper for variable substitution with environment variables
+pub(crate) struct Environment {}
+
+impl HasVariables for Environment {
+    fn get_variable(&self, input: &str) -> Option<String> {
+        std::env::var(input).ok()
+    }
+}
+
 fn parser<'a>(
     variables: &'a [&'a dyn HasVariables],
 ) -> impl Parser<'a, &'a str, String, chumsky::extra::Err<Rich<'a, char>>> {

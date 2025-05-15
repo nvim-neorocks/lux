@@ -20,7 +20,7 @@ use tokio::process::Command;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
-use super::variables::{self, VariableSubstitutionError};
+use super::variables::{self, Environment, VariableSubstitutionError};
 
 /// Copies a lua source file to a specific destination. The destination is described by a
 /// `module.path` syntax (equivalent to the syntax provided to Lua's `require()` function).
@@ -533,7 +533,7 @@ pub(crate) fn substitute_variables(
     lua: &LuaInstallation,
     config: &Config,
 ) -> Result<String, VariableSubstitutionError> {
-    variables::substitute(&[output_paths, lua, config], input)
+    variables::substitute(&[output_paths, lua, config, &Environment {}], input)
 }
 
 pub(crate) fn format_path(path: &Path) -> String {
