@@ -9,7 +9,7 @@ pub enum VariableSubstitutionError {
     RecursionLimit,
 }
 
-pub trait HasVariables {
+pub(crate) trait HasVariables {
     fn get_variable(&self, input: &str) -> Option<String>;
 }
 
@@ -37,7 +37,7 @@ fn parser<'a>(
 
 /// Substitute variables of the format `$(VAR)`, where `VAR` is the variable name
 /// passed to `get_var`.
-pub fn substitute(
+pub(crate) fn substitute(
     variables: &[&dyn HasVariables],
     input: &str,
 ) -> Result<String, VariableSubstitutionError> {
