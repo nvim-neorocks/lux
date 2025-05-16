@@ -6,6 +6,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.5.1](https://github.com/nvim-neorocks/lux/compare/v0.5.0...v0.5.1) - 2025-05-16
+
+### Other
+- update Cargo.lock dependencies
+
+## `lux-lib` - [0.6.1](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.6.0...lux-lib-v0.6.1) - 2025-05-16
+
+### Fixed
+- error when luajit is not aliased to lua ([#707](https://github.com/nvim-neorocks/lux/pull/707))
+
+### Other
+- *(deps)* bump zip from 2.6.0 to 3.0.0 ([#705](https://github.com/nvim-neorocks/lux/pull/705))
+
 ## `lux-cli` - [0.5.0](https://github.com/nvim-neorocks/lux/compare/v0.4.5...v0.5.0) - 2025-05-14
 
 ### Added
