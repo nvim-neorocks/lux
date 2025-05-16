@@ -122,6 +122,8 @@ pub enum UploadError {
         "unsupported version: `{0}`.\nLux can upload packages with a SemVer version, 'dev' or 'scm'"
     )]
     UnsupportedVersion(String),
+    #[error("{0}")] // We don't know the concrete error type
+    Rockspec(String),
 }
 
 #[derive(Clone, Debug, Error)]
@@ -255,7 +257,9 @@ async fn upload_from_project(
         return Err(UploadError::RockExists(config.server().clone()));
     }
 
-    let rockspec_content = rockspec.to_lua_rockspec_string();
+    let rockspec_content = rockspec
+        .to_lua_rockspec_string()
+        .map_err(|err| UploadError::Rockspec(err.to_string()))?;
 
     #[cfg(target_env = "msvc")]
     let signed: Option<String> = None;

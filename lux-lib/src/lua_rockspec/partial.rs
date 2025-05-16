@@ -10,7 +10,7 @@ use crate::{
 
 use super::{
     parse_lua_tbl_or_default, BuildSpecInternal, DeploySpec, ExternalDependencySpec,
-    PlatformSupport, RockDescription, RockSourceInternal, TestSpecInternal,
+    PlatformSupport, RockDescription, TestSpecInternal,
 };
 
 pub struct PartialLuaRockspec {
@@ -25,7 +25,6 @@ pub struct PartialLuaRockspec {
     pub(crate) build_dependencies: Option<Vec<LuaDependencySpec>>,
     pub(crate) external_dependencies: Option<HashMap<String, ExternalDependencySpec>>,
     pub(crate) test_dependencies: Option<Vec<LuaDependencySpec>>,
-    pub(crate) source: Option<RockSourceInternal>,
     pub(crate) test: Option<TestSpecInternal>,
 }
 
@@ -58,9 +57,6 @@ impl PartialLuaRockspec {
                 .unwrap_or_default(),
             external_dependencies: lua
                 .from_value(globals.get("external_dependencies").unwrap_or(Value::Nil))
-                .unwrap_or_default(),
-            source: lua
-                .from_value(globals.get("source").unwrap_or(Value::Nil))
                 .unwrap_or_default(),
             build: lua
                 .from_value(globals.get("build").unwrap_or(Value::Nil))
@@ -133,13 +129,6 @@ mod tests {
                 "busted 1.0",
             }
 
-            source = {
-                url = "https://example.com",
-                hash = "sha256-di00mD8txN7rjaVpvxzNbnQsAh6H16zUtJZapH7U4HU=",
-                file = "my-package-1.0.0.tar.gz",
-                dir = "my-package-1.0.0",
-            }
-
             test = {
                 type = "command",
                 script = "test.lua",
@@ -165,7 +154,6 @@ mod tests {
         assert!(rockspec.build_dependencies.is_some());
         assert!(rockspec.external_dependencies.is_some());
         assert!(rockspec.test_dependencies.is_some());
-        assert!(rockspec.source.is_some());
         assert!(rockspec.build.is_some());
         assert!(rockspec.test.is_some());
     }

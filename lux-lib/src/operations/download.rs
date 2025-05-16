@@ -180,7 +180,9 @@ impl RemoteRockDownload {
             RockSourceSpec::Url(url) => RemotePackageSourceUrl::Url { url: url.clone() },
         });
         let rockspec = RemoteLuaRockspec::from_package_and_source_spec(package_spec, source_spec);
-        let rockspec_content = rockspec.to_lua_rockspec_string();
+        let rockspec_content = rockspec
+            .to_lua_rockspec_string()
+            .expect("the infallible happened");
         let rockspec_download = DownloadedRockspec {
             rockspec,
             source_url,
