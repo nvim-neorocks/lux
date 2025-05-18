@@ -17,28 +17,28 @@ test = false
 bench = false
 
 [dependencies]
-clap = { version = "4.5.3", features = ["derive"] }
+clap = { version = "4.5.38", features = ["derive"] }
 eyre = "0.6.12"
-git-url-parse = "0.4.4"
-git2 = "0.20.0"
+git-url-parse = "0.4.5"
+git2 = "0.20.2"
 inquire = "0.7.5"
 itertools = "0.14.0"
 nucleo = "0.5.0"
-octocrab = "0.44.0"
-serde_json = "1.0.118"
-spdx = "0.10.4"
+octocrab = "0.44.1"
+serde_json = "1.0.140"
+spdx = "0.10.8"
 spinners = "4.1.1"
 stylua = { version = "2.1.0", features = ["fromstr", "lua52"] }
-strum = "0.27.0"
-strum_macros = "0.27.0"
+strum = "0.27.1"
+strum_macros = "0.27.1"
 tempdir = "0.3.7"
 termcolor = "1.4.1"
 text_trees = "0.1.2"
 tokio = { version = "1.45.0", features = ["full"] }
-toml = "0.8.19"
+toml = "0.8.22"
 walkdir = "2.5.0"
-which = "7.0.0"
-indicatif = "0.17.8"
+which = "7.0.3"
+indicatif = "0.17.11"
 path-absolutize = "3.1.1"
 url = "2.5.4"
 open = "5.3.2"
@@ -50,7 +50,7 @@ whoami = "1.6.0"
 
 [dev-dependencies]
 serial_test = { version = "3.2.0" }
-assert_fs = "1.1.2"
+assert_fs = "1.1.3"
 
 [dependencies.lux-lib]
 version = "0.6.1"

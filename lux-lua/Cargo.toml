@@ -9,12 +9,12 @@ crate-type = ["cdylib"]
 
 [dependencies]
 lux-lib = { version = "0.6.1", path = "../lux-lib", default-features = false }
-mlua = { version = "0.10.1", features = ["async"] }
+mlua = { version = "0.10.3", features = ["async"] }
 path-absolutize = "3.1.1"
 lux-workspace-hack = { version = "0.1", path = "../lux-workspace-hack" }
 
 [dev-dependencies]
-assert_fs = "1.1.2"
+assert_fs = "1.1.3"
 
 [features]
 lua51 = ["mlua/module", "mlua/lua51", "lux-lib/lua51"]
