@@ -236,7 +236,7 @@ impl LuaInstallation {
 
     /// Get the Lua binary (if present), prioritising
     /// a potentially overridden value in the config.
-    pub(crate) fn lua_binary_or_config_override(&self, config: &Config) -> Option<String> {
+    pub fn lua_binary_or_config_override(&self, config: &Config) -> Option<String> {
         config.variables().get("LUA").cloned().or(self
             .bin
             .clone()
