@@ -60,6 +60,10 @@ impl PackageVersion {
         }
     }
 
+    pub(crate) fn is_semver(&self) -> bool {
+        matches!(self, PackageVersion::SemVer(_))
+    }
+
     pub(crate) fn default_dev_version() -> Self {
         Self::DevVer(DevVer::default())
     }

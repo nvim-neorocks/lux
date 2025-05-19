@@ -14,10 +14,7 @@ use thiserror::Error;
 use tokio::process::Command;
 
 use crate::{
-    build::{
-        variables::{self, VariableSubstitutionError},
-        Build, BuildError,
-    },
+    build::{Build, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{LocalPackage, LocalPackageId},
     lua_installation::LuaInstallation,
@@ -28,6 +25,7 @@ use crate::{
     remote_package_db::{RemotePackageDB, RemotePackageDBError},
     rockspec::Rockspec,
     tree::{self, Tree, TreeError},
+    variables::{self, VariableSubstitutionError},
 };
 
 #[cfg(target_family = "unix")]

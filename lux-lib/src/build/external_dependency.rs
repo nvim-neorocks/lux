@@ -9,12 +9,10 @@ use thiserror::Error;
 
 use crate::{
     config::external_deps::ExternalDependencySearchConfig, lua_rockspec::ExternalDependencySpec,
-};
-
-use super::{
-    utils::{c_lib_extension, format_path},
     variables::HasVariables,
 };
+
+use super::utils::{c_lib_extension, format_path};
 
 #[derive(Error, Debug)]
 pub enum ExternalDependencyError {

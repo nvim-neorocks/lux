@@ -141,12 +141,6 @@ impl Deref for ProjectRoot {
     }
 }
 
-impl AsRef<Path> for ProjectRoot {
-    fn as_ref(&self) -> &Path {
-        self.0.as_ref()
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct Project {
     /// The path where the `lux.toml` resides.
