@@ -1585,6 +1585,7 @@ mod tests {
         let project_root = assert_fs::TempDir::new().unwrap();
         let repo = init_sample_project_repo(&project_root);
         let tag_name = "v1.0.0";
+        create_tag(&repo, "bla");
         create_tag(&repo, tag_name);
         let project = Project::from(&project_root).unwrap().unwrap();
         let remote_project_toml = project.toml().into_remote().unwrap();
@@ -1603,6 +1604,7 @@ mod tests {
     fn test_git_project_generate_release_source_tag_without_v_prefix() {
         let project_root = assert_fs::TempDir::new().unwrap();
         let repo = init_sample_project_repo(&project_root);
+        create_tag(&repo, "bla");
         let tag_name = "1.0.0";
         create_tag(&repo, tag_name);
         let project = Project::from(&project_root).unwrap().unwrap();

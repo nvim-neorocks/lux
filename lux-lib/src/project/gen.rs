@@ -173,7 +173,9 @@ fn version_from_semver_tag(repo: &Repository) -> Result<Option<PackageVersion>, 
             let tag = obj.into_tag().expect("not a tag");
             if tag.target_id() == current_rev {
                 if let Some(tag_name) = tag.name() {
-                    if let Ok(version) = PackageVersion::parse(tag_name.trim_start_matches("v")) {
+                    if let Ok(version @ PackageVersion::SemVer(_)) =
+                        PackageVersion::parse(tag_name.trim_start_matches("v"))
+                    {
                         result = Some(version);
                         return false; // stop iteration
                     }
@@ -200,7 +202,9 @@ fn current_tag_or_revision(repo: &Repository) -> Result<String, git2::Error> {
             let tag = obj.into_tag().expect("not a tag");
             if tag.target_id() == current_rev {
                 if let Some(tag_name) = tag.name() {
-                    if PackageVersion::parse(tag_name.trim_start_matches("v")).is_ok() {
+                    if PackageVersion::parse(tag_name.trim_start_matches("v"))
+                        .is_ok_and(|version| version.is_semver())
+                    {
                         semver_tag = Some(tag_name.to_string());
                         return false; // stop iteration
                     }
