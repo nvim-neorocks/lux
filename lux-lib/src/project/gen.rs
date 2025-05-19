@@ -68,17 +68,9 @@ struct GitProject<'a>(&'a ProjectRoot);
 impl HasVariables for GitProject<'_> {
     fn get_variable(&self, input: &str) -> Option<String> {
         match input {
-            "REF" => Repository::open(self.0).ok().and_then(|repo| {
-                repo.head().ok().and_then(|head| {
-                    head.target().map(|rev| match repo.find_tag(rev) {
-                        Ok(tag) => tag
-                            .name()
-                            .map(|name| name.to_string())
-                            .unwrap_or(rev.to_string()),
-                        Err(_) => rev.to_string(),
-                    })
-                })
-            }),
+            "REF" => Repository::open(self.0)
+                .ok()
+                .and_then(|repo| current_tag_or_revision(&repo).ok()),
             _ => None,
         }
     }
@@ -117,16 +109,7 @@ impl RockSourceTemplate {
             }),
             SourceUrl::Git(_) if self.tag.is_none() => {
                 if let Ok(repo) = Repository::open(project_root) {
-                    let head = repo.head()?;
-                    let rev = head
-                        .target()
-                        .ok_or_else(|| git2::Error::from_str("No HEAD target"))?;
-                    let tag_or_rev = repo
-                        .find_tag(rev)
-                        .ok()
-                        .and_then(|tag| tag.name().map(|name| name.to_string()))
-                        .unwrap_or(rev.to_string());
-
+                    let tag_or_rev = current_tag_or_revision(&repo)?;
                     Ok(RockSourceInternal {
                         url: Some(url_str.to_string()),
                         tag: Some(tag_or_rev),
@@ -154,7 +137,7 @@ pub(crate) struct PackageVersionTemplate(Option<PackageVersion>);
 
 #[derive(Debug, Error)]
 pub enum GenerateVersionError {
-    #[error("error generating version from git:\n{0}")]
+    #[error("error generating version from git repository metadata:\n{0}")]
     Git(#[from] git2::Error),
     #[error("error parsing version from git ref:\n{0}")]
     PackageVersionParse(#[from] PackageVersionParseError),
@@ -169,19 +152,65 @@ impl PackageVersionTemplate {
             Ok(version.clone())
         } else {
             let repo = Repository::open(project_root)?;
-            let head = repo.head()?;
-            let rev = head
-                .target()
-                .ok_or_else(|| git2::Error::from_str("No HEAD target"))?;
-            let tag_or_rev = repo
-                .find_tag(rev)
-                .ok()
-                .and_then(|tag| {
-                    tag.name()
-                        .map(|name| name.trim_start_matches("v").to_string())
-                })
-                .unwrap_or(rev.to_string());
-            Ok(tag_or_rev.parse()?)
+            if let Some(version) = version_from_semver_tag(&repo)? {
+                Ok(version)
+            } else {
+                Ok(PackageVersion::default_dev_version())
+            }
         }
     }
+}
+
+/// Searches the current HEAD for SemVer tags and returns the first one found.
+fn version_from_semver_tag(repo: &Repository) -> Result<Option<PackageVersion>, git2::Error> {
+    let head = repo.head()?;
+    let current_rev = head
+        .target()
+        .ok_or_else(|| git2::Error::from_str("No HEAD target"))?;
+    let mut result = None;
+    repo.tag_foreach(|oid, _| {
+        if let Ok(obj) = repo.find_object(oid, None) {
+            let tag = obj.into_tag().expect("not a tag");
+            if tag.target_id() == current_rev {
+                if let Some(tag_name) = tag.name() {
+                    if let Ok(version) = PackageVersion::parse(tag_name.trim_start_matches("v")) {
+                        result = Some(version);
+                        return false; // stop iteration
+                    }
+                }
+            }
+        }
+        true // continue iteration
+    })?;
+    Ok(result)
+}
+
+/// Searches the current HEAD for a tag, and if found, returns it.
+/// Prioritises SemVer tags.
+/// Returns the HEAD's commit SHA if no tag is found.
+fn current_tag_or_revision(repo: &Repository) -> Result<String, git2::Error> {
+    let head = repo.head()?;
+    let current_rev = head
+        .target()
+        .ok_or_else(|| git2::Error::from_str("No HEAD target"))?;
+    let mut semver_tag = None;
+    let mut fallback_tag = None;
+    repo.tag_foreach(|oid, _| {
+        if let Ok(obj) = repo.find_object(oid, None) {
+            let tag = obj.into_tag().expect("not a tag");
+            if tag.target_id() == current_rev {
+                if let Some(tag_name) = tag.name() {
+                    if PackageVersion::parse(tag_name.trim_start_matches("v")).is_ok() {
+                        semver_tag = Some(tag_name.to_string());
+                        return false; // stop iteration
+                    }
+                    fallback_tag = Some(tag_name.to_string());
+                }
+            }
+        }
+        true // continue iteration
+    })?;
+    Ok(semver_tag
+        .or(fallback_tag)
+        .unwrap_or(current_rev.to_string()))
 }

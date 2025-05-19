@@ -182,6 +182,7 @@ pub struct PartialProjectToml {
     pub(crate) package: PackageName,
     #[serde(default, rename = "version")]
     pub(crate) version_template: PackageVersionTemplate,
+    #[serde(default)]
     pub(crate) build: BuildSpecInternal,
     pub(crate) rockspec_format: Option<RockspecFormat>,
     #[serde(default)]
@@ -294,7 +295,8 @@ impl PartialProjectToml {
             package: project_toml.package,
             version: project_toml
                 .version_template
-                .try_generate(&self.project_root)?,
+                .try_generate(&self.project_root)
+                .unwrap_or(PackageVersion::default_dev_version()),
             lua: project_toml
                 .lua
                 .ok_or(LocalProjectTomlValidationError::NoLuaVersion)?,
@@ -1009,11 +1011,18 @@ impl UserData for RemoteProjectToml {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
+    use assert_fs::prelude::PathCopy;
+    use git2::{Repository, RepositoryInitOptions};
+    use git_url_parse::GitUrl;
     use itertools::Itertools;
+    use url::Url;
 
     use crate::{
-        lua_rockspec::{PartialLuaRockspec, PerPlatform, RemoteLuaRockspec},
-        project::ProjectRoot,
+        git::GitSource,
+        lua_rockspec::{PartialLuaRockspec, PerPlatform, RemoteLuaRockspec, RockSourceSpec},
+        project::{Project, ProjectRoot},
         rockspec::{lua_dependency::LuaDependencySpec, Rockspec},
     };
 
@@ -1509,5 +1518,103 @@ mod tests {
             .unwrap()
             .into_remote()
             .unwrap();
+    }
+
+    fn init_sample_project_repo(temp_dir: &assert_fs::TempDir) -> Repository {
+        let sample_project: PathBuf = "resources/test/sample-project-source-template/".into();
+        temp_dir.copy_from(&sample_project, &["**"]).unwrap();
+        let repo = Repository::init(temp_dir).unwrap();
+        let mut opts = RepositoryInitOptions::new();
+        opts.initial_head("main");
+        {
+            let mut config = repo.config().unwrap();
+            config.set_str("user.name", "name").unwrap();
+            config.set_str("user.email", "email").unwrap();
+            let mut index = repo.index().unwrap();
+            let id = index.write_tree().unwrap();
+
+            let tree = repo.find_tree(id).unwrap();
+            let sig = repo.signature().unwrap();
+            repo.commit(Some("HEAD"), &sig, &sig, "initial\n\nbody", &tree, &[])
+                .unwrap();
+        }
+        repo
+    }
+
+    fn create_tag(repo: &Repository, name: &str) {
+        let sig = repo.signature().unwrap();
+        let id = repo.head().unwrap().target().unwrap();
+        let obj = repo.find_object(id, None).unwrap();
+        repo.tag(name, &obj, &sig, "msg", true).unwrap();
+    }
+
+    #[test]
+    fn test_git_project_generate_dev_source() {
+        let project_root = assert_fs::TempDir::new().unwrap();
+        init_sample_project_repo(&project_root);
+        let project = Project::from(&project_root).unwrap().unwrap();
+        let remote_project_toml = project.toml().into_remote().unwrap();
+        let source_spec = &remote_project_toml.source.current_platform().source_spec;
+        assert!(matches!(source_spec, &RockSourceSpec::Git { .. }));
+        if let RockSourceSpec::Git(GitSource { url, checkout_ref }) = source_spec {
+            let expected_url: GitUrl = "https://github.com/nvim-neorocks/lux.git".parse().unwrap();
+            assert_eq!(url, &expected_url);
+            assert!(checkout_ref.is_some());
+        }
+    }
+
+    #[test]
+    fn test_git_project_generate_non_semver_tag_source() {
+        let project_root = assert_fs::TempDir::new().unwrap();
+        let repo = init_sample_project_repo(&project_root);
+        let tag_name = "bla";
+        create_tag(&repo, tag_name);
+        let project = Project::from(&project_root).unwrap().unwrap();
+        let remote_project_toml = project.toml().into_remote().unwrap();
+        let source_spec = &remote_project_toml.source.current_platform().source_spec;
+        assert!(matches!(source_spec, &RockSourceSpec::Git { .. }));
+        if let RockSourceSpec::Git(GitSource { url, checkout_ref }) = source_spec {
+            let expected_url: GitUrl = "https://github.com/nvim-neorocks/lux.git".parse().unwrap();
+            assert_eq!(url, &expected_url);
+            assert_eq!(checkout_ref, &Some(tag_name.to_string()));
+        }
+    }
+
+    #[test]
+    fn test_git_project_generate_release_source_tag_with_v_prefix() {
+        let project_root = assert_fs::TempDir::new().unwrap();
+        let repo = init_sample_project_repo(&project_root);
+        let tag_name = "v1.0.0";
+        create_tag(&repo, tag_name);
+        let project = Project::from(&project_root).unwrap().unwrap();
+        let remote_project_toml = project.toml().into_remote().unwrap();
+        let source_spec = &remote_project_toml.source.current_platform().source_spec;
+        assert!(matches!(source_spec, &RockSourceSpec::Url { .. }));
+        if let RockSourceSpec::Url(url) = source_spec {
+            let expected_url: Url =
+                "https://github.com/nvim-neorocks/lux/archive/refs/tags/v1.0.0.zip"
+                    .parse()
+                    .unwrap();
+            assert_eq!(url, &expected_url);
+        }
+    }
+
+    #[test]
+    fn test_git_project_generate_release_source_tag_without_v_prefix() {
+        let project_root = assert_fs::TempDir::new().unwrap();
+        let repo = init_sample_project_repo(&project_root);
+        let tag_name = "1.0.0";
+        create_tag(&repo, tag_name);
+        let project = Project::from(&project_root).unwrap().unwrap();
+        let remote_project_toml = project.toml().into_remote().unwrap();
+        let source_spec = &remote_project_toml.source.current_platform().source_spec;
+        assert!(matches!(source_spec, &RockSourceSpec::Url { .. }));
+        if let RockSourceSpec::Url(url) = source_spec {
+            let expected_url: Url =
+                "https://github.com/nvim-neorocks/lux/archive/refs/tags/1.0.0.zip"
+                    .parse()
+                    .unwrap();
+            assert_eq!(url, &expected_url);
+        }
     }
 }
