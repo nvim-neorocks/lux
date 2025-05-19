@@ -200,7 +200,26 @@ pub enum Commands {
     Unpin(ChangePin),
     /// Updates all rocks in a project.
     Update(Update),
-    /// Upload a rockspec to the public luarocks repository.
+    /// Generate a Lua rockspec for a Lux project and upload it to the public luarocks repository.{n}
+    /// You can specify a source template for release and dev packages in the lux.toml.{n}
+    ///{n}
+    /// Example:{n}
+    ///{n}
+    /// ```toml{n}
+    /// [source]{n}
+    /// url = "https://host.com/owner/$(PACKAGE)/refs/tags/$(REF).zip"{n}
+    /// dev = "git+https://host.com/owner/$(PACKAGE).git"{n}
+    /// ```{n}
+    ///{n}
+    /// You can use the following variables in the source template:{n}
+    ///{n}
+    /// - $(PACKAGE): The package name.{n}
+    /// - $(VERSION): The package version.{n}
+    /// - $(REF): The git tag or revision (if in a git repository).{n}
+    /// - You may also specify environment variables with `$(<VAR_NAME>)`.{n}
+    ///{n}
+    /// If the `version` is not set in the lux.toml, lux will search the current
+    /// commit for SemVer tags and if found, will use it to generate the package version.
     Upload(Upload),
     /// Tell which file corresponds to a given module name.
     Which(Which),
