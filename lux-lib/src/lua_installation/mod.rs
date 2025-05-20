@@ -12,9 +12,9 @@ use crate::build::utils::{format_path, lua_lib_extension};
 use crate::operations::{LuaBinary, LuaBinaryError};
 use crate::project::Project;
 use crate::{
-    build::variables::HasVariables,
     config::{Config, LuaVersion},
     package::PackageVersion,
+    variables::HasVariables,
 };
 
 pub struct LuaInstallation {

@@ -180,7 +180,9 @@ impl RemoteRockDownload {
             RockSourceSpec::Url(url) => RemotePackageSourceUrl::Url { url: url.clone() },
         });
         let rockspec = RemoteLuaRockspec::from_package_and_source_spec(package_spec, source_spec);
-        let rockspec_content = rockspec.to_lua_rockspec_string();
+        let rockspec_content = rockspec
+            .to_lua_remote_rockspec_string()
+            .expect("the infallible happened");
         let rockspec_download = DownloadedRockspec {
             rockspec,
             source_url,
@@ -299,6 +301,7 @@ async fn download_remote_rock(
                 _src_rock: rock.bytes,
             })
         }
+        RemotePackageSource::Local => Err(SearchAndDownloadError::LocalSource),
         #[cfg(test)]
         RemotePackageSource::Test => unimplemented!(),
     }
@@ -330,6 +333,8 @@ pub enum SearchAndDownloadError {
     PackageSpecFromPackageReq(#[from] PackageSpecFromPackageReqError),
     #[error("git source {0} without a revision or tag.")]
     MissingCheckoutRef(String),
+    #[error("cannot download from a local rock source.")]
+    LocalSource,
 }
 
 async fn search_and_download_src_rock(

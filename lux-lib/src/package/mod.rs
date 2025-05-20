@@ -18,6 +18,7 @@ use crate::{
     lua_rockspec::{DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue},
     remote_package_source::RemotePackageSource,
     rockspec::lua_dependency::LuaDependencySpec,
+    variables::HasVariables,
 };
 
 #[derive(Debug, Error)]
@@ -96,6 +97,16 @@ impl mlua::UserData for PackageSpec {
         methods.add_method("to_package_req", |_, this, ()| {
             Ok(this.clone().into_package_req())
         })
+    }
+}
+
+impl HasVariables for PackageSpec {
+    fn get_variable(&self, input: &str) -> Option<String> {
+        match input {
+            "PACKAGE" => Some(self.name.to_string()),
+            "VERSION" => Some(self.version.to_string()),
+            _ => None,
+        }
     }
 }
 
