@@ -490,7 +490,8 @@ mod tests {
             conf: dest_dir.join("conf"),
             doc: dest_dir.join("doc"),
         };
-        let lua = LuaInstallation::new(config.lua_version().unwrap_or(&LuaVersion::Lua51), &config);
+        let lua_version = config.lua_version().unwrap_or(&LuaVersion::Lua51);
+        let lua = LuaInstallation::new(lua_version, &config);
         let project = Project::from(&project_root).unwrap().unwrap();
         let rockspec = project.toml().into_remote().unwrap();
         let progress = Progress::Progress(MultiProgress::new());
@@ -518,7 +519,10 @@ mod tests {
         let foo_bar_baz = foo_bar_dir.child("baz.lua");
         foo_bar_baz.assert(predicate::path::is_file());
         foo_bar_baz.assert(predicate::str::contains("return true"));
-        let bin_file = tree_dir.child("bin").child("hello");
+        let bin_file = tree_dir
+            .child(lua_version.to_string())
+            .child("bin")
+            .child("hello");
         bin_file.assert(predicate::path::is_file());
         bin_file.assert(predicate::str::contains("#!/usr/bin/env bash"));
         bin_file.assert(predicate::str::contains("echo \"Hello\""));

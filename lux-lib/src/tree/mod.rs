@@ -29,8 +29,8 @@ const LOCKFILE_NAME: &str = "lux.lock";
 pub struct Tree {
     /// The Lua version of the tree.
     version: LuaVersion,
-    /// The root of the tree.
-    root: PathBuf,
+    /// The parent of this tree's root directory.
+    root_parent: PathBuf,
     /// The rock layout config for this tree
     entrypoint_layout: RockLayoutConfig,
 }
@@ -122,7 +122,7 @@ impl Tree {
         std::fs::create_dir_all(&path_with_version)?;
 
         // Ensure that the bin directory exists.
-        std::fs::create_dir_all(root.join("bin"))?;
+        std::fs::create_dir_all(path_with_version.join("bin"))?;
         let lockfile_path = root.join(LOCKFILE_NAME);
         let rock_layout_config = if lockfile_path.is_file() {
             let lockfile = Lockfile::load(lockfile_path, None)?;
@@ -131,7 +131,7 @@ impl Tree {
             config.entrypoint_layout().clone()
         };
         Ok(Self {
-            root,
+            root_parent: root,
             version,
             entrypoint_layout: rock_layout_config,
         })
@@ -139,7 +139,7 @@ impl Tree {
 
     /// The root of the tree
     pub fn root(&self) -> PathBuf {
-        self.root.join(self.version.to_string())
+        self.root_parent.join(self.version.to_string())
     }
 
     pub fn version(&self) -> &LuaVersion {
@@ -156,7 +156,7 @@ impl Tree {
     }
 
     pub fn bin(&self) -> PathBuf {
-        self.root.join("bin")
+        self.root().join("bin")
     }
 
     /// Directory containing unwrapped Lua scripts
@@ -422,7 +422,7 @@ mod tests {
         assert_eq!(
             neorg,
             RockLayout {
-                bin: tree_path.join("bin"),
+                bin: tree_path.join("5.1/bin"),
                 rock_path: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1")),
                 etc: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1/etc")),
                 lib: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1/lib")),
@@ -448,7 +448,7 @@ mod tests {
         assert_eq!(
             lua_cjson,
             RockLayout {
-                bin: tree_path.join("bin"),
+                bin: tree_path.join("5.1/bin"),
                 rock_path: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1")),
                 etc: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1/etc")),
                 lib: tree_path.join(format!("5.1/{id}-lua-cjson@2.1.0-1/lib")),
