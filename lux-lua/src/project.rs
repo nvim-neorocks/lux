@@ -110,6 +110,11 @@ type = "builtin"
         .exec()
         .unwrap();
 
+        if std::env::var("LUX_SKIP_IMPURE_TESTS").unwrap_or("0".into()) == "1" {
+            println!("Skipping impure test");
+            return;
+        }
+
         // ADDING DEPENDENCIES
 
         lua.load(

@@ -35,6 +35,9 @@ jobs:
     - name: Tests
       run: nix build ".#checks.${{matrix.job.target}}.tests" --accept-flake-config --log-lines 500
       shell: bash
+    - name: Lua tests
+      run: nix build ".#checks.${{matrix.job.target}}.lua-tests" --accept-flake-config --log-lines 500
+      shell: bash
     - name: Build devShell
       run: nix build ".#devShells.${{matrix.job.target}}.default" --accept-flake-config --log-lines 500
       shell: bash
