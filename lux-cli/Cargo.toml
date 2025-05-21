@@ -58,7 +58,7 @@ path = "../lux-lib/"
 features = ["clap"]
 
 [features]
-default = ["luajit"]
+default = ["lua54", "vendored-lua"]
 lua51 = ["lux-lib/lua51"]
 lua52 = ["lux-lib/lua52"]
 lua53 = ["lux-lib/lua53"]

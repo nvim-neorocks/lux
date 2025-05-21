@@ -43,7 +43,7 @@
       pname = "lux";
       version = "0.1.0";
       src = cleanCargoSrc;
-      buildInputs = commonArgs.buildInputs ++ [final.luajit];
+      buildInputs = commonArgs.buildInputs ++ [final.lua5_4];
     });
 
   individualCrateArgs =
@@ -108,7 +108,7 @@
         inherit (luxCliCargo) pname version;
         inherit buildType;
 
-        buildInputs = individualCrateArgs.buildInputs ++ [final.luajit];
+        buildInputs = individualCrateArgs.buildInputs ++ [final.lua5_4];
 
         cargoExtraArgs = "-p ${luxCliCargo.pname}";
 
@@ -171,7 +171,7 @@ in {
       inherit (luxCliCargo) pname version;
       src = self;
 
-      buildInputs = commonArgs.buildInputs ++ [final.luajit];
+      buildInputs = commonArgs.buildInputs ++ [final.lua5_4];
 
       nativeCheckInputs = with final; [
         cacert
@@ -233,7 +233,7 @@ in {
     // {
       inherit (luxCliCargo) pname version;
       src = cleanCargoSrc;
-      buildInputs = commonArgs.buildInputs ++ [final.luajit];
+      buildInputs = commonArgs.buildInputs ++ [final.lua5_4];
       cargoArtifacts = lux-deps;
       cargoClippyExtraArgs = "--all-targets -- --deny warnings";
     });
