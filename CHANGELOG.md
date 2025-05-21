@@ -6,6 +6,22 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.5.2](https://github.com/nvim-neorocks/lux/compare/v0.5.1...v0.5.2) - 2025-05-21
+
+### Fixed
+- unable to parse large luarocks manifest ([#726](https://github.com/nvim-neorocks/lux/pull/726))
+
+### Other
+- *(deps)* upgrade ([#712](https://github.com/nvim-neorocks/lux/pull/712))
+
+## `lux-lib` - [0.6.2](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.6.1...lux-lib-v0.6.2) - 2025-05-21
+
+### Fixed
+- unable to parse large luarocks manifest ([#726](https://github.com/nvim-neorocks/lux/pull/726))
+
+### Other
+- *(deps)* upgrade ([#712](https://github.com/nvim-neorocks/lux/pull/712))
+
 ## `lux-cli` - [0.5.1](https://github.com/nvim-neorocks/lux/compare/v0.5.0...v0.5.1) - 2025-05-16
 
 ### Other
