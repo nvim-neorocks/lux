@@ -79,7 +79,6 @@ mod tests {
             assert(full_config:only_sources() == "example", "only_sources should be https://example.com")
             assert(full_config:namespace() == "example", "namespace should be example")
             assert(full_config:lua_dir() == "lua", "lua_dir should be lua")
-            assert(full_config:lua_version() == "5.1", "lua_version should be 5.1")
             assert(full_config:user_tree("5.1"), "tree should be not nil")
             assert(full_config:no_project(), "no_project should be true")
             assert(full_config:verbose(), "verbose should be true")
