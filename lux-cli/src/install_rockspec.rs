@@ -1,5 +1,4 @@
 use eyre::eyre;
-use itertools::Itertools;
 use std::{path::PathBuf, sync::Arc};
 
 use clap::Args;
@@ -11,7 +10,6 @@ use lux_lib::{
     lua_rockspec::{BuildBackendSpec, RemoteLuaRockspec},
     luarocks::luarocks_installation::LuaRocksInstallation,
     operations::{Install, PackageInstallSpec},
-    package::PackageName,
     progress::MultiProgress,
     rockspec::{LuaVersionCompatibility, Rockspec},
     tree,
@@ -45,18 +43,13 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
     let tree = config.user_tree(lua_version)?;
 
     // Ensure all dependencies are installed first
-    let dependencies = rockspec
-        .dependencies()
-        .current_platform()
-        .iter()
-        .filter(|package| !package.name().eq(&PackageName::new("lua".into())))
-        .collect_vec();
+    let dependencies = rockspec.dependencies().current_platform();
 
     let progress_arc = MultiProgress::new_arc();
     let progress = Arc::clone(&progress_arc);
 
     let dependencies_to_install = dependencies
-        .into_iter()
+        .iter()
         .filter(|dep| {
             tree.match_rocks(dep.package_req())
                 .is_ok_and(|rock_match| rock_match.is_found())
