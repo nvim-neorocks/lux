@@ -42,7 +42,7 @@ tokio = { version = "1.45.0", features = ["full"] }
 tempdir = "0.3.7"
 vfs = "0.12.1"
 walkdir = "2.5.0"
-zip = "3.0.0"
+zip = "4.0.0"
 tar = "0.4.44"
 flate2 = "1.1.1"
 which = "7.0.3"
