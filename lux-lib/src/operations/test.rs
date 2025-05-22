@@ -240,7 +240,6 @@ async fn ensure_dependencies(
         .dependencies()
         .current_platform()
         .iter()
-        .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
         .filter_map(|dep| {
             let build_behaviour = if project_tree
                 .match_rocks(dep.package_req())
