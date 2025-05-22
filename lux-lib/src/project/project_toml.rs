@@ -39,7 +39,7 @@ use crate::{
         BuildDependencies, Dependencies, PackageName, PackageReq, PackageVersion,
         PackageVersionReq, TestDependencies,
     },
-    rockspec::{latest_lua_version, LuaVersionCompatibility, Rockspec},
+    rockspec::{LuaVersionCompatibility, Rockspec},
 };
 
 use super::gen::GenerateSourceError;
@@ -474,51 +474,27 @@ impl LuaVersionCompatibility for PartialProjectToml {
     }
 
     fn supports_lua_version(&self, lua_version: &LuaVersion) -> bool {
-        let binding = self.dependencies.as_ref().cloned().unwrap_or_default();
-        let lua_version_reqs = binding
-            .iter()
-            .filter(|val| *val.name() == "lua".into())
-            .collect_vec();
-        let lua_pkg_version = lua_version.as_version();
-        lua_version_reqs.is_empty()
-            || lua_version_reqs
-                .into_iter()
-                .any(|lua| lua.version_req().matches(&lua_pkg_version))
+        self.lua
+            .as_ref()
+            .is_none_or(|lua| lua.matches(&lua_version.as_version()))
     }
 
     fn lua_version(&self) -> Option<LuaVersion> {
-        latest_lua_version(
-            &self
-                .dependencies
+        for (possibility, version) in [
+            ("5.4.0", LuaVersion::Lua54),
+            ("5.3.0", LuaVersion::Lua53),
+            ("5.2.0", LuaVersion::Lua52),
+            ("5.1.0", LuaVersion::Lua51),
+        ] {
+            if self
+                .lua
                 .as_ref()
-                .map(|deps| {
-                    PerPlatform::new(
-                        deps.iter()
-                            .filter(|dep| *dep.name() == "lua".into())
-                            .cloned()
-                            .collect_vec(),
-                    )
-                })
-                .unwrap_or_default(),
-        )
-    }
-
-    fn test_lua_version(&self) -> Option<LuaVersion> {
-        latest_lua_version(
-            &self
-                .test_dependencies
-                .as_ref()
-                .map(|deps| {
-                    PerPlatform::new(
-                        deps.iter()
-                            .filter(|dep| *dep.name() == "lua".into())
-                            .cloned()
-                            .collect_vec(),
-                    )
-                })
-                .unwrap_or_default(),
-        )
-        .or(self.lua_version())
+                .is_none_or(|lua| lua.matches(&possibility.parse().unwrap()))
+            {
+                return Some(version);
+            }
+        }
+        None
     }
 }
 
@@ -620,6 +596,10 @@ impl Rockspec for LocalProjectToml {
 
     fn supported_platforms(&self) -> &PlatformSupport {
         &self.supported_platforms
+    }
+
+    fn lua(&self) -> &PackageVersionReq {
+        &self.lua
     }
 
     fn dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {
@@ -794,6 +774,10 @@ impl Rockspec for RemoteProjectToml {
 
     fn supported_platforms(&self) -> &PlatformSupport {
         self.local.supported_platforms()
+    }
+
+    fn lua(&self) -> &PackageVersionReq {
+        self.local.lua()
     }
 
     fn dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {
@@ -1016,7 +1000,6 @@ mod tests {
     use assert_fs::prelude::PathCopy;
     use git2::{Repository, RepositoryInitOptions};
     use git_url_parse::GitUrl;
-    use itertools::Itertools;
     use url::Url;
 
     use crate::{
@@ -1410,13 +1393,8 @@ mod tests {
             expected_rockspec.supported_platforms()
         );
         assert_eq!(
-            // We filter out the lua dependency here, as it is not marked
-            // as a dependency in TOML-based rockspecs
             sorted_package_reqs(merged.dependencies()),
             sorted_package_reqs(expected_rockspec.dependencies())
-                .into_iter()
-                .filter(|dep| dep.name() != &"lua".into())
-                .collect_vec(),
         );
         assert_eq!(
             sorted_package_reqs(merged.build_dependencies()),

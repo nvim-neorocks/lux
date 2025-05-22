@@ -333,33 +333,18 @@ impl<T> PerPlatform<T> {
         )
     }
 
-    pub fn map<U, F>(self, cb: F) -> PerPlatform<U>
+    pub(crate) fn map<U, F>(&self, cb: F) -> PerPlatform<U>
     where
-        F: Fn(T) -> U,
+        F: Fn(&T) -> U,
     {
         PerPlatform {
-            default: cb(self.default),
+            default: cb(&self.default),
             per_platform: self
                 .per_platform
-                .into_iter()
-                .map(|(identifier, value)| (identifier, cb(value)))
+                .iter()
+                .map(|(identifier, value)| (identifier.clone(), cb(value)))
                 .collect(),
         }
-    }
-
-    pub fn try_map<U, E, F>(self, cb: F) -> Result<PerPlatform<U>, E>
-    where
-        F: Fn(T) -> Result<U, E>,
-        E: std::error::Error,
-    {
-        Ok(PerPlatform {
-            default: cb(self.default)?,
-            per_platform: self
-                .per_platform
-                .into_iter()
-                .map(|(identifier, value)| Ok((identifier, cb(value)?)))
-                .try_collect()?,
-        })
     }
 }
 

@@ -768,7 +768,7 @@ mod tests {
         lua_rockspec::ExternalDependencySpec,
         manifest::{Manifest, ManifestMetadata},
         package::PackageReq,
-        rockspec::{lua_dependency::LuaDependencySpec, Rockspec},
+        rockspec::Rockspec,
     };
 
     #[tokio::test]
@@ -821,29 +821,22 @@ mod tests {
             .await
             .unwrap();
 
-        let strip_lua = |deps: &Vec<LuaDependencySpec>| -> Vec<LuaDependencySpec> {
-            deps.iter()
-                .filter(|dep| dep.name() != &"lua".into())
-                .cloned()
-                .collect()
-        };
-
         // Reparse the lux.toml (not usually necessary, but we want to test that the file was
         // written correctly)
         let project = Project::from(&project_root).unwrap().unwrap();
         let validated_toml = project.toml().into_remote().unwrap();
 
         assert_eq!(
-            strip_lua(validated_toml.dependencies().current_platform()),
-            expected_dependencies
+            validated_toml.dependencies().current_platform(),
+            &expected_dependencies
         );
         assert_eq!(
-            strip_lua(validated_toml.build_dependencies().current_platform()),
-            expected_dependencies
+            validated_toml.build_dependencies().current_platform(),
+            &expected_dependencies
         );
         assert_eq!(
-            strip_lua(validated_toml.test_dependencies().current_platform()),
-            expected_dependencies
+            validated_toml.test_dependencies().current_platform(),
+            &expected_dependencies
         );
         assert_eq!(
             validated_toml

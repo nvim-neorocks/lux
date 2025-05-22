@@ -29,8 +29,9 @@ use url::Url;
 use crate::{
     config::{LuaVersion, LuaVersionUnset},
     hash::HasIntegrity,
-    package::{PackageName, PackageSpec, PackageVersion},
-    project::{project_toml::ProjectTomlError, ProjectRoot},
+    package::{PackageName, PackageSpec, PackageVersion, PackageVersionReq},
+    project::project_toml::ProjectTomlError,
+    project::ProjectRoot,
     rockspec::{lua_dependency::LuaDependencySpec, Rockspec},
 };
 
@@ -63,6 +64,8 @@ pub struct LocalLuaRockspec {
     version: PackageVersion,
     description: RockDescription,
     supported_platforms: PlatformSupport,
+    /// The Lua version requirement for this rock
+    lua: PackageVersionReq,
     dependencies: PerPlatform<Vec<LuaDependencySpec>>,
     build_dependencies: PerPlatform<Vec<LuaDependencySpec>>,
     external_dependencies: PerPlatform<HashMap<String, ExternalDependencySpec>>,
@@ -83,6 +86,7 @@ impl UserData for LocalLuaRockspec {
         methods.add_method("supported_platforms", |_, this, _: ()| {
             Ok(this.supported_platforms.clone())
         });
+        methods.add_method("lua", |_, this, _: ()| Ok(this.lua.clone()));
         methods.add_method("dependencies", |_, this, _: ()| {
             Ok(this.dependencies.clone())
         });
@@ -116,15 +120,44 @@ impl LocalLuaRockspec {
         lua.load(rockspec_content).exec()?;
 
         let globals = lua.globals();
+
+        let dependencies: PerPlatform<Vec<LuaDependencySpec>> = globals.get("dependencies")?;
+
+        let lua_version_req = dependencies
+            .current_platform()
+            .iter()
+            .find(|dep| dep.name().to_string() == "lua")
+            .cloned()
+            .map(|dep| dep.version_req().clone())
+            .unwrap_or(PackageVersionReq::Any);
+
+        fn strip_lua(
+            dependencies: PerPlatform<Vec<LuaDependencySpec>>,
+        ) -> PerPlatform<Vec<LuaDependencySpec>> {
+            dependencies.map(|deps| {
+                deps.iter()
+                    .filter(|dep| dep.name().to_string() != "lua")
+                    .cloned()
+                    .collect()
+            })
+        }
+
+        let build_dependencies: PerPlatform<Vec<LuaDependencySpec>> =
+            globals.get("build_dependencies")?;
+
+        let test_dependencies: PerPlatform<Vec<LuaDependencySpec>> =
+            globals.get("test_dependencies")?;
+
         let rockspec = LocalLuaRockspec {
             rockspec_format: globals.get("rockspec_format")?,
             package: globals.get("package")?,
             version: globals.get("version")?,
             description: parse_lua_tbl_or_default(&lua, "description")?,
             supported_platforms: parse_lua_tbl_or_default(&lua, "supported_platforms")?,
-            dependencies: globals.get("dependencies")?,
-            build_dependencies: globals.get("build_dependencies")?,
-            test_dependencies: globals.get("test_dependencies")?,
+            lua: lua_version_req,
+            dependencies: strip_lua(dependencies),
+            build_dependencies: strip_lua(build_dependencies),
+            test_dependencies: strip_lua(test_dependencies),
             external_dependencies: globals.get("external_dependencies")?,
             build: globals.get("build")?,
             test: globals.get("test")?,
@@ -179,6 +212,10 @@ impl Rockspec for LocalLuaRockspec {
 
     fn supported_platforms(&self) -> &PlatformSupport {
         &self.supported_platforms
+    }
+
+    fn lua(&self) -> &PackageVersionReq {
+        &self.lua
     }
 
     fn dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {
@@ -261,6 +298,7 @@ impl UserData for RemoteLuaRockspec {
         methods.add_method("supported_platforms", |_, this, _: ()| {
             Ok(this.local.supported_platforms.clone())
         });
+        methods.add_method("lua", |_, this, _: ()| Ok(this.local.lua.clone()));
         methods.add_method("dependencies", |_, this, _: ()| {
             Ok(this.local.dependencies.clone())
         });
@@ -332,6 +370,7 @@ build = {{
             version,
             description: RockDescription::default(),
             supported_platforms: PlatformSupport::default(),
+            lua: PackageVersionReq::Any,
             dependencies: PerPlatform::default(),
             build_dependencies: PerPlatform::default(),
             external_dependencies: PerPlatform::default(),
@@ -371,6 +410,10 @@ impl Rockspec for RemoteLuaRockspec {
 
     fn supported_platforms(&self) -> &PlatformSupport {
         self.local.supported_platforms()
+    }
+
+    fn lua(&self) -> &PackageVersionReq {
+        self.local.lua()
     }
 
     fn dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {

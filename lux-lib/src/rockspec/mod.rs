@@ -17,7 +17,7 @@ use crate::{
         BuildSpec, DeploySpec, ExternalDependencySpec, LuaVersionError, PerPlatform,
         PlatformSupport, RemoteRockSource, RockDescription, RockspecFormat, TestSpec,
     },
-    package::{PackageName, PackageVersion},
+    package::{PackageName, PackageVersion, PackageVersionReq},
 };
 
 pub trait Rockspec {
@@ -27,6 +27,7 @@ pub trait Rockspec {
     fn version(&self) -> &PackageVersion;
     fn description(&self) -> &RockDescription;
     fn supported_platforms(&self) -> &PlatformSupport;
+    fn lua(&self) -> &PackageVersionReq;
     fn dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>>;
     fn build_dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>>;
     fn external_dependencies(&self) -> &PerPlatform<HashMap<String, ExternalDependencySpec>>;
@@ -75,9 +76,6 @@ pub trait LuaVersionCompatibility {
 
     /// Returns the lua version required by the rockspec.
     fn lua_version(&self) -> Option<LuaVersion>;
-
-    /// Returns the lua version required by the rockspec's test dependencies.
-    fn test_lua_version(&self) -> Option<LuaVersion>;
 }
 
 impl<T: Rockspec> LuaVersionCompatibility for T {
@@ -100,49 +98,22 @@ impl<T: Rockspec> LuaVersionCompatibility for T {
     }
 
     fn supports_lua_version(&self, lua_version: &LuaVersion) -> bool {
-        let lua_version_reqs = self
-            .dependencies()
-            .default
-            .iter()
-            .filter(|val| *val.name() == "lua".into())
-            .collect_vec();
-        let lua_pkg_version = lua_version.as_version();
-        lua_version_reqs.is_empty()
-            || lua_version_reqs
-                .into_iter()
-                .any(|lua| lua.version_req().matches(&lua_pkg_version))
+        self.lua().matches(&lua_version.as_version())
     }
 
     fn lua_version(&self) -> Option<LuaVersion> {
-        latest_lua_version(self.dependencies())
-    }
-
-    fn test_lua_version(&self) -> Option<LuaVersion> {
-        latest_lua_version(self.test_dependencies()).or(self.lua_version())
-    }
-}
-
-pub(crate) fn latest_lua_version(
-    dependencies: &PerPlatform<Vec<LuaDependencySpec>>,
-) -> Option<LuaVersion> {
-    dependencies
-        .default
-        .iter()
-        .find(|val| *val.name() == "lua".into())
-        .and_then(|lua| {
-            for (possibility, version) in [
-                ("5.4.0", LuaVersion::Lua54),
-                ("5.3.0", LuaVersion::Lua53),
-                ("5.2.0", LuaVersion::Lua52),
-                ("5.1.0", LuaVersion::Lua51),
-            ] {
-                if lua.version_req().matches(&possibility.parse().unwrap()) {
-                    return Some(version);
-                }
+        for (possibility, version) in [
+            ("5.4.0", LuaVersion::Lua54),
+            ("5.3.0", LuaVersion::Lua53),
+            ("5.2.0", LuaVersion::Lua52),
+            ("5.1.0", LuaVersion::Lua51),
+        ] {
+            if self.lua().matches(&possibility.parse().unwrap()) {
+                return Some(version);
             }
-
-            None
-        })
+        }
+        None
+    }
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialOrd, Ord, Hash, PartialEq, Eq)]

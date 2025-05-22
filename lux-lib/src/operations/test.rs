@@ -11,7 +11,7 @@ use crate::{
     config::Config,
     lua_installation::{LuaBinary, LuaBinaryError},
     lua_rockspec::{LuaVersionError, TestSpecError},
-    package::{PackageName, PackageVersionReqError},
+    package::PackageVersionReqError,
     path::{Paths, PathsError},
     progress::{MultiProgress, Progress},
     project::{
@@ -247,7 +247,6 @@ async fn ensure_dependencies(
         .test_dependencies()
         .current_platform()
         .iter()
-        .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
         .filter_map(|dep| {
             let build_behaviour = if test_tree
                 .match_rocks(dep.package_req())
