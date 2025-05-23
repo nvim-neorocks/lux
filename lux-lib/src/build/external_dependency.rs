@@ -43,6 +43,11 @@ impl ExternalDependencyInfo {
             .cargo_metadata(false)
             .env_metadata(false)
             .probe(&name.to_lowercase())
+            .or(PkgConfig::new()
+                .print_system_libs(false)
+                .cargo_metadata(false)
+                .env_metadata(false)
+                .probe(&format!("lib{}", name.to_lowercase())))
             .ok();
         if lib_info.is_none() {
             if let Some(lib) = &dependency.library {
