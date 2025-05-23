@@ -1,5 +1,7 @@
 use itertools::Itertools;
 use mlua::{FromLua, Lua, LuaSerdeExt, Table, Value};
+use path_slash::PathBufExt;
+use serde::Deserialize;
 /// Compatibility layer/adapter for the luarocks client
 use std::{collections::HashMap, path::PathBuf};
 use thiserror::Error;
@@ -40,16 +42,16 @@ impl FromLua for RockManifest {
         match &value {
             Value::Table(rock_manifest) => {
                 let lib = RockManifestLib {
-                    entries: rock_manifest_entry_from_lua(rock_manifest, lua, "lib")?,
+                    entries: rock_manifest_dir_or_file_entry_from_lua(rock_manifest, lua, "lib")?,
                 };
                 let lua_entry = RockManifestLua {
-                    entries: rock_manifest_entry_from_lua(rock_manifest, lua, "lua")?,
+                    entries: rock_manifest_dir_or_file_entry_from_lua(rock_manifest, lua, "lua")?,
                 };
                 let bin = RockManifestBin {
-                    entries: rock_manifest_entry_from_lua(rock_manifest, lua, "bin")?,
+                    entries: rock_manifest_bin_entry_from_lua(rock_manifest, lua, "bin")?,
                 };
                 let doc = RockManifestDoc {
-                    entries: rock_manifest_entry_from_lua(rock_manifest, lua, "doc")?,
+                    entries: rock_manifest_dir_or_file_entry_from_lua(rock_manifest, lua, "doc")?,
                 };
                 let mut root_entry = HashMap::new();
                 rock_manifest.for_each(|key: String, value: Value| {
@@ -112,13 +114,51 @@ impl DisplayAsLuaValue for HashMap<PathBuf, String> {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
+pub(crate) enum DirOrFileEntry {
+    DirEntry(HashMap<PathBuf, DirOrFileEntry>),
+    FileEntry(String),
+}
+
+impl DisplayAsLuaValue for DirOrFileEntry {
+    fn display_lua_value(&self) -> DisplayLuaValue {
+        match self {
+            Self::DirEntry(dir_map) => DisplayLuaValue::Table(to_lua_kv_vec(dir_map)),
+            Self::FileEntry(md5sum) => DisplayLuaValue::String(md5sum.clone()),
+        }
+    }
+}
+
+impl DisplayAsLuaValue for HashMap<PathBuf, DirOrFileEntry> {
+    fn display_lua_value(&self) -> DisplayLuaValue {
+        DisplayLuaValue::Table(to_lua_kv_vec(self))
+    }
+}
+
+fn to_lua_kv_vec(dir_map: &HashMap<PathBuf, DirOrFileEntry>) -> Vec<DisplayLuaKV> {
+    dir_map
+        .iter()
+        .map(|(k, v)| DisplayLuaKV {
+            key: k.to_slash_lossy().to_string(),
+            value: v.display_lua_value(),
+        })
+        .collect_vec()
+}
+
+impl From<&str> for DirOrFileEntry {
+    fn from(value: &str) -> Self {
+        Self::FileEntry(value.into())
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct RockManifestLua {
-    pub entries: HashMap<PathBuf, String>,
+    pub entries: HashMap<PathBuf, DirOrFileEntry>,
 }
 
 impl DisplayAsLuaKV for RockManifestLua {
-    fn display_lua(&self) -> crate::lua_rockspec::DisplayLuaKV {
+    fn display_lua(&self) -> DisplayLuaKV {
         DisplayLuaKV {
             key: "lua".to_string(),
             value: self.entries.display_lua_value(),
@@ -128,7 +168,7 @@ impl DisplayAsLuaKV for RockManifestLua {
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct RockManifestLib {
-    pub entries: HashMap<PathBuf, String>,
+    pub entries: HashMap<PathBuf, DirOrFileEntry>,
 }
 
 impl DisplayAsLuaKV for RockManifestLib {
@@ -156,7 +196,7 @@ impl DisplayAsLuaKV for RockManifestBin {
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct RockManifestDoc {
-    pub entries: HashMap<PathBuf, String>,
+    pub entries: HashMap<PathBuf, DirOrFileEntry>,
 }
 
 impl DisplayAsLuaKV for RockManifestDoc {
@@ -173,7 +213,19 @@ pub(crate) struct RockManifestRoot {
     pub entries: HashMap<PathBuf, String>,
 }
 
-fn rock_manifest_entry_from_lua(
+fn rock_manifest_dir_or_file_entry_from_lua(
+    rock_manifest: &Table,
+    lua: &Lua,
+    key: &str,
+) -> mlua::Result<HashMap<PathBuf, DirOrFileEntry>> {
+    if rock_manifest.contains_key(key)? {
+        lua.from_value(rock_manifest.get(key)?)
+    } else {
+        Ok(HashMap::default())
+    }
+}
+
+fn rock_manifest_bin_entry_from_lua(
     rock_manifest: &Table,
     lua: &Lua,
     key: &str,
@@ -237,5 +289,16 @@ rock_manifest = {
                 },
             }
         );
+    }
+
+    #[tokio::test]
+    pub async fn regression_http_rock_manifest_from_lua() {
+        let content = String::from_utf8(
+            tokio::fs::read("resources/test/http-0.4-0-rock_manifest")
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        RockManifest::new(&content).unwrap();
     }
 }

@@ -11,6 +11,7 @@ use thiserror::Error;
 use crate::{
     build::{
         external_dependency::{ExternalDependencyError, ExternalDependencyInfo},
+        utils::recursive_copy_dir,
         BuildBehaviour,
     },
     config::Config,
@@ -48,6 +49,10 @@ pub enum InstallBinaryRockError {
     RockManifestNotFound,
     #[error(transparent)]
     RockManifestError(#[from] RockManifestError),
+    #[error(
+        "the entry {0} listed in the `rock_manifest` is neither a file nor a directory: {1:?}"
+    )]
+    NotAFileOrDirectory(String, std::fs::Metadata),
 }
 
 pub(crate) struct BinaryRockInstall<'a> {
@@ -161,27 +166,32 @@ impl<'a> BinaryRockInstall<'a> {
                     &rock_manifest.lib.entries,
                     &unpack_dir.join("lib"),
                     &output_paths.lib,
-                )?;
+                )
+                .await?;
                 install_manifest_entries(
                     &rock_manifest.lua.entries,
                     &unpack_dir.join("lua"),
                     &output_paths.src,
-                )?;
+                )
+                .await?;
                 install_manifest_entries(
                     &rock_manifest.bin.entries,
                     &unpack_dir.join("bin"),
                     &output_paths.bin,
-                )?;
+                )
+                .await?;
                 install_manifest_entries(
                     &rock_manifest.doc.entries,
                     &unpack_dir.join("doc"),
                     &output_paths.doc,
-                )?;
+                )
+                .await?;
                 install_manifest_entries(
                     &rock_manifest.root.entries,
                     &unpack_dir,
                     &output_paths.etc,
-                )?;
+                )
+                .await?;
                 // rename <name>-<version>.rockspec
                 let rockspec_path = output_paths.etc.join(format!(
                     "{}-{}.rockspec",
@@ -189,8 +199,8 @@ impl<'a> BinaryRockInstall<'a> {
                     package.version()
                 ));
                 if rockspec_path.is_file() {
-                    std::fs::copy(&rockspec_path, output_paths.rockspec_path())?;
-                    std::fs::remove_file(&rockspec_path)?;
+                    tokio::fs::copy(&rockspec_path, output_paths.rockspec_path()).await?;
+                    tokio::fs::remove_file(&rockspec_path).await?;
                 }
                 Ok(package)
             }
@@ -198,15 +208,26 @@ impl<'a> BinaryRockInstall<'a> {
     }
 }
 
-fn install_manifest_entries(
-    entry: &HashMap<PathBuf, String>,
+async fn install_manifest_entries<T>(
+    entry: &HashMap<PathBuf, T>,
     src: &Path,
     dest: &Path,
 ) -> Result<(), InstallBinaryRockError> {
     for relative_src_path in entry.keys() {
         let target = dest.join(relative_src_path);
-        std::fs::create_dir_all(target.parent().unwrap())?;
-        std::fs::copy(src.join(relative_src_path), target)?;
+        let src_path = src.join(relative_src_path);
+        if src_path.is_dir() {
+            recursive_copy_dir(&src.to_path_buf(), &target)?;
+        } else if src_path.is_file() {
+            tokio::fs::create_dir_all(target.parent().unwrap()).await?;
+            tokio::fs::copy(src.join(relative_src_path), target).await?;
+        } else {
+            let metadata = std::fs::metadata(&src_path)?;
+            return Err(InstallBinaryRockError::NotAFileOrDirectory(
+                src_path.to_string_lossy().to_string(),
+                metadata,
+            ));
+        }
     }
     Ok(())
 }
