@@ -4,6 +4,7 @@ use std::{
     string::FromUtf8Error,
 };
 
+use bon::Builder;
 use bytes::Bytes;
 use thiserror::Error;
 use url::{ParseError, Url};
@@ -366,7 +367,9 @@ pub(crate) async fn download_src_rock(
     server_url: &Url,
     progress: &Progress<ProgressBar>,
 ) -> Result<DownloadedPackedRockBytes, DownloadSrcRockError> {
-    download_packed_rock_impl(package, server_url, "src.rock", progress).await
+    ArchiveDownload::new(package, server_url, "src.rock", progress)
+        .download()
+        .await
 }
 
 pub(crate) async fn download_binary_rock(
@@ -374,13 +377,11 @@ pub(crate) async fn download_binary_rock(
     server_url: &Url,
     progress: &Progress<ProgressBar>,
 ) -> Result<DownloadedPackedRockBytes, DownloadSrcRockError> {
-    download_packed_rock_impl(
-        package,
-        server_url,
-        format!("{}.rock", luarocks::current_platform_luarocks_identifier()).as_str(),
-        progress,
-    )
-    .await
+    let ext = format!("{}.rock", luarocks::current_platform_luarocks_identifier());
+    ArchiveDownload::new(package, server_url, &ext, progress)
+        .fallback_ext("all.rock")
+        .download()
+        .await
 }
 
 async fn download_src_rock_to_file(
@@ -408,35 +409,70 @@ async fn download_src_rock_to_file(
     })
 }
 
-async fn download_packed_rock_impl(
-    package: &PackageSpec,
-    server_url: &Url,
-    ext: &str,
-    progress: &Progress<ProgressBar>,
-) -> Result<DownloadedPackedRockBytes, DownloadSrcRockError> {
-    progress.map(|p| {
-        p.set_message(format!(
-            "📥 Downloading {}-{}.{}",
-            package.name(),
-            package.version(),
-            ext,
-        ))
-    });
-    let full_rock_name = mk_packed_rock_name(package.name(), package.version(), ext);
+#[derive(Builder)]
+#[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
+struct ArchiveDownload<'a> {
+    #[builder(start_fn)]
+    package: &'a PackageSpec,
 
-    let url = server_url.join(&full_rock_name)?;
-    let bytes = reqwest::get(url.clone())
-        .await?
-        .error_for_status()?
-        .bytes()
-        .await?;
-    Ok(DownloadedPackedRockBytes {
-        name: package.name().clone(),
-        version: package.version().clone(),
-        bytes,
-        file_name: full_rock_name,
-        url,
-    })
+    #[builder(start_fn)]
+    server_url: &'a Url,
+
+    #[builder(start_fn)]
+    ext: &'a str,
+
+    #[builder(start_fn)]
+    progress: &'a Progress<ProgressBar>,
+
+    fallback_ext: Option<&'a str>,
+}
+
+impl<State> ArchiveDownloadBuilder<'_, State>
+where
+    State: archive_download_builder::State,
+{
+    async fn download(self) -> Result<DownloadedPackedRockBytes, DownloadSrcRockError> {
+        let args = self._build();
+        let progress = args.progress;
+        let package = args.package;
+        let ext = args.ext;
+        let server_url = args.server_url;
+        progress.map(|p| {
+            p.set_message(format!(
+                "📥 Downloading {}-{}.{}",
+                package.name(),
+                package.version(),
+                ext,
+            ))
+        });
+        let full_rock_name = mk_packed_rock_name(package.name(), package.version(), ext);
+        let url = server_url.join(&full_rock_name)?;
+        let response = reqwest::get(url.clone()).await?;
+        let bytes = if response.status().is_success() {
+            response.bytes().await
+        } else {
+            match args.fallback_ext {
+                Some(ext) => {
+                    let full_rock_name =
+                        mk_packed_rock_name(package.name(), package.version(), ext);
+                    let url = server_url.join(&full_rock_name)?;
+                    reqwest::get(url.clone())
+                        .await?
+                        .error_for_status()?
+                        .bytes()
+                        .await
+                }
+                None => response.error_for_status()?.bytes().await,
+            }
+        }?;
+        Ok(DownloadedPackedRockBytes {
+            name: package.name().clone(),
+            version: package.version().clone(),
+            bytes,
+            file_name: full_rock_name,
+            url,
+        })
+    }
 }
 
 fn mk_packed_rock_name(name: &PackageName, version: &PackageVersion, ext: &str) -> String {
