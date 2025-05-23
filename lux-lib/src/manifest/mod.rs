@@ -46,7 +46,13 @@ async fn get_manifest(
     target: &Path,
     client: &Client,
 ) -> Result<String, ManifestFromServerError> {
-    let manifest_bytes = client.get(url.clone()).send().await?.bytes().await?;
+    let manifest_bytes = client
+        .get(url.clone())
+        .send()
+        .await?
+        .error_for_status()?
+        .bytes()
+        .await?;
     let mut archive = ZipArchive::new(std::io::Cursor::new(manifest_bytes))
         .map_err(|err| ManifestFromServerError::ZipRead(url.clone(), err))?;
 
@@ -97,7 +103,7 @@ async fn manifest_from_cache_or_server(
         let last_modified_local: SystemTime = metadata.modified()?;
 
         // Ask the server for the last modified date of its manifest.
-        let response = client.head(url.clone()).send().await?;
+        let response = client.head(url.clone()).send().await?.error_for_status()?;
 
         if let Some(last_modified_header) = response.headers().get("Last-Modified") {
             let server_last_modified = httpdate::parse_http_date(last_modified_header.to_str()?)?;

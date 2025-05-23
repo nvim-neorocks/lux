@@ -158,7 +158,11 @@ impl LuaRocksInstallation {
         use crate::{hash::HasIntegrity, operations};
         use std::io::Cursor;
         let url = "https://luarocks.github.io/luarocks/releases/luarocks-3.11.1-windows-64.zip";
-        let response = reqwest::get(url.to_owned()).await?.bytes().await?;
+        let response = reqwest::get(url.to_owned())
+            .await?
+            .error_for_status()?
+            .bytes()
+            .await?;
         let hash = response.hash()?;
         let expected_hash: Integrity = "sha256-xx26PQPhIwXpzNAixiHIhpq6PRJNkkniFK7VwW82gqM="
             .parse()
