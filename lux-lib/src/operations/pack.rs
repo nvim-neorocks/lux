@@ -2,6 +2,7 @@ use crate::build::utils;
 use crate::build::utils::lua_dylib_extension;
 use crate::lockfile::LocalPackage;
 use crate::luarocks;
+use crate::luarocks::rock_manifest::DirOrFileEntry;
 use crate::luarocks::rock_manifest::RockManifest;
 use crate::luarocks::rock_manifest::RockManifestBin;
 use crate::luarocks::rock_manifest::RockManifestDoc;
@@ -14,6 +15,7 @@ use bon::{builder, Builder};
 use clean_path::Clean;
 use itertools::Itertools;
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::fs::File;
 use std::io;
 use std::io::Read;
@@ -88,14 +90,14 @@ fn do_pack(args: Pack) -> Result<PathBuf, PackError> {
     let packed_rockspec_name = format!("{}-{}.rockspec", &package.name(), &package.version());
     let renamed_rockspec_entry = temp_dir.join(packed_rockspec_name);
     std::fs::copy(layout.rockspec_path(), &renamed_rockspec_entry)?;
-    let root_entries = add_rock_entries(&mut zip, &temp_dir, "".into())?;
+    let root_entries = add_root_rock_entries(&mut zip, &temp_dir, "".into())?;
     let mut bin_entries = HashMap::new();
     for relative_binary_path in package.spec.binaries() {
         let binary_path = tree.bin().join(
             relative_binary_path
                 .clean()
                 .file_name()
-                .expect("malformed lockfile"),
+                .expect("malformed binary path"),
         );
         if binary_path.is_file() {
             let (path, digest) =
@@ -142,7 +144,7 @@ fn is_binary_rock(layout: &RockLayout) -> bool {
     })
 }
 
-fn add_rock_entries(
+fn add_root_rock_entries(
     zip: &mut ZipWriter<File>,
     source_dir: &PathBuf,
     zip_dir: PathBuf,
@@ -158,8 +160,31 @@ fn add_rock_entries(
             }
         }) {
             let file = file?;
-            let (path, digest) = add_rock_entry(zip, file, source_dir, &zip_dir)?;
-            result.insert(path, digest);
+            let (relative_path, digest) = add_rock_entry(zip, file, source_dir, &zip_dir)?;
+            result.insert(relative_path, digest);
+        }
+    }
+    Ok(result)
+}
+
+fn add_rock_entries(
+    zip: &mut ZipWriter<File>,
+    source_dir: &PathBuf,
+    zip_dir: PathBuf,
+) -> Result<HashMap<PathBuf, DirOrFileEntry>, PackError> {
+    let mut result = HashMap::new();
+    if source_dir.is_dir() {
+        for file in WalkDir::new(source_dir).into_iter().filter_map_ok(|entry| {
+            let file = entry.into_path();
+            if file.is_file() {
+                Some(file)
+            } else {
+                None
+            }
+        }) {
+            let file = file?;
+            let (relative_path, digest) = add_rock_entry(zip, file, source_dir, &zip_dir)?;
+            add_dir_or_file_entry(&mut result, &relative_path, digest);
         }
     }
     Ok(result)
@@ -188,4 +213,33 @@ fn add_rock_entry(
     zip.start_file(zip_dir.join(&relative_path).to_string_lossy(), options)?;
     zip.write_all(&buffer)?;
     Ok((relative_path, format!("{:x}", digest)))
+}
+
+fn add_dir_or_file_entry(
+    dir_map: &mut HashMap<PathBuf, DirOrFileEntry>,
+    relative_path: &Path,
+    digest: String,
+) {
+    let mut components = relative_path
+        .components()
+        .filter_map(|component| match component {
+            std::path::Component::Normal(path) => Some(PathBuf::from(path)),
+            _ => None,
+        })
+        .collect::<VecDeque<_>>();
+    match &components.len() {
+        n if *n > 1 => {
+            let mut entries = HashMap::new();
+            let first_dir = components.pop_front().unwrap();
+            let remainder = components.iter().collect::<PathBuf>();
+            add_dir_or_file_entry(&mut entries, &remainder, digest);
+            dir_map.insert(first_dir, DirOrFileEntry::DirEntry(entries));
+        }
+        _ => {
+            dir_map.insert(
+                relative_path.to_path_buf(),
+                DirOrFileEntry::FileEntry(digest),
+            );
+        }
+    }
 }
