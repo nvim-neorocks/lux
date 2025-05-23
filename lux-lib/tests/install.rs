@@ -22,7 +22,7 @@ async fn install_git_package() {
     test_install(install_spec).await
 }
 
-// http 0.4 has an http-0.4-0.all.rock packed rock on luarocks.rog
+// http 0.4 has an http-0.4-0.all.rock packed rock on luarocks.org
 #[tokio::test]
 async fn install_http_package() {
     let install_spec =
