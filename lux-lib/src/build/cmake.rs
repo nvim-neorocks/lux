@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use std::{
+    collections::HashMap,
     env, io,
     path::Path,
     process::{Command, ExitStatus},
@@ -15,7 +16,10 @@ use crate::{
     tree::{RockLayout, Tree},
 };
 
-use super::variables::{self, HasVariables, VariableSubstitutionError};
+use super::{
+    external_dependency::ExternalDependencyInfo,
+    variables::{self, HasVariables, VariableSubstitutionError},
+};
 
 const CMAKE_BUILD_FILE: &str = "build.lux";
 
@@ -59,6 +63,7 @@ impl Build for CMakeBuildSpec {
         output_paths: &RockLayout,
         no_install: bool,
         lua: &LuaInstallation,
+        external_dependencies: &HashMap<String, ExternalDependencyInfo>,
         config: &Config,
         _tree: &Tree,
         build_dir: &Path,
@@ -76,8 +81,13 @@ impl Build for CMakeBuildSpec {
         self.variables
             .into_iter()
             .map(|(key, value)| {
-                let substituted_value =
-                    utils::substitute_variables(&value, output_paths, lua, config)?;
+                let substituted_value = utils::substitute_variables(
+                    &value,
+                    output_paths,
+                    lua,
+                    external_dependencies,
+                    config,
+                )?;
                 let substituted_value =
                     variables::substitute(&[&CMakeVariables], &substituted_value)?;
                 Ok::<_, Self::Err>(format!("{key}={substituted_value}"))

@@ -4,11 +4,14 @@ use crate::lua_rockspec::Build;
 use crate::lua_rockspec::{BuildInfo, TreesitterParserBuildSpec};
 use crate::progress::{Progress, ProgressBar};
 use crate::tree::{RockLayout, Tree};
+use std::collections::HashMap;
 use std::io;
 use std::num::ParseIntError;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tree_sitter_generate::GenerateError;
+
+use super::external_dependency::ExternalDependencyInfo;
 
 const DEFAULT_GENERATE_ABI_VERSION: usize = tree_sitter::LANGUAGE_VERSION;
 
@@ -38,6 +41,7 @@ impl Build for TreesitterParserBuildSpec {
         output_paths: &RockLayout,
         _no_install: bool,
         _lua: &LuaInstallation,
+        _external_dependencies: &HashMap<String, ExternalDependencyInfo>,
         _config: &Config,
         _tree: &Tree,
         build_dir: &Path,

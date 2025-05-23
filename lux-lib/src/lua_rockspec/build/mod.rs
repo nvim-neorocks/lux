@@ -31,6 +31,7 @@ use thiserror::Error;
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
 use crate::{
+    build::external_dependency::ExternalDependencyInfo,
     config::Config,
     lua_installation::LuaInstallation,
     progress::{Progress, ProgressBar},
@@ -988,6 +989,7 @@ pub trait Build {
         output_paths: &RockLayout,
         no_install: bool,
         lua: &LuaInstallation,
+        external_dependencies: &HashMap<String, ExternalDependencyInfo>,
         config: &Config,
         tree: &Tree,
         build_dir: &Path,

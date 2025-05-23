@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use path_slash::PathBufExt;
 use std::{
+    collections::HashMap,
     io,
     path::{Path, PathBuf},
     process::{Command, ExitStatus},
@@ -16,7 +17,7 @@ use crate::{
     tree::{RockLayout, Tree},
 };
 
-use super::variables::VariableSubstitutionError;
+use super::{external_dependency::ExternalDependencyInfo, variables::VariableSubstitutionError};
 
 #[derive(Error, Debug)]
 pub enum MakeError {
@@ -45,6 +46,7 @@ impl Build for MakeBuildSpec {
         output_paths: &RockLayout,
         no_install: bool,
         lua: &LuaInstallation,
+        external_dependencies: &HashMap<String, ExternalDependencyInfo>,
         config: &Config,
         _tree: &Tree,
         build_dir: &Path,
@@ -58,8 +60,13 @@ impl Build for MakeBuildSpec {
                 .chain(&self.build_variables)
                 .filter(|(_, value)| !value.is_empty())
                 .map(|(key, value)| {
-                    let substituted_value =
-                        utils::substitute_variables(value, output_paths, lua, config)?;
+                    let substituted_value = utils::substitute_variables(
+                        value,
+                        output_paths,
+                        lua,
+                        external_dependencies,
+                        config,
+                    )?;
                     Ok(format!("{key}={substituted_value}").trim().to_string())
                 })
                 .try_collect::<_, Vec<_>, Self::Err>()?;
@@ -103,8 +110,13 @@ impl Build for MakeBuildSpec {
                 .chain(&self.install_variables)
                 .filter(|(_, value)| !value.is_empty())
                 .map(|(key, value)| {
-                    let substituted_value =
-                        utils::substitute_variables(value, output_paths, lua, config)?;
+                    let substituted_value = utils::substitute_variables(
+                        value,
+                        output_paths,
+                        lua,
+                        external_dependencies,
+                        config,
+                    )?;
                     Ok(format!("{key}={substituted_value}").trim().to_string())
                 })
                 .try_collect::<_, Vec<_>, Self::Err>()?;
