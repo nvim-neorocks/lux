@@ -2,6 +2,7 @@ use crate::lockfile::{LockfileError, OptState, RemotePackageSourceUrl};
 use crate::lua_rockspec::LuaVersionError;
 use crate::rockspec::{LuaVersionCompatibility, Rockspec};
 use crate::tree::{self, EntryType, TreeError};
+use std::collections::HashMap;
 use std::{io, path::Path};
 
 use crate::{
@@ -177,36 +178,100 @@ async fn run_build<R: Rockspec + HasIntegrity>(
 ) -> Result<BuildInfo, BuildError> {
     progress.map(|p| p.set_message("🛠️ Building..."));
 
+    let external_dependencies = rockspec
+        .external_dependencies()
+        .current_platform()
+        .iter()
+        .map(|(name, dep)| {
+            ExternalDependencyInfo::probe(&name, dep, config.external_deps())
+                .map(|info| (name.clone(), info))
+        })
+        .try_collect::<_, HashMap<_, _>, _>()?;
+
     Ok(
         match rockspec.build().current_platform().build_backend.to_owned() {
             Some(BuildBackendSpec::Builtin(build_spec)) => {
                 build_spec
-                    .run(output_paths, false, lua, config, tree, build_dir, progress)
+                    .run(
+                        output_paths,
+                        false,
+                        lua,
+                        &external_dependencies,
+                        config,
+                        tree,
+                        build_dir,
+                        progress,
+                    )
                     .await?
             }
             Some(BuildBackendSpec::Make(make_spec)) => {
                 make_spec
-                    .run(output_paths, false, lua, config, tree, build_dir, progress)
+                    .run(
+                        output_paths,
+                        false,
+                        lua,
+                        &external_dependencies,
+                        config,
+                        tree,
+                        build_dir,
+                        progress,
+                    )
                     .await?
             }
             Some(BuildBackendSpec::CMake(cmake_spec)) => {
                 cmake_spec
-                    .run(output_paths, false, lua, config, tree, build_dir, progress)
+                    .run(
+                        output_paths,
+                        false,
+                        lua,
+                        &external_dependencies,
+                        config,
+                        tree,
+                        build_dir,
+                        progress,
+                    )
                     .await?
             }
             Some(BuildBackendSpec::Command(command_spec)) => {
                 command_spec
-                    .run(output_paths, false, lua, config, tree, build_dir, progress)
+                    .run(
+                        output_paths,
+                        false,
+                        lua,
+                        &external_dependencies,
+                        config,
+                        tree,
+                        build_dir,
+                        progress,
+                    )
                     .await?
             }
             Some(BuildBackendSpec::RustMlua(rust_mlua_spec)) => {
                 rust_mlua_spec
-                    .run(output_paths, false, lua, config, tree, build_dir, progress)
+                    .run(
+                        output_paths,
+                        false,
+                        lua,
+                        &external_dependencies,
+                        config,
+                        tree,
+                        build_dir,
+                        progress,
+                    )
                     .await?
             }
             Some(BuildBackendSpec::TreesitterParser(treesitter_parser_spec)) => {
                 treesitter_parser_spec
-                    .run(output_paths, false, lua, config, tree, build_dir, progress)
+                    .run(
+                        output_paths,
+                        false,
+                        lua,
+                        &external_dependencies,
+                        config,
+                        tree,
+                        build_dir,
+                        progress,
+                    )
                     .await?
             }
             Some(BuildBackendSpec::LuaRock(_)) => {
@@ -222,7 +287,16 @@ async fn run_build<R: Rockspec + HasIntegrity>(
                 .await?
             }
             Some(BuildBackendSpec::Source) => {
-                source::build(output_paths, lua, config, tree, build_dir, progress).await?
+                source::build(
+                    output_paths,
+                    lua,
+                    &external_dependencies,
+                    config,
+                    tree,
+                    build_dir,
+                    progress,
+                )
+                .await?
             }
             None => BuildInfo::default(),
         },
@@ -309,10 +383,6 @@ async fn do_build<R: Rockspec + HasIntegrity>(
             rockspec.version()
         ))
     });
-
-    for (name, dep) in rockspec.external_dependencies().current_platform() {
-        let _ = ExternalDependencyInfo::detect(name, dep, build.config.external_deps())?;
-    }
 
     let lua_version = rockspec.lua_version_matches(build.config)?;
 

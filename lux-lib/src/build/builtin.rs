@@ -17,7 +17,10 @@ use crate::{
     tree::{RockLayout, Tree, TreeError},
 };
 
-use super::utils::{CompileCFilesError, CompileCModulesError, InstallBinaryError};
+use super::{
+    external_dependency::ExternalDependencyInfo,
+    utils::{CompileCFilesError, CompileCModulesError, InstallBinaryError},
+};
 
 #[derive(Error, Debug)]
 pub enum BuiltinBuildError {
@@ -41,6 +44,7 @@ impl Build for BuiltinBuildSpec {
         output_paths: &RockLayout,
         _no_install: bool,
         lua: &LuaInstallation,
+        _external_dependencies: &HashMap<String, ExternalDependencyInfo>,
         config: &Config,
         tree: &Tree,
         build_dir: &Path,

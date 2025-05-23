@@ -1,3 +1,4 @@
+use super::external_dependency::ExternalDependencyInfo;
 use super::utils::lua_dylib_extension;
 use crate::config::LuaVersionUnset;
 use crate::lua_rockspec::BuildInfo;
@@ -38,6 +39,7 @@ impl Build for RustMluaBuildSpec {
         output_paths: &RockLayout,
         _no_install: bool,
         _lua: &LuaInstallation,
+        _external_dependencies: &HashMap<String, ExternalDependencyInfo>,
         config: &Config,
         _tree: &Tree,
         build_dir: &Path,

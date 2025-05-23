@@ -120,7 +120,7 @@ impl<'a> BinaryRockInstall<'a> {
             ))
         });
         for (name, dep) in rockspec.external_dependencies().current_platform() {
-            let _ = ExternalDependencyInfo::detect(name, dep, self.config.external_deps())?;
+            let _ = ExternalDependencyInfo::probe(name, dep, self.config.external_deps())?;
         }
 
         rockspec.lua_version_matches(self.config)?;

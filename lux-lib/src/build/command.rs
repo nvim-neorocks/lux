@@ -1,5 +1,6 @@
 use shell_words::split;
 use std::{
+    collections::HashMap,
     io,
     path::Path,
     process::{Command, ExitStatus},
@@ -14,7 +15,9 @@ use crate::{
     tree::{RockLayout, Tree},
 };
 
-use super::{utils, variables::VariableSubstitutionError};
+use super::{
+    external_dependency::ExternalDependencyInfo, utils, variables::VariableSubstitutionError,
+};
 
 #[derive(Error, Debug)]
 pub enum CommandError {
@@ -46,16 +49,31 @@ impl Build for CommandBuildSpec {
         output_paths: &RockLayout,
         no_install: bool,
         lua: &LuaInstallation,
+        external_dependencies: &HashMap<String, ExternalDependencyInfo>,
         config: &Config,
         _tree: &Tree,
         build_dir: &Path,
         progress: &Progress<ProgressBar>,
     ) -> Result<BuildInfo, Self::Err> {
         progress.map(|bar| bar.set_message("Running build_command..."));
-        run_command(&self.build_command, output_paths, lua, config, build_dir)?;
+        run_command(
+            &self.build_command,
+            output_paths,
+            lua,
+            external_dependencies,
+            config,
+            build_dir,
+        )?;
         if !no_install {
             progress.map(|bar| bar.set_message("Running install_command..."));
-            run_command(&self.install_command, output_paths, lua, config, build_dir)?;
+            run_command(
+                &self.install_command,
+                output_paths,
+                lua,
+                external_dependencies,
+                config,
+                build_dir,
+            )?;
         }
         Ok(BuildInfo::default())
     }
@@ -65,10 +83,12 @@ fn run_command(
     command: &str,
     output_paths: &RockLayout,
     lua: &LuaInstallation,
+    external_dependencies: &HashMap<String, ExternalDependencyInfo>,
     config: &Config,
     build_dir: &Path,
 ) -> Result<(), CommandError> {
-    let substituted_cmd = utils::substitute_variables(command, output_paths, lua, config)?;
+    let substituted_cmd =
+        utils::substitute_variables(command, output_paths, lua, external_dependencies, config)?;
     let cmd_parts = split(&substituted_cmd).map_err(|err| CommandError::ParseError {
         err,
         command: substituted_cmd.clone(),
