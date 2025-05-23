@@ -6,6 +6,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.5.3](https://github.com/nvim-neorocks/lux/compare/v0.5.2...v0.5.3) - 2025-05-23
+
+### Other
+- update Cargo.lock dependencies
+
+## `lux-lib` - [0.7.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.6.2...lux-lib-v0.7.0) - 2025-05-23
+
+### Fixed
+- [**breaking**] bin scripts installed into tree's root ([#724](https://github.com/nvim-neorocks/lux/pull/724))
+
+### Other
+- *(deps)* bump zip from 3.0.0 to 4.0.0 ([#728](https://github.com/nvim-neorocks/lux/pull/728))
+
 ## `lux-cli` - [0.5.2](https://github.com/nvim-neorocks/lux/compare/v0.5.1...v0.5.2) - 2025-05-21
 
 ### Fixed
