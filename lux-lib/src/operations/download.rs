@@ -238,6 +238,8 @@ async fn download_remote_rock(
             let bytes = reqwest::get(format!("{}/{}", &url, rockspec_name))
                 .await
                 .map_err(DownloadRockspecError::Request)?
+                .error_for_status()
+                .map_err(DownloadRockspecError::Request)?
                 .bytes()
                 .await
                 .map_err(DownloadRockspecError::Request)?;
@@ -423,7 +425,11 @@ async fn download_packed_rock_impl(
     let full_rock_name = mk_packed_rock_name(package.name(), package.version(), ext);
 
     let url = server_url.join(&full_rock_name)?;
-    let bytes = reqwest::get(url.clone()).await?.bytes().await?;
+    let bytes = reqwest::get(url.clone())
+        .await?
+        .error_for_status()?
+        .bytes()
+        .await?;
     Ok(DownloadedPackedRockBytes {
         name: package.name().clone(),
         version: package.version().clone(),

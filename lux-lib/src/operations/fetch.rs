@@ -205,7 +205,11 @@ async fn do_fetch_src<R: Rockspec>(
         RockSourceSpec::Url(url) => {
             progress.map(|p| p.set_message(format!("📥 Downloading {}", url.to_owned())));
 
-            let response = reqwest::get(url.to_owned()).await?.bytes().await?;
+            let response = reqwest::get(url.to_owned())
+                .await?
+                .error_for_status()?
+                .bytes()
+                .await?;
             let hash = response.hash()?;
             let file_name = url
                 .path_segments()
