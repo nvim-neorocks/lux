@@ -114,6 +114,7 @@ pub(crate) fn compile_c_files(
     target_module: &LuaModule,
     target_dir: &Path,
     lua: &LuaInstallation,
+    external_dependencies: &HashMap<String, ExternalDependencyInfo>,
 ) -> Result<(), CompileCFilesError> {
     let target = target_dir.join(target_module.to_lib_path());
 
@@ -139,7 +140,12 @@ pub(crate) fn compile_c_files(
         .warnings(false)
         .files(files)
         .host(std::env::consts::OS)
-        .include(&lua.include_dir)
+        .includes(lua.includes())
+        .includes(
+            external_dependencies
+                .iter()
+                .filter_map(|(_, dep)| dep.include_dir.as_ref()),
+        )
         .opt_level(3)
         .out_dir(intermediate_dir)
         .target(&host.to_string());
@@ -173,6 +179,11 @@ pub(crate) fn compile_c_files(
             .arg(format!("/DEF:{}", def_file.display()))
             .arg(format!("/OUT:{}", output_path.display()))
             .args(lua.lib_link_args(&compiler))
+            .args(
+                external_dependencies
+                    .iter()
+                    .flat_map(|(_, dep)| dep.lib_link_args(&compiler)),
+            )
             .output()?
     } else {
         build
@@ -181,6 +192,11 @@ pub(crate) fn compile_c_files(
             .to_command()
             .args(vec!["-o".into(), output_path.to_string_lossy().to_string()])
             .args(lua.lib_link_args(&compiler))
+            .args(
+                external_dependencies
+                    .iter()
+                    .flat_map(|(_, dep)| dep.lib_link_args(&compiler)),
+            )
             .args(&objects)
             .output()?
     };
@@ -220,8 +236,8 @@ luaopen_{}
 
 // TODO: (#261): special cases for mingw/cygwin?
 
-/// the extension for Lua shared libraries.
-pub(crate) fn lua_dylib_extension() -> &'static str {
+/// the extension for C shared libraries.
+pub(crate) fn c_dylib_extension() -> &'static str {
     if cfg!(target_env = "msvc") {
         "dll"
     } else {
@@ -229,8 +245,8 @@ pub(crate) fn lua_dylib_extension() -> &'static str {
     }
 }
 
-/// the extension for Lua static libraries.
-pub(crate) fn lua_lib_extension() -> &'static str {
+/// the extension for C static libraries.
+pub(crate) fn c_lib_extension() -> &'static str {
     if cfg!(target_env = "msvc") {
         "lib"
     } else {
@@ -238,8 +254,8 @@ pub(crate) fn lua_lib_extension() -> &'static str {
     }
 }
 
-/// the extension for Lua objects.
-pub(crate) fn lua_obj_extension() -> &'static str {
+/// the extension for C objects.
+pub(crate) fn c_obj_extension() -> &'static str {
     if cfg!(target_env = "msvc") {
         "obj"
     } else {
@@ -288,6 +304,7 @@ pub(crate) fn compile_c_modules(
     target_module: &LuaModule,
     target_dir: &Path,
     lua: &LuaInstallation,
+    external_dependencies: &HashMap<String, ExternalDependencyInfo>,
 ) -> Result<(), CompileCModulesError> {
     let target = target_dir.join(target_module.to_lib_path());
 
@@ -306,6 +323,11 @@ pub(crate) fn compile_c_modules(
         .incdirs
         .iter()
         .map(|dir| source_dir.join(dir))
+        .chain(
+            external_dependencies
+                .iter()
+                .filter_map(|(_, dep)| dep.include_dir.clone()),
+        )
         .collect_vec();
 
     let intermediate_dir = tempdir::TempDir::new(target_module.as_str())?;
@@ -317,7 +339,12 @@ pub(crate) fn compile_c_modules(
         .files(source_files)
         .host(std::env::consts::OS)
         .includes(&include_dirs)
-        .include(&lua.include_dir)
+        .includes(lua.includes())
+        .includes(
+            external_dependencies
+                .iter()
+                .filter_map(|(_, dep)| dep.include_dir.as_ref()),
+        )
         .opt_level(3)
         .out_dir(intermediate_dir)
         .target(&host.to_string());
@@ -380,6 +407,11 @@ pub(crate) fn compile_c_modules(
             .arg(format!("/DEF:{}", def_file.display()))
             .arg(format!("/OUT:{}", output_path.display()))
             .args(lua.lib_link_args(&build.try_get_compiler()?))
+            .args(
+                external_dependencies
+                    .iter()
+                    .flat_map(|(_, dep)| dep.lib_link_args(&compiler)),
+            )
             .args(libdir_args)
             .args(library_args)
             .output()?
@@ -390,6 +422,11 @@ pub(crate) fn compile_c_modules(
             .to_command()
             .args(vec!["-o".into(), output_path.to_string_lossy().to_string()])
             .args(lua.lib_link_args(&build.try_get_compiler()?))
+            .args(
+                external_dependencies
+                    .iter()
+                    .flat_map(|(_, dep)| dep.lib_link_args(&compiler)),
+            )
             .args(&objects)
             .args(libdir_args)
             .args(library_args)
@@ -476,7 +513,6 @@ exec {0} "{1}" "$@"
         lua_bin,
         unwrapped_bin.display(),
     );
-
     #[cfg(target_family = "windows")]
     let content = format!(
         r#"@echo off

@@ -44,7 +44,7 @@ impl Build for BuiltinBuildSpec {
         output_paths: &RockLayout,
         _no_install: bool,
         lua: &LuaInstallation,
-        _external_dependencies: &HashMap<String, ExternalDependencyInfo>,
+        external_dependencies: &HashMap<String, ExternalDependencyInfo>,
         config: &Config,
         tree: &Tree,
         build_dir: &Path,
@@ -75,6 +75,7 @@ impl Build for BuiltinBuildSpec {
                             destination_path,
                             &output_paths.lib,
                             lua,
+                            external_dependencies,
                         )?
                     } else {
                         progress.map(|p| {
@@ -101,6 +102,7 @@ impl Build for BuiltinBuildSpec {
                         destination_path,
                         &output_paths.lib,
                         lua,
+                        external_dependencies,
                     )?
                 }
                 ModuleSpec::ModulePaths(data) => {
@@ -111,6 +113,7 @@ impl Build for BuiltinBuildSpec {
                         destination_path,
                         &output_paths.lib,
                         lua,
+                        external_dependencies,
                     )?
                 }
             }

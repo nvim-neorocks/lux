@@ -5,7 +5,7 @@ use std::{collections::HashMap, convert::Infallible, fmt::Display, path::PathBuf
 use thiserror::Error;
 
 use crate::{
-    build::utils::lua_dylib_extension,
+    build::utils::c_dylib_extension,
     lua_rockspec::{
         deserialize_vec_from_lua_array_or_string, DisplayAsLuaValue, FromPlatformOverridable,
         PartialOverride, PerPlatform, PlatformOverridable,
@@ -45,7 +45,7 @@ impl LuaModule {
     }
 
     pub fn to_lib_path(&self) -> PathBuf {
-        self.to_file_path(&format!(".{}", lua_dylib_extension()))
+        self.to_file_path(&format!(".{}", c_dylib_extension()))
     }
 
     fn to_path_buf(&self) -> PathBuf {

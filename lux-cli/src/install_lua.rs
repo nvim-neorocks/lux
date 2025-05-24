@@ -18,8 +18,9 @@ pub async fn install_lua(config: Config) -> Result<()> {
     // whether they'd like to forcefully reinstall.
     let lua = LuaInstallation::install(version_stringified, &config);
     let lua_root = lua
-        .include_dir
-        .parent()
+        .includes()
+        .first()
+        .and_then(|dir| dir.parent())
         .expect("error getting parent directory");
 
     bar.finish_with_message(format!(

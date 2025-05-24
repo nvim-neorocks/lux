@@ -10,7 +10,7 @@ use super::{
 };
 
 /// Can be defined in a [platform-agnostic](https://github.com/luarocks/luarocks/wiki/platform-agnostic-external-dependencies) manner
-#[derive(Debug, PartialEq, Clone, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Deserialize, Default)]
 pub struct ExternalDependencySpec {
     /// A header file, e.g. "foo.h"
     pub(crate) header: Option<PathBuf>,

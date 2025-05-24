@@ -504,8 +504,8 @@ fn default_variables() -> impl Iterator<Item = (String, String)> {
     vec![
         ("MAKE".into(), "make".into()),
         ("CMAKE".into(), "cmake".into()),
-        ("LIB_EXTENSION".into(), utils::lua_dylib_extension().into()),
-        ("OBJ_EXTENSION".into(), utils::lua_obj_extension().into()),
+        ("LIB_EXTENSION".into(), utils::c_dylib_extension().into()),
+        ("OBJ_EXTENSION".into(), utils::c_obj_extension().into()),
         ("CFLAGS".into(), cflags),
         ("LIBFLAG".into(), utils::default_libflag().into()),
     ]

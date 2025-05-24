@@ -1,5 +1,5 @@
 use super::external_dependency::ExternalDependencyInfo;
-use super::utils::lua_dylib_extension;
+use super::utils::c_dylib_extension;
 use crate::config::LuaVersionUnset;
 use crate::lua_rockspec::BuildInfo;
 use crate::progress::{Progress, ProgressBar};
@@ -108,7 +108,7 @@ fn install_rust_libs(
     for (module, rust_lib) in modules {
         let src = build_dir.join(target_path).join("release").join(rust_lib);
         let mut dst: PathBuf = output_paths.lib.join(module);
-        dst.set_extension(lua_dylib_extension());
+        dst.set_extension(c_dylib_extension());
         fs::copy(src, dst)?;
     }
     Ok(())
