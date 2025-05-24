@@ -55,7 +55,9 @@ pub(crate) async fn build<R: Rockspec>(
     std::fs::write(&rockspec_file, rockspec.to_lua_rockspec_string())?;
     let luarocks = LuaRocksInstallation::new(config, tree.build_tree(config)?)?;
     let luarocks_tree = TempDir::new("luarocks-compat-tree")?;
-    luarocks.make(&rockspec_file, build_dir, luarocks_tree.path(), lua)?;
+    luarocks
+        .make(&rockspec_file, build_dir, luarocks_tree.path(), lua)
+        .await?;
     install(rockspec, &luarocks_tree.into_path(), output_paths, config)
 }
 

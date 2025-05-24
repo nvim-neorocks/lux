@@ -10,7 +10,6 @@ use lux_lib::{
 
 #[tokio::test]
 async fn install_git_package() {
-    let dir = TempDir::new().unwrap();
     let install_spec =
         PackageInstallSpec::new("rustaceanvim@6.0.3".parse().unwrap(), EntryType::Entrypoint)
             .source(RockSourceSpec::Git(GitSource {
@@ -20,8 +19,22 @@ async fn install_git_package() {
                 checkout_ref: Some("v6.0.3".into()),
             }))
             .build();
+    test_install(install_spec).await
+}
 
+// http 0.4 has an http-0.4-0.all.rock packed rock on luarocks.org
+#[tokio::test]
+#[cfg(not(target_env = "msvc"))] // http has dependencies that are not supported on Windows
+async fn install_http_package() {
+    let install_spec =
+        PackageInstallSpec::new("http@0.4-0".parse().unwrap(), EntryType::Entrypoint).build();
+    test_install(install_spec).await
+}
+
+async fn test_install(install_spec: PackageInstallSpec) {
+    let dir = TempDir::new().unwrap();
     let lua_version = detect_installed_lua_version(LuaBinary::default())
+        .await
         .ok()
         .and_then(|version| LuaVersion::from_version(version).ok())
         .or(Some(LuaVersion::Lua51));
@@ -42,5 +55,5 @@ async fn install_git_package() {
         .install()
         .await
         .unwrap();
-    assert_eq!(installed.len(), 1);
+    assert!(!installed.is_empty());
 }

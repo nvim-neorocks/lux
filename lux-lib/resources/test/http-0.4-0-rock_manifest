@@ -1,0 +1,74 @@
+rock_manifest = {
+   doc = {
+      Makefile = "816ac4149d8524aa9c15d4c2c35ae460",
+      ["README.md"] = "c1d40f72a2f942f17edb87bebb5b8fd8",
+      interfaces = {
+         ["connection.md"] = "7567d84a017ca26fe93caac59813e2f8",
+         ["stream.md"] = "b5355a7bbd6ab16afed2056c8c85932f"
+      },
+      ["interfaces.md"] = "c84ae52dd527d47c1db6da31e726d985",
+      ["introduction.md"] = "8cc5f48e0a1abd6dcd816f9f85bb3654",
+      ["links.md"] = "4eab591d3cd4fbac74ebf3c7fae6d5a8",
+      ["metadata.yaml"] = "8bed2788e8b204e6cb055240aae7a7de",
+      modules = {
+         ["http.bit.md"] = "5d44492a2fd14e3ae4d9f804b0d89dee",
+         ["http.client.md"] = "8e01077ac6e6b3511d9e21f7560a1a11",
+         ["http.compat.prosody.md"] = "be5ec5d33c7897ff1cd42a5bcc4be00e",
+         ["http.compat.socket.md"] = "bb131a57b0c19902ff15fcf061bd3552",
+         ["http.cookie.md"] = "5407c3c75e95a883cee3ea2bada4ae88",
+         ["http.h1_connection.md"] = "fa2f7e55078c0b35f1e24adf32f8a260",
+         ["http.h1_reason_phrases.md"] = "347db2f9e7d57f7b73c13ca70a1a3740",
+         ["http.h1_stream.md"] = "545c01e563e6bd123f89dae4eb13449a",
+         ["http.h2_connection.md"] = "f7f053b3dba665a0ebd19e3769add6fa",
+         ["http.h2_error.md"] = "c324ec2e6decdb781b308580a131b0cc",
+         ["http.h2_stream.md"] = "81bf529bec307d9d677e2a70d8dfb252",
+         ["http.headers.md"] = "f20b9136cd3f6c0ba9f26d68633134ee",
+         ["http.hpack.md"] = "2e70bd475477f933ec0c6494291a177c",
+         ["http.hsts.md"] = "dfdee2ddbc9c905b44c25280143a54ab",
+         ["http.proxies.md"] = "41f13078a01178df27e85d809bfb1a85",
+         ["http.request.md"] = "8e5c8df4046644f789015770ff0baf0b",
+         ["http.server.md"] = "af8c907e9b6728370cf37656963cdca0",
+         ["http.socks.md"] = "a36d926fe28f9b7a163e80e4646c5b15",
+         ["http.tls.md"] = "5141ec56aa126d35d1d5b26cd87121d4",
+         ["http.util.md"] = "fd468005715c7bf6c5509777644c2a1f",
+         ["http.version.md"] = "33fbfdf067d15a0f8efd01058d1f2f34",
+         ["http.websocket.md"] = "c0fee3f27a071846dab53665658774a5",
+         ["http.zlib.md"] = "d6915e0dbf4845f0a45dcb1b5dbcc2e6"
+      },
+      ["modules.md"] = "06fc4f8b14f3b282ea578be5ead32d74",
+      ["site.css"] = "e24a70fb22cbe34e535c2eb8f371e87e",
+      ["template.html"] = "28b0abc0798bebafcc28781124477049"
+   },
+   ["http-0.4-0.rockspec"] = "10b16abc344f67b571b413babd32f694",
+   lua = {
+      http = {
+         ["bit.lua"] = "9f187eaeb6150465e112cc3da7b8786e",
+         ["client.lua"] = "05602639d3d3a7b2873bbff90a9cd51f",
+         compat = {
+            ["prosody.lua"] = "2f3db0dfbc86db6aa0d5584a9cc89149",
+            ["socket.lua"] = "00baa9b80fa47717a541662c9c05758f"
+         },
+         ["connection_common.lua"] = "8ecf7c3f811372808d381d45413f1f64",
+         ["cookie.lua"] = "756570ec47db42d2a53fed0f81737acc",
+         ["h1_connection.lua"] = "6d7a97b9559ddf5ef9ad52e29449a2bf",
+         ["h1_reason_phrases.lua"] = "00696c0da486d6d32fe5056b2a856679",
+         ["h1_stream.lua"] = "a008d3eb20c0eb30362b4c053cbe8ff5",
+         ["h2_connection.lua"] = "71be7f9a14ba6b5265cedcea253eb15e",
+         ["h2_error.lua"] = "0424bbc1d888616facd000d8d10db392",
+         ["h2_stream.lua"] = "ad61b801cafc8d930a79b1e5137e3d84",
+         ["headers.lua"] = "706ecb6915cef1be41f22d960ebd2733",
+         ["hpack.lua"] = "3e1cfa429c52fa9434102f704810a6f2",
+         ["hsts.lua"] = "46427298f887baea63442ced61f609cc",
+         ["proxies.lua"] = "45c770c16942ea4265c643d52b587477",
+         ["request.lua"] = "1582aa20973c8f9646f0954015e1912b",
+         ["server.lua"] = "0d6cec46f3dd6f17b691722faf88c5db",
+         ["socks.lua"] = "31dbe69b9d632b272faf9c0790acbfae",
+         ["stream_common.lua"] = "45ca7dbd359c42626508e4f19c7b54b8",
+         ["tls.lua"] = "2012b91ccecf1f434247c788b81cc641",
+         ["util.lua"] = "18d96b38ca4682b022c5913c4451a27a",
+         ["version.lua"] = "8c2b80acd597cb75c0e02c09d8503328",
+         ["websocket.lua"] = "0e368ac281cfcd3a268ea6ccbee339c1",
+         ["zlib.lua"] = "f8d0d64f57c95b959684ef61aab5952d"
+      }
+   }
+}

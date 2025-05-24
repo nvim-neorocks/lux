@@ -1,4 +1,5 @@
-use std::{io, process::Command};
+use std::{io, process::ExitStatus};
+use tokio::process::Command;
 
 use crate::{
     config::{Config, LuaVersion, LuaVersionUnset},
@@ -53,10 +54,13 @@ impl<State: exec_builder::State> ExecBuilder<'_, State> {
 
 #[derive(Error, Debug)]
 pub enum ExecError {
-    #[error("Running {0} failed!")]
-    RunFailure(String),
-    #[error("failed to execute `{0}`: {1}")]
-    RunCommandFailure(String, io::Error),
+    #[error("failed to execute `{name}`.\n\n{status}\n\nstdout:\n{stdout}\n\nstderr:\n{stderr}")]
+    RunCommandFailure {
+        name: String,
+        status: ExitStatus,
+        stdout: String,
+        stderr: String,
+    },
     #[error(transparent)]
     LuaVersionUnset(#[from] LuaVersionUnset),
     #[error(transparent)]
@@ -67,6 +71,8 @@ pub enum ExecError {
     LuaVersionError(#[from] LuaVersionError),
     #[error(transparent)]
     ProjectTreeError(#[from] ProjectTreeError),
+    #[error("failed to execute `{0}`:\n{1}")]
+    Io(String, io::Error),
 }
 
 async fn exec(run: Exec<'_>) -> Result<(), ExecError> {
@@ -83,21 +89,22 @@ async fn exec(run: Exec<'_>) -> Result<(), ExecError> {
         paths.prepend(&Paths::new(&project.tree(run.config)?)?);
     }
 
-    let status = match Command::new(run.command)
+    match Command::new(run.command)
         .args(run.args)
         .env("PATH", paths.path_prepended().joined())
         .env("LUA_PATH", paths.package_path().joined())
         .env("LUA_CPATH", paths.package_cpath().joined())
-        .status()
+        .output()
+        .await
     {
-        Ok(status) => Ok(status),
-        Err(err) => Err(ExecError::RunCommandFailure(run.command.to_string(), err)),
-    }?;
-
-    if status.success() {
-        Ok(())
-    } else {
-        Err(ExecError::RunFailure(run.command.to_string()))
+        Ok(output) if output.status.success() => Ok(()),
+        Ok(output) => Err(ExecError::RunCommandFailure {
+            name: run.command.to_string(),
+            status: output.status,
+            stdout: String::from_utf8_lossy(&output.stdout).into(),
+            stderr: String::from_utf8_lossy(&output.stderr).into(),
+        }),
+        Err(err) => Err(ExecError::Io(run.command.to_string(), err)),
     }
 }
 

@@ -1,4 +1,5 @@
-use super::utils::lua_dylib_extension;
+use super::external_dependency::ExternalDependencyInfo;
+use super::utils::c_dylib_extension;
 use crate::config::LuaVersionUnset;
 use crate::lua_rockspec::BuildInfo;
 use crate::progress::{Progress, ProgressBar};
@@ -12,9 +13,10 @@ use crate::{
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus};
+use std::process::ExitStatus;
 use std::{fs, io};
 use thiserror::Error;
+use tokio::process::Command;
 
 #[derive(Error, Debug)]
 pub enum RustError {
@@ -38,6 +40,7 @@ impl Build for RustMluaBuildSpec {
         output_paths: &RockLayout,
         _no_install: bool,
         _lua: &LuaInstallation,
+        _external_dependencies: &HashMap<String, ExternalDependencyInfo>,
         config: &Config,
         _tree: &Tree,
         build_dir: &Path,
@@ -68,6 +71,7 @@ impl Build for RustMluaBuildSpec {
             .current_dir(build_dir)
             .args(build_args)
             .output()
+            .await
         {
             Ok(output) if output.status.success() => {}
             Ok(output) => {
@@ -104,7 +108,7 @@ fn install_rust_libs(
     for (module, rust_lib) in modules {
         let src = build_dir.join(target_path).join("release").join(rust_lib);
         let mut dst: PathBuf = output_paths.lib.join(module);
-        dst.set_extension(lua_dylib_extension());
+        dst.set_extension(c_dylib_extension());
         fs::copy(src, dst)?;
     }
     Ok(())

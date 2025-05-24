@@ -445,11 +445,11 @@ impl ConfigBuilder {
 
         let lua_version =
             self.lua_version
-                .or(
-                    crate::lua_installation::detect_installed_lua_version(LuaBinary::default())
-                        .ok()
-                        .and_then(|version| LuaVersion::from_version(version).ok()),
-                );
+                .or(crate::lua_installation::detect_installed_lua_version_sync(
+                    LuaBinary::default(),
+                )
+                .ok()
+                .and_then(|version| LuaVersion::from_version(version).ok()));
         Ok(Config {
             enable_development_packages: self.enable_development_packages.unwrap_or(false),
             server: self
@@ -504,8 +504,8 @@ fn default_variables() -> impl Iterator<Item = (String, String)> {
     vec![
         ("MAKE".into(), "make".into()),
         ("CMAKE".into(), "cmake".into()),
-        ("LIB_EXTENSION".into(), utils::lua_dylib_extension().into()),
-        ("OBJ_EXTENSION".into(), utils::lua_obj_extension().into()),
+        ("LIB_EXTENSION".into(), utils::c_dylib_extension().into()),
+        ("OBJ_EXTENSION".into(), utils::c_obj_extension().into()),
         ("CFLAGS".into(), cflags),
         ("LIBFLAG".into(), utils::default_libflag().into()),
     ]

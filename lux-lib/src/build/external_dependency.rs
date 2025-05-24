@@ -1,9 +1,19 @@
+use itertools::Itertools;
+use path_slash::{PathBufExt, PathExt};
 use pkg_config::{Config as PkgConfig, Library};
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
 
 use crate::{
     config::external_deps::ExternalDependencySearchConfig, lua_rockspec::ExternalDependencySpec,
+};
+
+use super::{
+    utils::{c_lib_extension, format_path},
+    variables::HasVariables,
 };
 
 #[derive(Error, Debug)]
@@ -12,78 +22,99 @@ pub enum ExternalDependencyError {
     NotFound(String),
     #[error("IO error while trying to detect external dependencies: {0}")]
     Io(#[from] std::io::Error),
+    #[error("{0} was probed successfully, but the header {1} could not be found")]
+    SuccessfulProbeHeaderNotFound(String, String),
+    #[error("error probing external dependency {0}: the header {1} could not be found")]
+    HeaderNotFound(String, String),
+    #[error("error probing external dependency {0}: the library {1} could not be found")]
+    LibraryNotFound(String, String),
 }
 
 #[derive(Debug)]
-pub enum ExternalDependencyInfo {
-    /// Detected via pkg-config
-    PkgConfig(Library),
-    /// Library, detected via fallback mechanism
-    Library {
-        prefix: PathBuf,
-        include_dir: PathBuf,
-        lib_dir: PathBuf,
-        lib_file: PathBuf,
-    },
-    /// Header-only dependency, detected vial fallback mechanism
-    HeaderOnly {
-        prefix: PathBuf,
-        include_dir: PathBuf,
-    },
+pub struct ExternalDependencyInfo {
+    pub(crate) include_dir: Option<PathBuf>,
+    pub(crate) lib_dir: Option<PathBuf>,
+    pub(crate) bin_dir: Option<PathBuf>,
+    /// Name of the static library, (without the 'lib' prefix or file extension on unix targets),
+    /// for example, "foo" or "foo.dll"
+    pub(crate) lib_name: Option<String>,
+    /// pkg-config library information if available
+    pub(crate) lib_info: Option<Library>,
+}
+
+fn pkg_config_probe(name: &str) -> Option<Library> {
+    PkgConfig::new()
+        .print_system_libs(false)
+        .cargo_metadata(false)
+        .env_metadata(false)
+        .probe(&name.to_lowercase())
+        .ok()
 }
 
 impl ExternalDependencyInfo {
-    pub fn detect(
+    pub fn probe(
         name: &str,
         dependency: &ExternalDependencySpec,
         config: &ExternalDependencySearchConfig,
     ) -> Result<Self, ExternalDependencyError> {
-        let mut lib_info = PkgConfig::new()
-            .print_system_libs(false)
-            .cargo_metadata(false)
-            .env_metadata(false)
-            .probe(&name.to_lowercase())
-            .ok();
-        if lib_info.is_none() {
-            if let Some(lib) = &dependency.library {
-                // Strip "lib" prefix and extension if present
-                let file_name = lib.file_name().and_then(|f| f.to_str()).unwrap_or(name);
-                let lib_name = if file_name.starts_with("lib") {
-                    file_name.strip_prefix("lib").unwrap()
-                } else {
-                    file_name
-                };
-                let probe = if let Some(name_without_ext) = lib_name.split('.').next() {
-                    name_without_ext
-                } else {
-                    lib_name
-                };
-                lib_info = PkgConfig::new()
-                    .print_system_libs(false)
-                    .cargo_metadata(false)
-                    .env_metadata(false)
-                    .probe(probe)
-                    .ok();
-            }
-        }
+        let lib_info = pkg_config_probe(name)
+            .or(pkg_config_probe(&format!("lib{}", name.to_lowercase())))
+            .or(dependency.library.as_ref().and_then(|lib_name| {
+                let lib_name = lib_name.to_string_lossy().to_string();
+                let lib_name_without_ext = lib_name.split('.').next().unwrap_or(&lib_name);
+                pkg_config_probe(lib_name_without_ext)
+                    .or(pkg_config_probe(&format!("lib{}", lib_name_without_ext)))
+            }));
         if let Some(info) = lib_info {
-            if let Some(header) = &dependency.header {
-                if info
-                    .include_paths
+            let include_dir = if let Some(header) = &dependency.header {
+                Some(
+                    info.include_paths
+                        .iter()
+                        .find(|path| path.join(header).exists())
+                        .ok_or(ExternalDependencyError::SuccessfulProbeHeaderNotFound(
+                            name.to_string(),
+                            header.to_slash_lossy().to_string(),
+                        ))?
+                        .clone(),
+                )
+            } else {
+                info.include_paths.first().cloned()
+            };
+            let lib_dir = if let Some(lib) = &dependency.library {
+                info.link_paths
                     .iter()
-                    .any(|path| path.join(header).exists())
-                {
-                    return Ok(Self::PkgConfig(info));
-                }
-            }
-            if dependency.library.is_some() {
-                return Ok(Self::PkgConfig(info));
-            }
+                    .find(|path| library_exists(path, lib, &config.lib_patterns))
+                    .cloned()
+                    .or(info.link_paths.first().cloned())
+            } else {
+                info.link_paths.first().cloned()
+            };
+            let bin_dir = lib_dir.as_ref().and_then(|lib_dir| {
+                lib_dir
+                    .parent()
+                    .map(|parent| parent.join("bin"))
+                    .filter(|dir| dir.is_dir())
+            });
+            let lib_name = lib_dir.as_ref().and_then(|lib_dir| {
+                let prefix = dependency
+                    .library
+                    .as_ref()
+                    .map(|lib_name| lib_name.to_string_lossy().to_string())
+                    .unwrap_or(name.to_lowercase());
+                get_lib_name(lib_dir, &prefix)
+            });
+            return Ok(ExternalDependencyInfo {
+                include_dir,
+                lib_dir,
+                bin_dir,
+                lib_name,
+                lib_info: Some(info),
+            });
         }
-        Self::fallback_detect(name, dependency, config)
+        Self::fallback_probe(name, dependency, config)
     }
 
-    fn fallback_detect(
+    fn fallback_probe(
         name: &str,
         dependency: &ExternalDependencySpec,
         config: &ExternalDependencySearchConfig,
@@ -99,57 +130,159 @@ impl ExternalDependencyInfo {
         }
         search_prefixes.extend(config.search_prefixes.iter().cloned());
 
-        if let Some(header) = &dependency.header {
-            if let Some(inc_dir) = get_incdir(name, config) {
-                if inc_dir.join(header).exists() {
-                    return Ok(Self::HeaderOnly {
-                        prefix: inc_dir.parent().unwrap_or(&inc_dir).to_path_buf(),
-                        include_dir: inc_dir,
-                    });
-                }
-            }
+        let mut include_dir = get_incdir(name, config);
 
-            // Search prefixes
-            for prefix in &search_prefixes {
-                let inc_dir = prefix.join(&config.include_subdir);
-                if inc_dir.join(header).exists() {
-                    return Ok(Self::HeaderOnly {
-                        prefix: prefix.clone(),
-                        include_dir: inc_dir,
-                    });
-                }
-            }
-        }
-        if let Some(lib) = &dependency.library {
-            // Check for specific directory overrides first
-            if let (Some(inc_dir), Some(lib_dir)) =
-                (get_incdir(name, config), get_libdir(name, config))
+        if let Some(header) = &dependency.header {
+            if !&include_dir
+                .as_ref()
+                .is_some_and(|inc_dir| inc_dir.join(header).exists())
             {
-                if library_exists(&lib_dir, lib, &config.lib_patterns) {
-                    return Ok(Self::Library {
-                        prefix: inc_dir.parent().unwrap_or(&inc_dir).to_path_buf(),
-                        include_dir: inc_dir,
-                        lib_dir,
-                        lib_file: lib.clone(),
-                    });
-                }
-            }
-            for prefix in &search_prefixes {
-                let inc_dir = prefix.join(&config.include_subdir);
-                for lib_subdir in &config.lib_subdirs {
-                    let lib_dir = prefix.join(lib_subdir);
-                    if library_exists(&lib_dir, lib, &config.lib_patterns) {
-                        return Ok(Self::Library {
-                            prefix: prefix.clone(),
-                            include_dir: inc_dir,
-                            lib_dir,
-                            lib_file: lib.clone(),
-                        });
-                    }
-                }
+                // Search prefixes
+                let inc_dir = search_prefixes
+                    .iter()
+                    .find_map(|prefix| {
+                        let inc_dir = prefix.join(&config.include_subdir);
+                        if inc_dir.join(header).exists() {
+                            Some(inc_dir)
+                        } else {
+                            None
+                        }
+                    })
+                    .ok_or(ExternalDependencyError::HeaderNotFound(
+                        name.to_string(),
+                        header.to_slash_lossy().to_string(),
+                    ))?;
+                include_dir = Some(inc_dir);
             }
         }
-        Err(ExternalDependencyError::NotFound(name.into()))
+
+        let mut lib_dir = get_libdir(name, config);
+
+        if let Some(lib) = &dependency.library {
+            if !lib_dir
+                .as_ref()
+                .is_some_and(|lib_dir| library_exists(lib_dir, lib, &config.lib_patterns))
+            {
+                let probed_lib_dir = search_prefixes
+                    .iter()
+                    .find_map(|prefix| {
+                        for lib_subdir in &config.lib_subdirs {
+                            let lib_dir_candidate = prefix.join(lib_subdir);
+                            if library_exists(&lib_dir_candidate, lib, &config.lib_patterns) {
+                                return Some(lib_dir_candidate);
+                            }
+                        }
+                        None
+                    })
+                    .ok_or(ExternalDependencyError::LibraryNotFound(
+                        name.to_string(),
+                        lib.to_slash_lossy().to_string(),
+                    ))?;
+                lib_dir = Some(probed_lib_dir);
+            }
+        }
+
+        if let (None, None) = (&include_dir, &lib_dir) {
+            return Err(ExternalDependencyError::NotFound(name.into()));
+        }
+        let bin_dir = lib_dir.as_ref().and_then(|lib_dir| {
+            lib_dir
+                .parent()
+                .map(|parent| parent.join("bin"))
+                .filter(|dir| dir.is_dir())
+        });
+        let lib_name = lib_dir.as_ref().and_then(|lib_dir| {
+            let prefix = dependency
+                .library
+                .as_ref()
+                .map(|lib_name| lib_name.to_string_lossy().to_string())
+                .unwrap_or(name.to_lowercase());
+            get_lib_name(lib_dir, &prefix)
+        });
+        Ok(ExternalDependencyInfo {
+            include_dir,
+            lib_dir,
+            bin_dir,
+            lib_name,
+            lib_info: None,
+        })
+    }
+
+    pub(crate) fn define_flags(&self) -> Vec<String> {
+        if let Some(info) = &self.lib_info {
+            info.defines
+                .iter()
+                .map(|(k, v)| match v {
+                    Some(val) => {
+                        format!("-D{}={}", k, val)
+                    }
+                    None => format!("-D{}", k),
+                })
+                .collect_vec()
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub(crate) fn lib_link_args(&self, compiler: &cc::Tool) -> Vec<String> {
+        if let Some(info) = &self.lib_info {
+            info.link_paths
+                .iter()
+                .map(|p| lib_dir_compile_arg(p, compiler))
+                .chain(
+                    info.libs
+                        .iter()
+                        .map(|lib| format_lib_link_arg(lib, compiler)),
+                )
+                .chain(info.ld_args.iter().map(|ld_arg_group| {
+                    ld_arg_group
+                        .iter()
+                        .map(|arg| format_linker_arg(arg, compiler))
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                }))
+                .collect_vec()
+        } else {
+            self.lib_dir
+                .iter()
+                .map(|lib_dir| lib_dir_compile_arg(lib_dir, compiler))
+                .chain(
+                    self.lib_name
+                        .as_ref()
+                        .and_then(|lib_name| {
+                            if compiler.is_like_msvc() {
+                                self.lib_dir.as_ref().map(|lib_dir| {
+                                    lib_dir.join(lib_name).to_slash_lossy().to_string()
+                                })
+                            } else {
+                                Some(format!("-l{}", lib_name))
+                            }
+                        })
+                        .iter()
+                        .cloned(),
+                )
+                .collect_vec()
+        }
+    }
+}
+
+impl HasVariables for HashMap<String, ExternalDependencyInfo> {
+    fn get_variable(&self, input: &str) -> Option<String> {
+        input.split_once('_').and_then(|(dep_key, dep_dir_type)| {
+            self.get(dep_key)
+                .and_then(|dep| match dep_dir_type {
+                    "DIR" => dep
+                        .include_dir
+                        .as_ref()
+                        .and_then(|dir| dir.parent().map(|parent| parent.to_path_buf())),
+                    "INCDIR" => dep.include_dir.clone(),
+                    "LIBDIR" => dep.lib_dir.clone(),
+                    "BINDIR" => dep.bin_dir.clone(),
+                    _ => None,
+                })
+                .as_deref()
+                .map(format_path)
+        })
     }
 }
 
@@ -167,6 +300,7 @@ fn get_incdir(name: &str, config: &ExternalDependencySearchConfig) -> Option<Pat
     } else {
         config.prefixes.get(&var_name).cloned()
     }
+    .filter(|dir| dir.is_dir())
 }
 
 fn get_libdir(name: &str, config: &ExternalDependencySearchConfig) -> Option<PathBuf> {
@@ -176,6 +310,7 @@ fn get_libdir(name: &str, config: &ExternalDependencySearchConfig) -> Option<Pat
     } else {
         config.prefixes.get(&var_name).cloned()
     }
+    .filter(|dir| dir.is_dir())
 }
 
 fn not_found_error_msg(name: &String) -> String {
@@ -195,6 +330,67 @@ Consider one of the following:
     )
 }
 
+fn lib_dir_compile_arg(dir: &Path, compiler: &cc::Tool) -> String {
+    if compiler.is_like_msvc() {
+        format!("/LIBPATH:{}", dir.to_slash_lossy())
+    } else {
+        format!("-L{}", dir.to_slash_lossy())
+    }
+}
+
+fn format_lib_link_arg(lib: &str, compiler: &cc::Tool) -> String {
+    if compiler.is_like_msvc() {
+        format!("{}.lib", lib)
+    } else {
+        format!("-l{}", lib)
+    }
+}
+
+fn format_linker_arg(arg: &str, compiler: &cc::Tool) -> String {
+    if compiler.is_like_msvc() {
+        format!("-Wl,{}", arg)
+    } else {
+        format!("/link {}", arg)
+    }
+}
+
+pub(crate) fn to_lib_name(file: &Path) -> String {
+    let file_name = file.file_name().unwrap();
+    if cfg!(target_family = "unix") {
+        file_name
+            .to_string_lossy()
+            .trim_start_matches("lib")
+            .trim_end_matches(".a")
+            .to_string()
+    } else {
+        file_name.to_string_lossy().to_string()
+    }
+}
+
+fn get_lib_name(lib_dir: &Path, prefix: &str) -> Option<String> {
+    std::fs::read_dir(lib_dir)
+        .ok()
+        .and_then(|entries| {
+            entries
+                .filter_map(Result::ok)
+                .map(|entry| entry.path().to_path_buf())
+                .filter(|file| file.extension().is_some_and(|ext| ext == c_lib_extension()))
+                .filter(|file| {
+                    file.file_name()
+                        .is_some_and(|name| is_lib_name(&name.to_string_lossy(), prefix))
+                })
+                .collect_vec()
+                .first()
+                .cloned()
+        })
+        .map(|file| to_lib_name(&file))
+}
+fn is_lib_name(file_name: &str, prefix: &str) -> bool {
+    #[cfg(target_family = "unix")]
+    let file_name = file_name.trim_start_matches("lib");
+    file_name == format!("{}.{}", prefix, c_lib_extension())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -204,60 +400,60 @@ mod tests {
     async fn test_detect_zlib_pkg_config_header() {
         // requires zlib to be in the nativeCheckInputs or dev environment
         let config = ExternalDependencySearchConfig::default();
-        let result = ExternalDependencyInfo::detect(
+        ExternalDependencyInfo::probe(
             "zlib",
             &ExternalDependencySpec {
                 header: Some("zlib.h".into()),
                 library: None,
             },
             &config,
-        );
-        assert!(matches!(result, Ok(ExternalDependencyInfo::PkgConfig(_))));
+        )
+        .unwrap();
     }
 
     #[tokio::test]
     async fn test_detect_zlib_pkg_config_library_libz() {
         // requires zlib to be in the nativeCheckInputs or dev environment
         let config = ExternalDependencySearchConfig::default();
-        let result = ExternalDependencyInfo::detect(
+        ExternalDependencyInfo::probe(
             "zlib",
             &ExternalDependencySpec {
                 library: Some("libz".into()),
                 header: None,
             },
             &config,
-        );
-        assert!(matches!(result, Ok(ExternalDependencyInfo::PkgConfig(_))));
+        )
+        .unwrap();
     }
 
     #[tokio::test]
     async fn test_detect_zlib_pkg_config_library_z() {
         // requires zlib to be in the nativeCheckInputs or dev environment
         let config = ExternalDependencySearchConfig::default();
-        let result = ExternalDependencyInfo::detect(
+        ExternalDependencyInfo::probe(
             "zlib",
             &ExternalDependencySpec {
                 library: Some("z".into()),
                 header: None,
             },
             &config,
-        );
-        assert!(matches!(result, Ok(ExternalDependencyInfo::PkgConfig(_))));
+        )
+        .unwrap();
     }
 
     #[tokio::test]
     async fn test_detect_zlib_pkg_config_library_zlib() {
         // requires zlib to be in the nativeCheckInputs or dev environment
         let config = ExternalDependencySearchConfig::default();
-        let result = ExternalDependencyInfo::detect(
+        ExternalDependencyInfo::probe(
             "zlib",
             &ExternalDependencySpec {
                 library: Some("zlib".into()),
                 header: None,
             },
             &config,
-        );
-        assert!(matches!(result, Ok(ExternalDependencyInfo::PkgConfig(_))));
+        )
+        .unwrap();
     }
 
     #[tokio::test]
@@ -275,22 +471,15 @@ mod tests {
             .prefixes
             .insert("FOO_DIR".into(), prefix_dir.path().to_path_buf());
 
-        let result = ExternalDependencyInfo::fallback_detect(
+        ExternalDependencyInfo::fallback_probe(
             "foo",
             &ExternalDependencySpec {
                 header: Some("foo.h".into()),
                 library: None,
             },
             &config,
-        );
-
-        assert!(matches!(
-            result,
-            Ok(ExternalDependencyInfo::HeaderOnly {
-                include_dir: _,
-                prefix: _,
-            })
-        ));
+        )
+        .unwrap();
     }
 
     #[tokio::test]
@@ -307,22 +496,15 @@ mod tests {
             .prefixes
             .insert("FOO_INCDIR".into(), include_dir.path().to_path_buf());
 
-        let result = ExternalDependencyInfo::fallback_detect(
+        ExternalDependencyInfo::fallback_probe(
             "foo",
             &ExternalDependencySpec {
                 header: Some("foo.h".into()),
                 library: None,
             },
             &config,
-        );
-
-        assert!(matches!(
-            result,
-            Ok(ExternalDependencyInfo::HeaderOnly {
-                include_dir: _,
-                prefix: _,
-            })
-        ));
+        )
+        .unwrap();
     }
 
     #[tokio::test]
@@ -348,24 +530,15 @@ mod tests {
             .prefixes
             .insert("FOO_DIR".to_string(), prefix_dir.path().to_path_buf());
 
-        let result = ExternalDependencyInfo::fallback_detect(
+        ExternalDependencyInfo::fallback_probe(
             "foo",
             &ExternalDependencySpec {
                 library: Some("foo".into()),
                 header: None,
             },
             &config,
-        );
-
-        assert!(matches!(
-            result,
-            Ok(ExternalDependencyInfo::Library {
-                include_dir: _,
-                lib_dir: _,
-                prefix: _,
-                lib_file: _,
-            })
-        ));
+        )
+        .unwrap();
     }
 
     #[tokio::test]
@@ -395,24 +568,15 @@ mod tests {
             .prefixes
             .insert("FOO_LIBDIR".into(), lib_dir.path().to_path_buf());
 
-        let result = ExternalDependencyInfo::fallback_detect(
+        ExternalDependencyInfo::fallback_probe(
             "foo",
             &ExternalDependencySpec {
                 library: Some("foo".into()),
                 header: None,
             },
             &config,
-        );
-
-        assert!(matches!(
-            result,
-            Ok(ExternalDependencyInfo::Library {
-                include_dir: _,
-                lib_dir: _,
-                prefix: _,
-                lib_file: _,
-            })
-        ));
+        )
+        .unwrap();
     }
 
     #[tokio::test]
@@ -436,31 +600,22 @@ mod tests {
         let mut config = ExternalDependencySearchConfig::default();
         config.search_prefixes.push(prefix_dir.path().to_path_buf());
 
-        let result = ExternalDependencyInfo::fallback_detect(
+        ExternalDependencyInfo::fallback_probe(
             "foo",
             &ExternalDependencySpec {
                 library: Some("foo".into()),
                 header: None,
             },
             &config,
-        );
-
-        assert!(matches!(
-            result,
-            Ok(ExternalDependencyInfo::Library {
-                include_dir: _,
-                lib_dir: _,
-                prefix: _,
-                lib_file: _,
-            })
-        ));
+        )
+        .unwrap();
     }
 
     #[tokio::test]
     async fn test_fallback_detect_not_found() {
         let config = ExternalDependencySearchConfig::default();
 
-        let result = ExternalDependencyInfo::fallback_detect(
+        let result = ExternalDependencyInfo::fallback_probe(
             "foo",
             &ExternalDependencySpec {
                 header: Some("foo.h".into()),
@@ -469,6 +624,45 @@ mod tests {
             &config,
         );
 
-        assert!(matches!(result, Err(ExternalDependencyError::NotFound(_))));
+        assert!(matches!(
+            result,
+            Err(ExternalDependencyError::HeaderNotFound { .. })
+        ));
+    }
+
+    #[cfg(not(target_env = "msvc"))]
+    #[tokio::test]
+    async fn test_to_lib_name() {
+        assert_eq!(to_lib_name(&PathBuf::from("lua.a")), "lua".to_string());
+        assert_eq!(
+            to_lib_name(&PathBuf::from("lua-5.1.a")),
+            "lua-5.1".to_string()
+        );
+        assert_eq!(
+            to_lib_name(&PathBuf::from("lua5.1.a")),
+            "lua5.1".to_string()
+        );
+        assert_eq!(to_lib_name(&PathBuf::from("lua51.a")), "lua51".to_string());
+        assert_eq!(
+            to_lib_name(&PathBuf::from("luajit-5.2.a")),
+            "luajit-5.2".to_string()
+        );
+        assert_eq!(
+            to_lib_name(&PathBuf::from("lua-5.2.a")),
+            "lua-5.2".to_string()
+        );
+        assert_eq!(to_lib_name(&PathBuf::from("liblua.a")), "lua".to_string());
+        assert_eq!(
+            to_lib_name(&PathBuf::from("liblua-5.1.a")),
+            "lua-5.1".to_string()
+        );
+        assert_eq!(
+            to_lib_name(&PathBuf::from("liblua53.a")),
+            "lua53".to_string()
+        );
+        assert_eq!(
+            to_lib_name(&PathBuf::from("liblua-54.a")),
+            "lua-54".to_string()
+        );
     }
 }
