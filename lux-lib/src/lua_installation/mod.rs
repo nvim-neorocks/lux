@@ -274,6 +274,10 @@ impl HasVariables for LuaInstallation {
         let result = match input {
             "LUA_INCDIR" => Some(format_path(&self.include_dir)),
             "LUA_LIBDIR" => Some(format_path(&self.lib_dir)),
+            "LUA_BINDIR" => self
+                .bin
+                .as_ref()
+                .and_then(|bin| bin.parent().map(format_path)),
             "LUA" => self
                 .bin
                 .clone()
