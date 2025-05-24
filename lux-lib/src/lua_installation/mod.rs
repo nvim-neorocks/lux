@@ -4,9 +4,10 @@ use path_slash::{PathBufExt, PathExt};
 use pkg_config::Library;
 use std::io;
 use std::path::Path;
-use std::{path::PathBuf, process::Command};
+use std::path::PathBuf;
 use target_lexicon::Triple;
 use thiserror::Error;
+use tokio::process::Command;
 
 use crate::build::utils::{format_path, lua_lib_extension};
 use crate::operations::{LuaBinary, LuaBinaryError};
@@ -304,11 +305,32 @@ pub enum DetectLuaVersionError {
     LuaVersion(#[from] crate::config::LuaVersionError),
 }
 
-pub fn detect_installed_lua_version(
+pub async fn detect_installed_lua_version(
     lua: LuaBinary,
 ) -> Result<PackageVersion, DetectLuaVersionError> {
     let lua_cmd: PathBuf = lua.try_into()?;
-    let output = match Command::new(&lua_cmd).arg("-v").output() {
+    let output = match Command::new(&lua_cmd).arg("-v").output().await {
+        Ok(output) => Ok(output),
+        Err(err) => Err(DetectLuaVersionError::RunLuaCommand(
+            lua_cmd.to_string_lossy().to_string(),
+            err,
+        )),
+    }?;
+    let output_vec = if output.stderr.is_empty() {
+        output.stdout
+    } else {
+        // Yes, Lua 5.1 prints to stderr (-‸ლ)
+        output.stderr
+    };
+    let lua_output = String::from_utf8_lossy(&output_vec).to_string();
+    parse_lua_version_from_output(&lua_output)
+}
+
+pub fn detect_installed_lua_version_sync(
+    lua: LuaBinary,
+) -> Result<PackageVersion, DetectLuaVersionError> {
+    let lua_cmd: PathBuf = lua.try_into()?;
+    let output = match std::process::Command::new(&lua_cmd).arg("-v").output() {
         Ok(output) => Ok(output),
         Err(err) => Err(DetectLuaVersionError::RunLuaCommand(
             lua_cmd.to_string_lossy().to_string(),
@@ -441,8 +463,9 @@ mod test {
         let lua_installation = LuaInstallation::new(lua_version, &config);
         // FIXME: This fails when run in the nix checkPhase
         assert!(lua_installation.bin.is_some());
-        let pkg_version =
-            detect_installed_lua_version(lua_installation.bin.unwrap().into()).unwrap();
+        let pkg_version = detect_installed_lua_version(lua_installation.bin.unwrap().into())
+            .await
+            .unwrap();
         assert_eq!(&LuaVersion::from_version(pkg_version).unwrap(), lua_version);
     }
 

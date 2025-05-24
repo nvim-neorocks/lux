@@ -3,9 +3,10 @@ use std::{
     collections::HashMap,
     env, io,
     path::Path,
-    process::{Command, ExitStatus},
+    process::{ExitStatus, Stdio},
 };
 use thiserror::Error;
+use tokio::process::Command;
 
 use crate::{
     build::utils,
@@ -25,7 +26,7 @@ const CMAKE_BUILD_FILE: &str = "build.lux";
 
 #[derive(Error, Debug)]
 pub enum CMakeError {
-    #[error("{name} step failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
+    #[error("{name} step failed.\n\n{status}\n\nstdout:\n{stdout}\n\nstderr:\n{stderr}")]
     CommandFailure {
         name: String,
         status: ExitStatus,
@@ -101,7 +102,8 @@ impl Build for CMakeBuildSpec {
                 .arg(format!("-B{}", CMAKE_BUILD_FILE))
                 .args(args),
             config,
-        )?;
+        )
+        .await?;
 
         if self.build_pass {
             spawn_cmake_cmd(
@@ -112,7 +114,8 @@ impl Build for CMakeBuildSpec {
                     .arg("--config")
                     .arg("Release"),
                 config,
-            )?
+            )
+            .await?
         }
 
         if self.install_pass && !no_install {
@@ -126,16 +129,17 @@ impl Build for CMakeBuildSpec {
                     .arg("--config")
                     .arg("Release"),
                 config,
-            )?;
+            )
+            .await?;
         }
 
         Ok(BuildInfo::default())
     }
 }
 
-fn spawn_cmake_cmd(cmd: &mut Command, config: &Config) -> Result<(), CMakeError> {
-    match cmd.spawn() {
-        Ok(child) => match child.wait_with_output() {
+async fn spawn_cmake_cmd(cmd: &mut Command, config: &Config) -> Result<(), CMakeError> {
+    match cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {
+        Ok(child) => match child.wait_with_output().await {
             Ok(output) if output.status.success() => {}
             Ok(output) => {
                 return Err(CMakeError::CommandFailure {

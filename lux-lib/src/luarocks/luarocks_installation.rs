@@ -6,11 +6,12 @@ use std::{
     collections::HashMap,
     io,
     path::{Path, PathBuf},
-    process::{Command, ExitStatus},
+    process::ExitStatus,
     sync::Arc,
 };
 use tempdir::TempDir;
 use thiserror::Error;
+use tokio::process::Command;
 
 use crate::{
     build::{Build, BuildError},
@@ -292,7 +293,7 @@ impl LuaRocksInstallation {
         Ok(())
     }
 
-    pub fn make(
+    pub async fn make(
         self,
         rockspec_path: &Path,
         build_dir: &Path,
@@ -310,10 +311,10 @@ impl LuaRocksInstallation {
             &dest_dir_str,
             &rockspec_path_str,
         ];
-        self.exec(args, build_dir, lua)
+        self.exec(args, build_dir, lua).await
     }
 
-    fn exec(
+    async fn exec(
         self,
         args: Vec<&str>,
         cwd: &Path,
@@ -362,7 +363,8 @@ variables = {{
                 "LUAROCKS_CONFIG",
                 luarocks_config.to_slash_lossy().to_string(),
             )
-            .output()?;
+            .output()
+            .await?;
         if output.status.success() {
             Ok(())
         } else {

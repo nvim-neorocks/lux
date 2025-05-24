@@ -33,6 +33,7 @@ async fn install_http_package() {
 async fn test_install(install_spec: PackageInstallSpec) {
     let dir = TempDir::new().unwrap();
     let lua_version = detect_installed_lua_version(LuaBinary::default())
+        .await
         .ok()
         .and_then(|version| LuaVersion::from_version(version).ok())
         .or(Some(LuaVersion::Lua51));

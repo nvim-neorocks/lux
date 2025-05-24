@@ -1,4 +1,4 @@
-use std::process::Command;
+use tokio::process::Command;
 
 use clap::Args;
 use eyre::{eyre, Result};
@@ -34,7 +34,7 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
     let lua_cmd = run_lua.lua.map(LuaBinary::Custom).unwrap_or(LuaBinary::Lua);
 
     if run_lua.help {
-        return print_lua_help(&lua_cmd);
+        return print_lua_help(&lua_cmd).await;
     }
 
     let project = Project::current()?;
@@ -70,11 +70,12 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
     Ok(())
 }
 
-fn print_lua_help(lua_cmd: &LuaBinary) -> Result<()> {
+async fn print_lua_help(lua_cmd: &LuaBinary) -> Result<()> {
     let output = match Command::new(lua_cmd.to_string())
         // HACK: This fails with exit 1, because lua doesn't actually have a help flag (╯°□°)╯︵ ┻━┻
         .arg("-h")
         .output()
+        .await
     {
         Ok(output) => Ok(output),
         Err(err) => Err(eyre!("Failed to run {}: {}", lua_cmd, err)),

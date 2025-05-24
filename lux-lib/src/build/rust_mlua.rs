@@ -13,9 +13,10 @@ use crate::{
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus};
+use std::process::ExitStatus;
 use std::{fs, io};
 use thiserror::Error;
+use tokio::process::Command;
 
 #[derive(Error, Debug)]
 pub enum RustError {
@@ -70,6 +71,7 @@ impl Build for RustMluaBuildSpec {
             .current_dir(build_dir)
             .args(build_args)
             .output()
+            .await
         {
             Ok(output) if output.status.success() => {}
             Ok(output) => {
