@@ -73,6 +73,7 @@
                   libxcrypt
                   cmakeMinimal
                   zlib
+                  gnum4
                 ])
                 ++ self.checks.${system}.git-hooks-check.enabledPackages
                 ++ pkgs.lux-cli.buildInputs

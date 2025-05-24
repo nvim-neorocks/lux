@@ -183,7 +183,7 @@ async fn run_build<R: Rockspec + HasIntegrity>(
         .current_platform()
         .iter()
         .map(|(name, dep)| {
-            ExternalDependencyInfo::probe(&name, dep, config.external_deps())
+            ExternalDependencyInfo::probe(name, dep, config.external_deps())
                 .map(|info| (name.clone(), info))
         })
         .try_collect::<_, HashMap<_, _>, _>()?;
