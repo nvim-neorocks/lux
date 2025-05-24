@@ -1,5 +1,5 @@
 use crate::build::utils;
-use crate::build::utils::lua_dylib_extension;
+use crate::build::utils::c_dylib_extension;
 use crate::lockfile::LocalPackage;
 use crate::luarocks;
 use crate::luarocks::rock_manifest::DirOrFileEntry;
@@ -139,7 +139,7 @@ fn is_binary_rock(layout: &RockLayout) -> bool {
             file.is_file()
                 && file
                     .extension()
-                    .is_some_and(|ext| ext.to_string_lossy() == lua_dylib_extension())
+                    .is_some_and(|ext| ext.to_string_lossy() == c_dylib_extension())
         })
     })
 }

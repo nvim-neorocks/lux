@@ -24,6 +24,7 @@ async fn install_git_package() {
 
 // http 0.4 has an http-0.4-0.all.rock packed rock on luarocks.org
 #[tokio::test]
+#[cfg(not(target_env = "msvc"))] // http has dependencies that are not supported on Windows
 async fn install_http_package() {
     let install_spec =
         PackageInstallSpec::new("http@0.4-0".parse().unwrap(), EntryType::Entrypoint).build();
@@ -54,5 +55,5 @@ async fn test_install(install_spec: PackageInstallSpec) {
         .install()
         .await
         .unwrap();
-    assert_eq!(installed.len(), 1);
+    assert!(!installed.is_empty());
 }

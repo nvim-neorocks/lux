@@ -1,7 +1,6 @@
 use is_executable::IsExecutable;
 use itertools::Itertools;
-use path_slash::{PathBufExt, PathExt};
-use pkg_config::Library;
+use path_slash::PathBufExt;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
@@ -9,7 +8,10 @@ use target_lexicon::Triple;
 use thiserror::Error;
 use tokio::process::Command;
 
-use crate::build::utils::{format_path, lua_lib_extension};
+use crate::build::external_dependency::to_lib_name;
+use crate::build::external_dependency::ExternalDependencyInfo;
+use crate::build::utils::{c_lib_extension, format_path};
+use crate::lua_rockspec::ExternalDependencySpec;
 use crate::operations::{LuaBinary, LuaBinaryError};
 use crate::project::Project;
 use crate::{
@@ -19,16 +21,10 @@ use crate::{
 };
 
 pub struct LuaInstallation {
-    pub include_dir: PathBuf,
-    pub lib_dir: PathBuf,
     pub version: LuaVersion,
+    dependency_info: ExternalDependencyInfo,
     /// Binary to the Lua executable, if present
     bin: Option<PathBuf>,
-    /// pkg-config library information if available
-    lib_info: Option<Library>,
-    /// Name of the static Lua library, (without the 'lib' prefix or file extension on unix targets),
-    /// for example, "lua" or "lua.dll"
-    lua_lib_name: Option<String>,
 }
 
 impl LuaInstallation {
@@ -40,55 +36,52 @@ impl LuaInstallation {
             LuaVersion::Lua54 => "lua5.4",
             LuaVersion::LuaJIT | LuaVersion::LuaJIT52 => "luajit",
         };
-        let lib_info = pkg_config::Config::new()
-            .print_system_libs(false)
-            .cargo_metadata(false)
-            .env_metadata(false)
-            .probe(pkg_name)
-            .or(pkg_config::Config::new()
-                .print_system_libs(false)
-                .cargo_metadata(false)
-                .env_metadata(false)
-                .probe(&format!("lib{}", pkg_name)))
-            .ok();
 
-        if let Some(info) = lib_info {
-            if !&info.include_paths.is_empty() && !&info.link_paths.is_empty() {
-                let lib_dir = PathBuf::from(&info.link_paths[0]);
-                let bin = lib_dir
+        let mut dependency_info = ExternalDependencyInfo::probe(
+            pkg_name,
+            &ExternalDependencySpec::default(),
+            config.external_deps(),
+        );
+
+        if let Ok(info) = &mut dependency_info {
+            let bin = info.lib_dir.as_ref().and_then(|lib_dir| {
+                lib_dir
                     .parent()
                     .map(|parent| parent.join("bin"))
                     .filter(|dir| dir.is_dir())
-                    .and_then(|bin_path| find_lua_executable(&bin_path));
-                let lua_lib_name = get_lua_lib_name(&lib_dir, version);
-                return Self {
-                    include_dir: PathBuf::from(&info.include_paths[0]),
-                    lib_dir,
-                    version: version.clone(),
-                    lib_info: Some(info),
-                    bin,
-                    lua_lib_name,
-                };
-            }
+                    .and_then(|bin_path| find_lua_executable(&bin_path))
+            });
+            let lua_lib_name = info
+                .lib_dir
+                .as_ref()
+                .and_then(|lib_dir| get_lua_lib_name(lib_dir, version));
+            info.lib_name = lua_lib_name;
+            return Self {
+                version: version.clone(),
+                dependency_info: dependency_info.unwrap(),
+                bin,
+            };
         }
 
         let output = Self::root_dir(version, config);
         if output.join("include").is_dir() {
-            let bin_path = output.join("bin");
-            let bin = if bin_path.is_dir() {
-                find_lua_executable(&bin_path)
-            } else {
-                None
-            };
+            let bin_dir = Some(output.join("bin")).filter(|bin_path| bin_path.is_dir());
+            let bin = bin_dir
+                .as_ref()
+                .and_then(|bin_path| find_lua_executable(bin_path));
             let lib_dir = output.join("lib");
             let lua_lib_name = get_lua_lib_name(&lib_dir, version);
+            let include_dir = Some(output.join("include"));
             LuaInstallation {
-                include_dir: output.join("include"),
-                lib_dir,
                 version: version.clone(),
-                lib_info: None,
+                dependency_info: ExternalDependencyInfo {
+                    include_dir,
+                    lib_dir: Some(lib_dir),
+                    bin_dir,
+                    lib_info: None,
+                    lib_name: lua_lib_name,
+                },
                 bin,
-                lua_lib_name,
             }
         } else {
             Self::install(version, config)
@@ -139,21 +132,26 @@ impl LuaInstallation {
             }
         };
 
-        let bin_path = output.join("bin");
-        let bin = if bin_path.is_dir() {
-            find_lua_executable(&bin_path)
-        } else {
-            None
-        };
+        let bin_dir = Some(output.join("bin")).filter(|bin_path| bin_path.is_dir());
+        let bin = bin_dir
+            .as_ref()
+            .and_then(|bin_path| find_lua_executable(bin_path));
         let lua_lib_name = get_lua_lib_name(&lib_dir, version);
         LuaInstallation {
-            include_dir,
-            lib_dir,
             version: version.clone(),
-            lib_info: None,
+            dependency_info: ExternalDependencyInfo {
+                include_dir: Some(include_dir),
+                lib_dir: Some(lib_dir),
+                bin_dir,
+                lib_info: None,
+                lib_name: lua_lib_name,
+            },
             bin,
-            lua_lib_name,
         }
+    }
+
+    pub fn includes(&self) -> Vec<&PathBuf> {
+        self.dependency_info.include_dir.iter().collect_vec()
     }
 
     fn root_dir(version: &LuaVersion, config: &Config) -> PathBuf {
@@ -171,68 +169,24 @@ impl LuaInstallation {
 
     #[cfg(not(target_env = "msvc"))]
     fn lua_lib(&self) -> Option<String> {
-        self.lua_lib_name
+        self.dependency_info
+            .lib_name
             .as_ref()
-            .map(|name| format!("{}.{}", name, lua_lib_extension()))
+            .map(|name| format!("{}.{}", name, c_lib_extension()))
     }
 
     #[cfg(target_env = "msvc")]
     fn lua_lib(&self) -> Option<String> {
-        self.lua_lib_name.clone()
+        self.dependency_info.lib_name.clone()
     }
 
     pub(crate) fn define_flags(&self) -> Vec<String> {
-        if let Some(info) = &self.lib_info {
-            info.defines
-                .iter()
-                .map(|(k, v)| match v {
-                    Some(val) => {
-                        format!("-D{}={}", k, val)
-                    }
-                    None => format!("-D{}", k),
-                })
-                .collect_vec()
-        } else {
-            Vec::new()
-        }
+        self.dependency_info.define_flags()
     }
 
     /// NOTE: In luarocks, these are behind a link_lua_explicity config option
     pub(crate) fn lib_link_args(&self, compiler: &cc::Tool) -> Vec<String> {
-        if let Some(info) = &self.lib_info {
-            info.link_paths
-                .iter()
-                .map(|p| lib_dir_compile_arg(p, compiler))
-                .chain(
-                    info.libs
-                        .iter()
-                        .map(|lib| format_lib_link_arg(lib, compiler)),
-                )
-                .chain(info.ld_args.iter().map(|ld_arg_group| {
-                    ld_arg_group
-                        .iter()
-                        .map(|arg| format_linker_arg(arg, compiler))
-                        .collect::<Vec<_>>()
-                        .join(" ")
-                }))
-                .collect_vec()
-        } else {
-            std::iter::once(lib_dir_compile_arg(&self.lib_dir, compiler))
-                .chain(
-                    self.lua_lib_name
-                        .as_ref()
-                        .map(|lib_name| {
-                            if compiler.is_like_msvc() {
-                                self.lib_dir.join(lib_name).to_slash_lossy().to_string()
-                            } else {
-                                format!("-l{}", lib_name)
-                            }
-                        })
-                        .iter()
-                        .cloned(),
-                )
-                .collect_vec()
-        }
+        self.dependency_info.lib_link_args(compiler)
     }
 
     /// Get the Lua binary (if present), prioritising
@@ -246,35 +200,19 @@ impl LuaInstallation {
     }
 }
 
-fn lib_dir_compile_arg(dir: &Path, compiler: &cc::Tool) -> String {
-    if compiler.is_like_msvc() {
-        format!("/LIBPATH:{}", dir.to_slash_lossy())
-    } else {
-        format!("-L{}", dir.to_slash_lossy())
-    }
-}
-
-fn format_lib_link_arg(lib: &str, compiler: &cc::Tool) -> String {
-    if compiler.is_like_msvc() {
-        format!("{}.lib", lib)
-    } else {
-        format!("-l{}", lib)
-    }
-}
-
-fn format_linker_arg(arg: &str, compiler: &cc::Tool) -> String {
-    if compiler.is_like_msvc() {
-        format!("-Wl,{}", arg)
-    } else {
-        format!("/link {}", arg)
-    }
-}
-
 impl HasVariables for LuaInstallation {
     fn get_variable(&self, input: &str) -> Option<String> {
         let result = match input {
-            "LUA_INCDIR" => Some(format_path(&self.include_dir)),
-            "LUA_LIBDIR" => Some(format_path(&self.lib_dir)),
+            "LUA_INCDIR" => self
+                .dependency_info
+                .include_dir
+                .as_ref()
+                .map(|dir| format_path(dir)),
+            "LUA_LIBDIR" => self
+                .dependency_info
+                .lib_dir
+                .as_ref()
+                .map(|dir| format_path(dir)),
             "LUA_BINDIR" => self
                 .bin
                 .as_ref()
@@ -393,22 +331,9 @@ fn is_lua_lib_name(name: &str, lua_version: &LuaVersion) -> bool {
     let name = name.trim_start_matches("lib");
     prefixes
         .iter()
-        .any(|prefix| name == format!("{}.{}", *prefix, lua_lib_extension()))
+        .any(|prefix| name == format!("{}.{}", *prefix, c_lib_extension()))
         || prefixes.iter().any(|prefix| name.starts_with(*prefix))
             && (name.contains(&version_str) || name.contains(&version_suffix))
-}
-
-fn to_lua_lib_name(file: &Path) -> String {
-    let file_name = file.file_name().unwrap();
-    if cfg!(target_family = "unix") {
-        file_name
-            .to_string_lossy()
-            .trim_start_matches("lib")
-            .trim_end_matches(".a")
-            .to_string()
-    } else {
-        file_name.to_string_lossy().to_string()
-    }
 }
 
 fn get_lua_lib_name(lib_dir: &Path, lua_version: &LuaVersion) -> Option<String> {
@@ -418,10 +343,7 @@ fn get_lua_lib_name(lib_dir: &Path, lua_version: &LuaVersion) -> Option<String> 
             entries
                 .filter_map(Result::ok)
                 .map(|entry| entry.path().to_path_buf())
-                .filter(|file| {
-                    file.extension()
-                        .is_some_and(|ext| ext == lua_lib_extension())
-                })
+                .filter(|file| file.extension().is_some_and(|ext| ext == c_lib_extension()))
                 .filter(|file| {
                     file.file_name()
                         .is_some_and(|name| is_lua_lib_name(&name.to_string_lossy(), lua_version))
@@ -430,7 +352,7 @@ fn get_lua_lib_name(lib_dir: &Path, lua_version: &LuaVersion) -> Option<String> 
                 .first()
                 .cloned()
         })
-        .map(|file| to_lua_lib_name(&file))
+        .map(|file| to_lib_name(&file))
 }
 
 #[cfg(test)]
@@ -467,48 +389,6 @@ mod test {
             .await
             .unwrap();
         assert_eq!(&LuaVersion::from_version(pkg_version).unwrap(), lua_version);
-    }
-
-    #[cfg(not(target_env = "msvc"))]
-    #[tokio::test]
-    async fn test_to_lua_lib_name() {
-        assert_eq!(to_lua_lib_name(&PathBuf::from("lua.a")), "lua".to_string());
-        assert_eq!(
-            to_lua_lib_name(&PathBuf::from("lua-5.1.a")),
-            "lua-5.1".to_string()
-        );
-        assert_eq!(
-            to_lua_lib_name(&PathBuf::from("lua5.1.a")),
-            "lua5.1".to_string()
-        );
-        assert_eq!(
-            to_lua_lib_name(&PathBuf::from("lua51.a")),
-            "lua51".to_string()
-        );
-        assert_eq!(
-            to_lua_lib_name(&PathBuf::from("luajit-5.2.a")),
-            "luajit-5.2".to_string()
-        );
-        assert_eq!(
-            to_lua_lib_name(&PathBuf::from("lua-5.2.a")),
-            "lua-5.2".to_string()
-        );
-        assert_eq!(
-            to_lua_lib_name(&PathBuf::from("liblua.a")),
-            "lua".to_string()
-        );
-        assert_eq!(
-            to_lua_lib_name(&PathBuf::from("liblua-5.1.a")),
-            "lua-5.1".to_string()
-        );
-        assert_eq!(
-            to_lua_lib_name(&PathBuf::from("liblua53.a")),
-            "lua53".to_string()
-        );
-        assert_eq!(
-            to_lua_lib_name(&PathBuf::from("liblua-54.a")),
-            "lua-54".to_string()
-        );
     }
 
     #[cfg(not(target_env = "msvc"))]

@@ -14,7 +14,10 @@ use thiserror::Error;
 use tokio::process::Command;
 
 use crate::{
-    build::{Build, BuildError},
+    build::{
+        variables::{self, VariableSubstitutionError},
+        Build, BuildError,
+    },
     config::{Config, LuaVersion, LuaVersionUnset},
     lockfile::{LocalPackage, LocalPackageId},
     lua_installation::LuaInstallation,
@@ -94,6 +97,8 @@ pub enum ExecLuaRocksError {
     LuaVersionUnset(#[from] LuaVersionUnset),
     #[error("could not write luarocks config: {0}")]
     WriteLuarocksConfigError(io::Error),
+    #[error("could not write luarocks config: {0}")]
+    VariableSubstitutionInConfig(#[from] VariableSubstitutionError),
     #[error("failed to run luarocks: {0}")]
     Io(#[from] io::Error),
     #[error("error setting up luarocks paths: {0}")]
@@ -333,18 +338,18 @@ impl LuaRocksInstallation {
             r#"
 lua_version = "{0}"
 variables = {{
-    LUA_LIBDIR = "{1}",
-    LUA_INCDIR = "{2}",
-    LUA_VERSION = "{3}",
-    MAKE = "{4}",
+    LUA_LIBDIR = "$(LUA_LIBDIR)",
+    LUA_INCDIR = "$(LUA_INCDIR)",
+    LUA_VERSION = "{1}",
+    MAKE = "{2}",
 }}
 "#,
             lua_version_str,
-            lua.lib_dir.to_slash_lossy(),
-            lua.include_dir.to_slash_lossy(),
             LuaVersion::from(&self.config)?,
             self.config.make_cmd(),
         );
+        let luarocks_config_content =
+            variables::substitute(&[lua, &self.config], &luarocks_config_content)?;
         let luarocks_config = temp_dir.path().join("luarocks-config.lua");
         std::fs::write(luarocks_config.clone(), luarocks_config_content)
             .map_err(ExecLuaRocksError::WriteLuarocksConfigError)?;

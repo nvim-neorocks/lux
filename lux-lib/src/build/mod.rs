@@ -167,26 +167,18 @@ impl From<bool> for BuildBehaviour {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_build<R: Rockspec + HasIntegrity>(
     rockspec: &R,
     output_paths: &RockLayout,
     lua: &LuaInstallation,
+    external_dependencies: &HashMap<String, ExternalDependencyInfo>,
     config: &Config,
     build_dir: &Path,
     tree: &Tree,
     progress: &Progress<ProgressBar>,
 ) -> Result<BuildInfo, BuildError> {
     progress.map(|p| p.set_message("🛠️ Building..."));
-
-    let external_dependencies = rockspec
-        .external_dependencies()
-        .current_platform()
-        .iter()
-        .map(|(name, dep)| {
-            ExternalDependencyInfo::probe(name, dep, config.external_deps())
-                .map(|info| (name.clone(), info))
-        })
-        .try_collect::<_, HashMap<_, _>, _>()?;
 
     Ok(
         match rockspec.build().current_platform().build_backend.to_owned() {
@@ -196,7 +188,7 @@ async fn run_build<R: Rockspec + HasIntegrity>(
                         output_paths,
                         false,
                         lua,
-                        &external_dependencies,
+                        external_dependencies,
                         config,
                         tree,
                         build_dir,
@@ -210,7 +202,7 @@ async fn run_build<R: Rockspec + HasIntegrity>(
                         output_paths,
                         false,
                         lua,
-                        &external_dependencies,
+                        external_dependencies,
                         config,
                         tree,
                         build_dir,
@@ -224,7 +216,7 @@ async fn run_build<R: Rockspec + HasIntegrity>(
                         output_paths,
                         false,
                         lua,
-                        &external_dependencies,
+                        external_dependencies,
                         config,
                         tree,
                         build_dir,
@@ -238,7 +230,7 @@ async fn run_build<R: Rockspec + HasIntegrity>(
                         output_paths,
                         false,
                         lua,
-                        &external_dependencies,
+                        external_dependencies,
                         config,
                         tree,
                         build_dir,
@@ -252,7 +244,7 @@ async fn run_build<R: Rockspec + HasIntegrity>(
                         output_paths,
                         false,
                         lua,
-                        &external_dependencies,
+                        external_dependencies,
                         config,
                         tree,
                         build_dir,
@@ -266,7 +258,7 @@ async fn run_build<R: Rockspec + HasIntegrity>(
                         output_paths,
                         false,
                         lua,
-                        &external_dependencies,
+                        external_dependencies,
                         config,
                         tree,
                         build_dir,
@@ -290,7 +282,7 @@ async fn run_build<R: Rockspec + HasIntegrity>(
                 source::build(
                     output_paths,
                     lua,
-                    &external_dependencies,
+                    external_dependencies,
                     config,
                     tree,
                     build_dir,
@@ -309,6 +301,7 @@ async fn install<R: Rockspec + HasIntegrity>(
     tree: &Tree,
     output_paths: &RockLayout,
     lua: &LuaInstallation,
+    external_dependencies: &HashMap<String, ExternalDependencyInfo>,
     build_dir: &Path,
     entry_type: &EntryType,
     progress: &Progress<ProgressBar>,
@@ -346,6 +339,7 @@ async fn install<R: Rockspec + HasIntegrity>(
             target,
             &output_paths.lib,
             lua,
+            external_dependencies,
         )?;
         progress.map(|p| p.set_position(p.position() + 1));
     }
@@ -457,10 +451,21 @@ async fn do_build<R: Rockspec + HasIntegrity>(
             )
             .apply()?;
 
+            let external_dependencies = rockspec
+                .external_dependencies()
+                .current_platform()
+                .iter()
+                .map(|(name, dep)| {
+                    ExternalDependencyInfo::probe(name, dep, build.config.external_deps())
+                        .map(|info| (name.clone(), info))
+                })
+                .try_collect::<_, HashMap<_, _>, _>()?;
+
             let output = run_build(
                 rockspec,
                 &output_paths,
                 &lua,
+                &external_dependencies,
                 build.config,
                 &build_dir,
                 tree,
@@ -475,6 +480,7 @@ async fn do_build<R: Rockspec + HasIntegrity>(
                 tree,
                 &output_paths,
                 &lua,
+                &external_dependencies,
                 &build_dir,
                 &build.entry_type,
                 build.progress,
@@ -569,6 +575,7 @@ mod tests {
             &rockspec,
             &rock_layout,
             &lua,
+            &HashMap::default(),
             &config,
             &build_dir,
             &tree,

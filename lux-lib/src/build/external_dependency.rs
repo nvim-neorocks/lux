@@ -1,4 +1,5 @@
-use path_slash::PathBufExt;
+use itertools::Itertools;
+use path_slash::{PathBufExt, PathExt};
 use pkg_config::{Config as PkgConfig, Library};
 use std::{
     collections::HashMap,
@@ -10,7 +11,10 @@ use crate::{
     config::external_deps::ExternalDependencySearchConfig, lua_rockspec::ExternalDependencySpec,
 };
 
-use super::{utils::format_path, variables::HasVariables};
+use super::{
+    utils::{c_lib_extension, format_path},
+    variables::HasVariables,
+};
 
 #[derive(Error, Debug)]
 pub enum ExternalDependencyError {
@@ -28,9 +32,14 @@ pub enum ExternalDependencyError {
 
 #[derive(Debug)]
 pub struct ExternalDependencyInfo {
-    include_dir: Option<PathBuf>,
-    lib_dir: Option<PathBuf>,
-    bin_dir: Option<PathBuf>,
+    pub(crate) include_dir: Option<PathBuf>,
+    pub(crate) lib_dir: Option<PathBuf>,
+    pub(crate) bin_dir: Option<PathBuf>,
+    /// Name of the static library, (without the 'lib' prefix or file extension on unix targets),
+    /// for example, "foo" or "foo.dll"
+    pub(crate) lib_name: Option<String>,
+    /// pkg-config library information if available
+    pub(crate) lib_info: Option<Library>,
 }
 
 fn pkg_config_probe(name: &str) -> Option<Library> {
@@ -86,10 +95,20 @@ impl ExternalDependencyInfo {
                     .map(|parent| parent.join("bin"))
                     .filter(|dir| dir.is_dir())
             });
+            let lib_name = lib_dir.as_ref().and_then(|lib_dir| {
+                let prefix = dependency
+                    .library
+                    .as_ref()
+                    .map(|lib_name| lib_name.to_string_lossy().to_string())
+                    .unwrap_or(name.to_lowercase());
+                get_lib_name(lib_dir, &prefix)
+            });
             return Ok(ExternalDependencyInfo {
                 include_dir,
                 lib_dir,
                 bin_dir,
+                lib_name,
+                lib_info: Some(info),
             });
         }
         Self::fallback_probe(name, dependency, config)
@@ -172,11 +191,78 @@ impl ExternalDependencyInfo {
                 .map(|parent| parent.join("bin"))
                 .filter(|dir| dir.is_dir())
         });
+        let lib_name = lib_dir.as_ref().and_then(|lib_dir| {
+            let prefix = dependency
+                .library
+                .as_ref()
+                .map(|lib_name| lib_name.to_string_lossy().to_string())
+                .unwrap_or(name.to_lowercase());
+            get_lib_name(lib_dir, &prefix)
+        });
         Ok(ExternalDependencyInfo {
             include_dir,
             lib_dir,
             bin_dir,
+            lib_name,
+            lib_info: None,
         })
+    }
+
+    pub(crate) fn define_flags(&self) -> Vec<String> {
+        if let Some(info) = &self.lib_info {
+            info.defines
+                .iter()
+                .map(|(k, v)| match v {
+                    Some(val) => {
+                        format!("-D{}={}", k, val)
+                    }
+                    None => format!("-D{}", k),
+                })
+                .collect_vec()
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub(crate) fn lib_link_args(&self, compiler: &cc::Tool) -> Vec<String> {
+        if let Some(info) = &self.lib_info {
+            info.link_paths
+                .iter()
+                .map(|p| lib_dir_compile_arg(p, compiler))
+                .chain(
+                    info.libs
+                        .iter()
+                        .map(|lib| format_lib_link_arg(lib, compiler)),
+                )
+                .chain(info.ld_args.iter().map(|ld_arg_group| {
+                    ld_arg_group
+                        .iter()
+                        .map(|arg| format_linker_arg(arg, compiler))
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                }))
+                .collect_vec()
+        } else {
+            self.lib_dir
+                .iter()
+                .map(|lib_dir| lib_dir_compile_arg(lib_dir, compiler))
+                .chain(
+                    self.lib_name
+                        .as_ref()
+                        .and_then(|lib_name| {
+                            if compiler.is_like_msvc() {
+                                self.lib_dir.as_ref().map(|lib_dir| {
+                                    lib_dir.join(lib_name).to_slash_lossy().to_string()
+                                })
+                            } else {
+                                Some(format!("-l{}", lib_name))
+                            }
+                        })
+                        .iter()
+                        .cloned(),
+                )
+                .collect_vec()
+        }
     }
 }
 
@@ -242,6 +328,67 @@ Consider one of the following:
    {} = "/path/to/installation""#,
         name, env_dir, env_inc, env_lib, env_dir,
     )
+}
+
+fn lib_dir_compile_arg(dir: &Path, compiler: &cc::Tool) -> String {
+    if compiler.is_like_msvc() {
+        format!("/LIBPATH:{}", dir.to_slash_lossy())
+    } else {
+        format!("-L{}", dir.to_slash_lossy())
+    }
+}
+
+fn format_lib_link_arg(lib: &str, compiler: &cc::Tool) -> String {
+    if compiler.is_like_msvc() {
+        format!("{}.lib", lib)
+    } else {
+        format!("-l{}", lib)
+    }
+}
+
+fn format_linker_arg(arg: &str, compiler: &cc::Tool) -> String {
+    if compiler.is_like_msvc() {
+        format!("-Wl,{}", arg)
+    } else {
+        format!("/link {}", arg)
+    }
+}
+
+pub(crate) fn to_lib_name(file: &Path) -> String {
+    let file_name = file.file_name().unwrap();
+    if cfg!(target_family = "unix") {
+        file_name
+            .to_string_lossy()
+            .trim_start_matches("lib")
+            .trim_end_matches(".a")
+            .to_string()
+    } else {
+        file_name.to_string_lossy().to_string()
+    }
+}
+
+fn get_lib_name(lib_dir: &Path, prefix: &str) -> Option<String> {
+    std::fs::read_dir(lib_dir)
+        .ok()
+        .and_then(|entries| {
+            entries
+                .filter_map(Result::ok)
+                .map(|entry| entry.path().to_path_buf())
+                .filter(|file| file.extension().is_some_and(|ext| ext == c_lib_extension()))
+                .filter(|file| {
+                    file.file_name()
+                        .is_some_and(|name| is_lib_name(&name.to_string_lossy(), prefix))
+                })
+                .collect_vec()
+                .first()
+                .cloned()
+        })
+        .map(|file| to_lib_name(&file))
+}
+fn is_lib_name(file_name: &str, prefix: &str) -> bool {
+    #[cfg(target_family = "unix")]
+    let file_name = file_name.trim_start_matches("lib");
+    file_name == format!("{}.{}", prefix, c_lib_extension())
 }
 
 #[cfg(test)]
@@ -481,5 +628,41 @@ mod tests {
             result,
             Err(ExternalDependencyError::HeaderNotFound { .. })
         ));
+    }
+
+    #[cfg(not(target_env = "msvc"))]
+    #[tokio::test]
+    async fn test_to_lib_name() {
+        assert_eq!(to_lib_name(&PathBuf::from("lua.a")), "lua".to_string());
+        assert_eq!(
+            to_lib_name(&PathBuf::from("lua-5.1.a")),
+            "lua-5.1".to_string()
+        );
+        assert_eq!(
+            to_lib_name(&PathBuf::from("lua5.1.a")),
+            "lua5.1".to_string()
+        );
+        assert_eq!(to_lib_name(&PathBuf::from("lua51.a")), "lua51".to_string());
+        assert_eq!(
+            to_lib_name(&PathBuf::from("luajit-5.2.a")),
+            "luajit-5.2".to_string()
+        );
+        assert_eq!(
+            to_lib_name(&PathBuf::from("lua-5.2.a")),
+            "lua-5.2".to_string()
+        );
+        assert_eq!(to_lib_name(&PathBuf::from("liblua.a")), "lua".to_string());
+        assert_eq!(
+            to_lib_name(&PathBuf::from("liblua-5.1.a")),
+            "lua-5.1".to_string()
+        );
+        assert_eq!(
+            to_lib_name(&PathBuf::from("liblua53.a")),
+            "lua53".to_string()
+        );
+        assert_eq!(
+            to_lib_name(&PathBuf::from("liblua-54.a")),
+            "lua-54".to_string()
+        );
     }
 }
