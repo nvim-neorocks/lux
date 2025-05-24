@@ -4,9 +4,10 @@ use std::{
     collections::HashMap,
     io,
     path::{Path, PathBuf},
-    process::{Command, ExitStatus},
+    process::{ExitStatus, Stdio},
 };
 use thiserror::Error;
+use tokio::process::Command;
 
 use crate::{
     build::utils,
@@ -21,7 +22,7 @@ use super::{external_dependency::ExternalDependencyInfo, variables::VariableSubs
 
 #[derive(Error, Debug)]
 pub enum MakeError {
-    #[error("{name} step failed.\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
+    #[error("{name} step failed.\n\n{status}\n\nstdout:\n{stdout}\n\nstderr:\n{stderr}")]
     CommandFailure {
         name: String,
         status: ExitStatus,
@@ -77,10 +78,12 @@ impl Build for MakeBuildSpec {
             match cmd
                 .current_dir(build_dir)
                 .args(["-f", &self.makefile.to_slash_lossy()])
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
                 .args(build_args)
                 .spawn()
             {
-                Ok(child) => match child.wait_with_output() {
+                Ok(child) => match child.wait_with_output().await {
                     Ok(output) if output.status.success() => {}
                     Ok(output) => {
                         return Err(MakeError::CommandFailure {
@@ -126,6 +129,7 @@ impl Build for MakeBuildSpec {
                 .args(["-f", &self.makefile.to_slash_lossy()])
                 .args(install_args)
                 .output()
+                .await
             {
                 Ok(output) if output.status.success() => {}
                 Ok(output) => {

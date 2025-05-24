@@ -6,13 +6,14 @@ use lux_lib::{
 };
 use mlua::{IntoLua, Lua};
 
-#[test]
-fn tree_userdata() {
+#[tokio::test]
+async fn tree_userdata() {
     let temp = TempDir::new().unwrap();
 
     let lua = Lua::new();
 
     let lua_version = detect_installed_lua_version(LuaBinary::default())
+        .await
         .ok()
         .and_then(|version| LuaVersion::from_version(version).ok())
         .or(Some(LuaVersion::Lua51));

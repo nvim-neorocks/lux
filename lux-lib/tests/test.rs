@@ -20,6 +20,7 @@ async fn run_busted_test() {
     let _ = std::fs::remove_dir_all(&tree_root);
 
     let lua_version = detect_installed_lua_version(LuaBinary::default())
+        .await
         .ok()
         .and_then(|version| LuaVersion::from_version(version).ok())
         .or(Some(LuaVersion::Lua51));
@@ -46,6 +47,7 @@ async fn run_busted_test_no_lock() {
     let _ = std::fs::remove_dir_all(&tree_root);
 
     let lua_version = detect_installed_lua_version(LuaBinary::default())
+        .await
         .ok()
         .and_then(|version| LuaVersion::from_version(version).ok())
         .or(Some(LuaVersion::Lua51));

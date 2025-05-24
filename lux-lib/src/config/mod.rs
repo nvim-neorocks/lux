@@ -445,11 +445,11 @@ impl ConfigBuilder {
 
         let lua_version =
             self.lua_version
-                .or(
-                    crate::lua_installation::detect_installed_lua_version(LuaBinary::default())
-                        .ok()
-                        .and_then(|version| LuaVersion::from_version(version).ok()),
-                );
+                .or(crate::lua_installation::detect_installed_lua_version_sync(
+                    LuaBinary::default(),
+                )
+                .ok()
+                .and_then(|version| LuaVersion::from_version(version).ok()));
         Ok(Config {
             enable_development_packages: self.enable_development_packages.unwrap_or(false),
             server: self

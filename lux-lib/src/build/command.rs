@@ -3,9 +3,10 @@ use std::{
     collections::HashMap,
     io,
     path::Path,
-    process::{Command, ExitStatus},
+    process::{ExitStatus, Stdio},
 };
 use thiserror::Error;
+use tokio::process::Command;
 
 use crate::{
     config::Config,
@@ -63,7 +64,8 @@ impl Build for CommandBuildSpec {
             external_dependencies,
             config,
             build_dir,
-        )?;
+        )
+        .await?;
         if !no_install {
             progress.map(|bar| bar.set_message("Running install_command..."));
             run_command(
@@ -73,13 +75,14 @@ impl Build for CommandBuildSpec {
                 external_dependencies,
                 config,
                 build_dir,
-            )?;
+            )
+            .await?;
         }
         Ok(BuildInfo::default())
     }
 }
 
-fn run_command(
+async fn run_command(
     command: &str,
     output_paths: &RockLayout,
     lua: &LuaInstallation,
@@ -97,6 +100,8 @@ fn run_command(
     match Command::new(program)
         .args(args)
         .current_dir(build_dir)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()
     {
         Err(err) => {
@@ -105,7 +110,7 @@ fn run_command(
                 command: substituted_cmd,
             })
         }
-        Ok(child) => match child.wait_with_output() {
+        Ok(child) => match child.wait_with_output().await {
             Ok(output) if output.status.success() => {}
             Ok(output) => {
                 return Err(CommandError::CommandFailure {

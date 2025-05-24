@@ -18,6 +18,7 @@ async fn luarocks_make() {
     let dir = TempDir::new().unwrap();
 
     let lua_version = detect_installed_lua_version(LuaBinary::default())
+        .await
         .ok()
         .and_then(|version| LuaVersion::from_version(version).ok())
         .or(Some(LuaVersion::Lua51));
@@ -43,6 +44,7 @@ async fn luarocks_make() {
     let lua = LuaInstallation::new(lua_version, &config);
     luarocks
         .make(&rockspec_path, build_dir.path(), dest_dir.path(), &lua)
+        .await
         .unwrap();
     let foo_dir = dest_dir
         .child("share")

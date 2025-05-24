@@ -110,6 +110,7 @@ pub async fn run_lua(
     let paths = Paths::new(tree)?;
 
     match lua_installation::detect_installed_lua_version(lua_cmd.clone())
+        .await
         .and_then(|ver| Ok(LuaVersion::from_version(ver)?))
     {
         Ok(installed_version) if installed_version != expected_version => {
