@@ -6,6 +6,29 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.5.3](https://github.com/nvim-neorocks/lux/compare/v0.5.2...v0.5.3) - 2025-05-25
+
+### Fixed
+- fix!(build/builtin): use external_dependency info
+- properly capture command output
+
+## `lux-lib` - [0.7.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.6.2...lux-lib-v0.7.0) - 2025-05-25
+
+### Fixed
+- fix!(build/builtin): use external_dependency info
+- properly capture command output
+- variable substitution for `LUA_BINDIR`
+- external_dependencies variable substitutions
+- rock_manifest parsing error
+- external dependencies not finding libraries via pkg-config
+- fall back to `all.rock` when downloading packed rocks
+- add checks to prevent trying to unpack HTML response ([#735](https://github.com/nvim-neorocks/lux/pull/735))
+- [**breaking**] bin scripts installed into tree's root ([#724](https://github.com/nvim-neorocks/lux/pull/724))
+
+### Other
+- add gnum4 to devShell
+- *(deps)* bump zip from 3.0.0 to 4.0.0 ([#728](https://github.com/nvim-neorocks/lux/pull/728))
+
 ## `lux-cli` - [0.5.2](https://github.com/nvim-neorocks/lux/compare/v0.5.1...v0.5.2) - 2025-05-21
 
 ### Fixed
