@@ -9,6 +9,8 @@ labels = [""]
 
 
 [dependencies]
+busted = "2.2.0-1"
+luassert = "1.9.0-1"
 # Add your dependencies here
 # `busted = ">=2.0"`
 
