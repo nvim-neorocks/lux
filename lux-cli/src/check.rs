@@ -33,8 +33,6 @@ pub async fn check(check: Check, config: Config) -> Result<()> {
         .arg(project.root().to_string_lossy())
         .args(check_args)
         .arg("--exclude-files")
-        .arg(".lux")
-        .arg(".direnv")
         .arg(project.tree(&config)?.root().to_string_lossy())
         .exec()
         .await?;
