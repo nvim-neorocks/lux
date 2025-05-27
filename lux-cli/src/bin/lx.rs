@@ -73,7 +73,7 @@ async fn main() -> Result<()> {
         Commands::Pin(pin_data) => pin::set_pinned_state(pin_data, config, Pinned).await?,
         Commands::Unpin(pin_data) => pin::set_pinned_state(pin_data, config, Unpinned).await?,
         Commands::Upload(upload_data) => upload::upload(upload_data, config).await?,
-        Commands::Check => check::check(config).await?,
+        Commands::Check(check_args) => check::check(check_args, config).await?,
         Commands::Add(add_data) => add::add(add_data, config).await?,
         Commands::Config(config_cmd) => config::config(config_cmd, config)?,
         Commands::Doc(doc_args) => doc::doc(doc_args, config).await?,

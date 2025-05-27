@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use add::Add;
 use build::Build;
+use check::Check;
 use clap::{Parser, Subcommand};
 use config::ConfigCmd;
 use debug::Debug;
@@ -136,7 +137,7 @@ pub enum Commands {
     /// Build/compile a project.
     Build(Build),
     /// Runs `luacheck` in the current project.
-    Check,
+    Check(Check),
     /// Interact with the lux configuration.
     #[command(subcommand, arg_required_else_help = true)]
     Config(ConfigCmd),
