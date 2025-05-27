@@ -23,6 +23,8 @@ pub async fn check(config: Config) -> Result<()> {
     Exec::new("luacheck", Some(&project), &config)
         .arg(project.root().to_string_lossy())
         .arg("--exclude-files")
+        .arg(".lux")
+        .arg(".direnv")
         .arg(project.tree(&config)?.root().to_string_lossy())
         .exec()
         .await?;
