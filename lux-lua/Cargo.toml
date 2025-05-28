@@ -1,6 +1,6 @@
 [package]
 name = "lux-lua"
-version = "0.1.7"
+version.workspace = true
 edition = "2021"
 publish = false
 

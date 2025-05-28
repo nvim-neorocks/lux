@@ -2327,7 +2327,7 @@ dependencies = [
 
 [[package]]
 name = "lux-lua"
-version = "0.1.7"
+version = "0.5.3"
 dependencies = [
  "assert_fs",
  "lux-lib",

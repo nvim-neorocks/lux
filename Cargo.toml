@@ -10,6 +10,9 @@ members = [
 default-members = ["lux-cli", "lux-lib"]
 resolver = "2"
 
+[workspace.package]
+version = "0.5.3"
+
 [profile.release]
 lto = true
 codegen-units = 1
