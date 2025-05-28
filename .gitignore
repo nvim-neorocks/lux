@@ -19,9 +19,4 @@
 /*.rockspec
 *.snap.new
 
-# Lux project files
-/.lux/*
-/lux.lock
-/lux.toml
-
 .pre-commit-config.yaml
