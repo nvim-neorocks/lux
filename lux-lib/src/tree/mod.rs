@@ -121,6 +121,9 @@ impl Tree {
         // Ensure that the root and the version directory exist.
         std::fs::create_dir_all(&path_with_version)?;
 
+        // In case the tree is in a git repository, we tell git to ignore it.
+        std::fs::write(root.join(".gitignore"), "*")?;
+
         // Ensure that the bin directory exists.
         std::fs::create_dir_all(path_with_version.join("bin"))?;
         let lockfile_path = root.join(LOCKFILE_NAME);

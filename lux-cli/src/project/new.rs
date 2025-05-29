@@ -348,7 +348,6 @@ type = "builtin"
         )
         .trim(),
     )?;
-    std::fs::write(validated.target.join(".gitignore"), ".lux\n")?;
 
     let main_dir = validated.target.join(validated.main.to_string());
     if main_dir.exists() {
