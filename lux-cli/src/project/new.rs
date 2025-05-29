@@ -348,7 +348,13 @@ type = "builtin"
         )
         .trim(),
     )?;
-    std::fs::write(validated.target.join(".gitignore"), ".lux\n")?;
+
+    std::fs::write(validated.target.join(".gitignore"), "")?; // just create a gitignore in the root
+
+    let lux_dir = validated.target.join(".lux");
+
+    std::fs::write(lux_dir.join(".gitignore"), "*\n!.gitignore\n").unwrap(); // ignore everthing but the .gitignore
+
 
     let main_dir = validated.target.join(validated.main.to_string());
     if main_dir.exists() {
