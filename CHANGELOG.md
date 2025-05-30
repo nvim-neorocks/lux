@@ -6,6 +6,22 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.5.4](https://github.com/nvim-neorocks/lux/compare/v0.5.3...v0.5.4) - 2025-05-30
+
+### Added
+- add .gitignore to install tree root ([#753](https://github.com/nvim-neorocks/lux/pull/753))
+- keep lux-cli and lux-lua versions in sync ([#751](https://github.com/nvim-neorocks/lux/pull/751))
+- feat!(cli/check): respect ignore files by default ([#749](https://github.com/nvim-neorocks/lux/pull/749))
+- *(cli)* Allow passing args into `lx check` ([#746](https://github.com/nvim-neorocks/lux/pull/746))
+
+## `lux-lib` - [0.8.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.7.0...lux-lib-v0.8.0) - 2025-05-30
+
+### Added
+- substitute variables from environment
+- [**breaking**] make `HasVariables` trait `pub(crate)`
+- add .gitignore to install tree root ([#753](https://github.com/nvim-neorocks/lux/pull/753))
+- feat!(cli/check): respect ignore files by default ([#749](https://github.com/nvim-neorocks/lux/pull/749))
+
 ## `lux-cli` - [0.5.3](https://github.com/nvim-neorocks/lux/compare/v0.5.2...v0.5.3) - 2025-05-25
 
 ### Fixed
