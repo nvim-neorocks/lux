@@ -452,10 +452,13 @@ pub enum InstallBinaryError {
 }
 
 #[derive(Debug, Error)]
-#[error(transparent)]
 pub enum WrapBinaryError {
+    #[error(transparent)]
     Io(#[from] io::Error),
+    #[error(transparent)]
     Utf8(#[from] FromUtf8Error),
+    #[error("no `lua` executable found")]
+    NoLuaBinary,
 }
 
 /// Returns the file path of the installed binary
@@ -502,7 +505,9 @@ async fn install_wrapped_binary(
     #[cfg(target_family = "windows")]
     let target = tree.bin().join(format!("{}.bat", target));
 
-    let lua_bin = lua.lua_binary(config).unwrap_or("lua".into());
+    let lua_bin = lua
+        .lua_binary_or_config_override(config)
+        .ok_or(WrapBinaryError::NoLuaBinary)?;
 
     #[cfg(target_family = "unix")]
     let content = format!(
@@ -541,19 +546,22 @@ async fn set_executable_permissions(script: &Path) -> std::io::Result<()> {
 /// Tries to load the file with Lua. If the file can be loaded,
 /// we treat it as a valid Lua script.
 async fn is_compatible_lua_script(file: &Path, lua: &LuaInstallation, config: &Config) -> bool {
-    let lua_bin = lua.lua_binary(config).unwrap_or("lua".into());
-    Command::new(lua_bin)
-        .arg("-e")
-        .arg(format!(
-            "if loadfile('{}') then os.exit(0) else os.exit(1) end",
-            // On Windows, Lua escapes path separators, so we ensure forward slashes
-            file.to_slash_lossy()
-        ))
-        .stderr(Stdio::null())
-        .stdout(Stdio::null())
-        .status()
-        .await
-        .is_ok_and(|status| status.success())
+    if let Some(lua_bin) = lua.lua_binary_or_config_override(config) {
+        Command::new(lua_bin)
+            .arg("-e")
+            .arg(format!(
+                "if loadfile('{}') then os.exit(0) else os.exit(1) end",
+                // On Windows, Lua escapes path separators, so we ensure forward slashes
+                file.to_slash_lossy()
+            ))
+            .stderr(Stdio::null())
+            .stdout(Stdio::null())
+            .status()
+            .await
+            .is_ok_and(|status| status.success())
+    } else {
+        false
+    }
 }
 
 #[cfg(target_family = "unix")]

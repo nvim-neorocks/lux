@@ -8,13 +8,14 @@ use tokio::process::Command;
 
 use crate::{
     config::Config,
+    lua_installation::LuaBinary,
     lua_rockspec::LuaVersionError,
     operations,
     path::{Paths, PathsError},
     project::{project_toml::LocalProjectTomlValidationError, Project, ProjectTreeError},
 };
 
-use super::{LuaBinary, RunLuaError};
+use super::RunLuaError;
 
 #[derive(Debug, Error)]
 #[error("`{0}` should not be used as a `command` as it is not cross-platform.
@@ -81,8 +82,7 @@ async fn run_with_local_lua(
     operations::run_lua(
         project.root(),
         &project.tree(config)?,
-        version,
-        LuaBinary::Lua,
+        LuaBinary::new(version, config),
         &args.into_iter().cloned().collect(),
     )
     .await?;

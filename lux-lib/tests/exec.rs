@@ -9,17 +9,11 @@ use tempdir::TempDir;
 #[cfg(not(target_env = "msvc"))]
 #[tokio::test]
 async fn run_nlua() {
-    use lux_lib::{
-        config::LuaVersion, lua_installation::detect_installed_lua_version, operations::LuaBinary,
-    };
+    use lux_lib::{config::LuaVersion, lua_installation::detect_installed_lua_version};
 
     let dir = TempDir::new("lux-test").unwrap();
 
-    let lua_version = detect_installed_lua_version(LuaBinary::default())
-        .await
-        .ok()
-        .and_then(|version| LuaVersion::from_version(version).ok())
-        .or(Some(LuaVersion::Lua51));
+    let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
 
     let config = ConfigBuilder::new()
         .unwrap()
