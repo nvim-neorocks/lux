@@ -468,10 +468,7 @@ pub(crate) async fn install_binary(
     config: &Config,
 ) -> Result<PathBuf, InstallBinaryError> {
     tokio::fs::create_dir_all(&tree.bin()).await?;
-    let script = if deploy.wrap_bin_scripts
-        && needs_wrapper(source).await?
-        && is_compatible_lua_script(source, lua, config).await
-    {
+    let script = if deploy.wrap_bin_scripts && is_compatible_lua_script(source, lua, config).await {
         install_wrapped_binary(source, target, tree, lua, config).await?
     } else {
         let target = tree.bin().join(target);
@@ -540,6 +537,11 @@ async fn set_executable_permissions(script: &Path) -> std::io::Result<()> {
 
 /// Tries to load the file with Lua. If the file can be loaded,
 /// we treat it as a valid Lua script.
+///
+/// NOTE: Lua may successfully load very short bash scripts (like `echo "Hello"`).
+/// But that's unlikely to be the case in practise.
+/// If a script is mistaken for a Lua script, package authors can disable
+/// wrapping with the `deploy.wrap_bin_scripts` rockspec config.
 async fn is_compatible_lua_script(file: &Path, lua: &LuaInstallation, config: &Config) -> bool {
     let lua_bin = lua.lua_binary(config).unwrap_or("lua".into());
     Command::new(lua_bin)
@@ -554,17 +556,6 @@ async fn is_compatible_lua_script(file: &Path, lua: &LuaInstallation, config: &C
         .status()
         .await
         .is_ok_and(|status| status.success())
-}
-
-#[cfg(target_family = "unix")]
-async fn needs_wrapper(script: &Path) -> Result<bool, WrapBinaryError> {
-    let content = String::from_utf8(tokio::fs::read(script).await?)?;
-    Ok(!content.starts_with("#!/usr/bin/env "))
-}
-
-#[cfg(target_family = "windows")]
-async fn needs_wrapper(_script: &Path) -> io::Result<bool> {
-    Ok(true)
 }
 
 pub(crate) fn substitute_variables(

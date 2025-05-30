@@ -1,2 +1,4 @@
 #!/usr/bin/env bash
+
+# Say hello
 echo "Hello"
