@@ -5,7 +5,8 @@ use eyre::{eyre, Result};
 use itertools::Itertools;
 use lux_lib::{
     config::{Config, LuaVersion},
-    operations::{self, LuaBinary},
+    lua_installation::LuaBinary,
+    operations,
     project::Project,
     rockspec::LuaVersionCompatibility,
 };
@@ -31,12 +32,6 @@ pub struct RunLua {
 }
 
 pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
-    let lua_cmd = run_lua.lua.map(LuaBinary::Custom).unwrap_or(LuaBinary::Lua);
-
-    if run_lua.help {
-        return print_lua_help(&lua_cmd).await;
-    }
-
     let project = Project::current()?;
     let (lua_version, root, tree) = match &project {
         Some(project) => (
@@ -54,18 +49,20 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
         }
     };
 
+    let lua_cmd = run_lua
+        .lua
+        .map(LuaBinary::Custom)
+        .unwrap_or(LuaBinary::new(lua_version, &config));
+
+    if run_lua.help {
+        return print_lua_help(&lua_cmd).await;
+    }
+
     if project.is_some() {
         build::build(run_lua.build, config.clone()).await?;
     }
 
-    operations::run_lua(
-        &root,
-        &tree,
-        lua_version,
-        lua_cmd,
-        &run_lua.args.unwrap_or_default(),
-    )
-    .await?;
+    operations::run_lua(&root, &tree, lua_cmd, &run_lua.args.unwrap_or_default()).await?;
 
     Ok(())
 }

@@ -1,18 +1,20 @@
 use is_executable::IsExecutable;
 use itertools::Itertools;
 use path_slash::PathBufExt;
+use std::fmt;
+use std::fmt::Display;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 use target_lexicon::Triple;
 use thiserror::Error;
-use tokio::process::Command;
+use which::which;
 
 use crate::build::external_dependency::to_lib_name;
 use crate::build::external_dependency::ExternalDependencyInfo;
 use crate::build::utils::{c_lib_extension, format_path};
+use crate::config::external_deps::ExternalDependencySearchConfig;
 use crate::lua_rockspec::ExternalDependencySpec;
-use crate::operations::{LuaBinary, LuaBinaryError};
 use crate::project::Project;
 use crate::{
     build::variables::HasVariables,
@@ -24,45 +26,47 @@ pub struct LuaInstallation {
     pub version: LuaVersion,
     dependency_info: ExternalDependencyInfo,
     /// Binary to the Lua executable, if present
-    bin: Option<PathBuf>,
+    pub(crate) bin: Option<PathBuf>,
+}
+
+#[derive(Debug, Error)]
+pub enum LuaBinaryError {
+    #[error("neither `lua` nor `luajit` found on the PATH")]
+    LuaBinaryNotFound,
+    #[error(transparent)]
+    DetectLuaVersion(#[from] DetectLuaVersionError),
+    #[error(
+        "{} -v (= {}) does not match expected Lua version {}",
+        lua_cmd,
+        installed_version,
+        lua_version
+    )]
+    LuaVersionMismatch {
+        lua_cmd: String,
+        installed_version: PackageVersion,
+        lua_version: LuaVersion,
+    },
+    #[error("{0} not found on the PATH")]
+    CustomBinaryNotFound(String),
+}
+
+#[derive(Error, Debug)]
+pub enum DetectLuaVersionError {
+    #[error("failed to run {0}: {1}")]
+    RunLuaCommand(String, io::Error),
+    #[error("failed to parse Lua version from output: {0}")]
+    ParseLuaVersion(String),
+    #[error(transparent)]
+    PackageVersionParse(#[from] crate::package::PackageVersionParseError),
+    #[error(transparent)]
+    LuaVersion(#[from] crate::config::LuaVersionError),
 }
 
 impl LuaInstallation {
     pub fn new(version: &LuaVersion, config: &Config) -> Self {
-        let pkg_name = match version {
-            LuaVersion::Lua51 => "lua5.1",
-            LuaVersion::Lua52 => "lua5.2",
-            LuaVersion::Lua53 => "lua5.3",
-            LuaVersion::Lua54 => "lua5.4",
-            LuaVersion::LuaJIT | LuaVersion::LuaJIT52 => "luajit",
-        };
-
-        let mut dependency_info = ExternalDependencyInfo::probe(
-            pkg_name,
-            &ExternalDependencySpec::default(),
-            config.external_deps(),
-        );
-
-        if let Ok(info) = &mut dependency_info {
-            let bin = info.lib_dir.as_ref().and_then(|lib_dir| {
-                lib_dir
-                    .parent()
-                    .map(|parent| parent.join("bin"))
-                    .filter(|dir| dir.is_dir())
-                    .and_then(|bin_path| find_lua_executable(&bin_path))
-            });
-            let lua_lib_name = info
-                .lib_dir
-                .as_ref()
-                .and_then(|lib_dir| get_lua_lib_name(lib_dir, version));
-            info.lib_name = lua_lib_name;
-            return Self {
-                version: version.clone(),
-                dependency_info: dependency_info.unwrap(),
-                bin,
-            };
+        if let Some(lua_intallation) = Self::probe(version, config.external_deps()) {
+            return lua_intallation;
         }
-
         let output = Self::root_dir(version, config);
         if output.join("include").is_dir() {
             let bin_dir = Some(output.join("bin")).filter(|bin_path| bin_path.is_dir());
@@ -85,6 +89,47 @@ impl LuaInstallation {
             }
         } else {
             Self::install(version, config)
+        }
+    }
+
+    pub(crate) fn probe(
+        version: &LuaVersion,
+        search_config: &ExternalDependencySearchConfig,
+    ) -> Option<Self> {
+        let pkg_name = match version {
+            LuaVersion::Lua51 => "lua5.1",
+            LuaVersion::Lua52 => "lua5.2",
+            LuaVersion::Lua53 => "lua5.3",
+            LuaVersion::Lua54 => "lua5.4",
+            LuaVersion::LuaJIT | LuaVersion::LuaJIT52 => "luajit",
+        };
+
+        let mut dependency_info = ExternalDependencyInfo::probe(
+            pkg_name,
+            &ExternalDependencySpec::default(),
+            search_config,
+        );
+
+        if let Ok(info) = &mut dependency_info {
+            let bin = info.lib_dir.as_ref().and_then(|lib_dir| {
+                lib_dir
+                    .parent()
+                    .map(|parent| parent.join("bin"))
+                    .filter(|dir| dir.is_dir())
+                    .and_then(|bin_path| find_lua_executable(&bin_path))
+            });
+            let lua_lib_name = info
+                .lib_dir
+                .as_ref()
+                .and_then(|lib_dir| get_lua_lib_name(lib_dir, version));
+            info.lib_name = lua_lib_name;
+            Some(Self {
+                version: version.clone(),
+                dependency_info: dependency_info.unwrap(),
+                bin,
+            })
+        } else {
+            None
         }
     }
 
@@ -191,11 +236,11 @@ impl LuaInstallation {
 
     /// Get the Lua binary (if present), prioritising
     /// a potentially overridden value in the config.
-    pub(crate) fn lua_binary(&self, config: &Config) -> Option<String> {
+    pub(crate) fn lua_binary_or_config_override(&self, config: &Config) -> Option<String> {
         config.variables().get("LUA").cloned().or(self
             .bin
             .clone()
-            .or(LuaBinary::default().try_into().ok())
+            .or(LuaBinary::new(self.version.clone(), config).try_into().ok())
             .map(|bin| bin.to_slash_lossy().to_string()))
     }
 }
@@ -220,7 +265,11 @@ impl HasVariables for LuaInstallation {
             "LUA" => self
                 .bin
                 .clone()
-                .or(LuaBinary::default().try_into().ok())
+                .or(LuaBinary::Lua {
+                    lua_version: self.version.clone(),
+                }
+                .try_into()
+                .ok())
                 .map(|lua| format_path(&lua)),
             "LUALIB" => self.lua_lib().or(Some("".into())),
             _ => None,
@@ -229,75 +278,94 @@ impl HasVariables for LuaInstallation {
     }
 }
 
-#[derive(Error, Debug)]
-pub enum DetectLuaVersionError {
-    #[error("error detecting Lua version: {0}")]
-    LuaBinary(#[from] LuaBinaryError),
-    #[error("failed to run {0}: {1}")]
-    RunLuaCommand(String, io::Error),
-    #[error("failed to parse Lua version from output: {0}")]
-    ParseLuaVersion(String),
-    #[error(transparent)]
-    PackageVersionParse(#[from] crate::package::PackageVersionParseError),
-    #[error(transparent)]
-    LuaVersion(#[from] crate::config::LuaVersionError),
+#[derive(Clone)]
+pub enum LuaBinary {
+    /// The regular Lua interpreter.
+    Lua { lua_version: LuaVersion },
+    /// Custom Lua interpreter.
+    Custom(String),
 }
 
-pub async fn detect_installed_lua_version(
-    lua: LuaBinary,
-) -> Result<PackageVersion, DetectLuaVersionError> {
-    let lua_cmd: PathBuf = lua.try_into()?;
-    let output = match Command::new(&lua_cmd).arg("-v").output().await {
-        Ok(output) => Ok(output),
-        Err(err) => Err(DetectLuaVersionError::RunLuaCommand(
-            lua_cmd.to_string_lossy().to_string(),
-            err,
-        )),
-    }?;
-    let output_vec = if output.stderr.is_empty() {
-        output.stdout
-    } else {
-        // Yes, Lua 5.1 prints to stderr (-‸ლ)
-        output.stderr
-    };
-    let lua_output = String::from_utf8_lossy(&output_vec).to_string();
-    parse_lua_version_from_output(&lua_output)
+impl Display for LuaBinary {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LuaBinary::Lua { lua_version } => write!(f, "lua {lua_version}"),
+            LuaBinary::Custom(cmd) => write!(f, "{cmd}"),
+        }
+    }
 }
 
-pub fn detect_installed_lua_version_sync(
-    lua: LuaBinary,
-) -> Result<PackageVersion, DetectLuaVersionError> {
-    let lua_cmd: PathBuf = lua.try_into()?;
-    let output = match std::process::Command::new(&lua_cmd).arg("-v").output() {
-        Ok(output) => Ok(output),
-        Err(err) => Err(DetectLuaVersionError::RunLuaCommand(
-            lua_cmd.to_string_lossy().to_string(),
-            err,
-        )),
-    }?;
-    let output_vec = if output.stderr.is_empty() {
-        output.stdout
-    } else {
-        // Yes, Lua 5.1 prints to stderr (-‸ლ)
-        output.stderr
-    };
-    let lua_output = String::from_utf8_lossy(&output_vec).to_string();
-    parse_lua_version_from_output(&lua_output)
+impl LuaBinary {
+    /// Construct a new `LuaBinary` for the given `LuaVersion`,
+    /// potentially prioritising an overridden value in the config.
+    pub fn new(lua_version: LuaVersion, config: &Config) -> Self {
+        match config.variables().get("LUA").cloned() {
+            Some(lua) => Self::Custom(lua),
+            None => Self::Lua { lua_version },
+        }
+    }
 }
 
-fn parse_lua_version_from_output(
-    lua_output: &str,
-) -> Result<PackageVersion, DetectLuaVersionError> {
-    let lua_version_str = lua_output
-        .trim_start_matches("Lua")
-        .trim_start_matches("JIT")
-        .split_whitespace()
-        .next()
-        .map(|s| s.to_string())
-        .ok_or(DetectLuaVersionError::ParseLuaVersion(
-            lua_output.to_string(),
-        ))?;
-    Ok(PackageVersion::parse(&lua_version_str)?)
+impl From<PathBuf> for LuaBinary {
+    fn from(value: PathBuf) -> Self {
+        Self::Custom(value.to_string_lossy().to_string())
+    }
+}
+
+impl TryFrom<LuaBinary> for PathBuf {
+    type Error = LuaBinaryError;
+
+    fn try_from(value: LuaBinary) -> Result<Self, Self::Error> {
+        match value {
+            LuaBinary::Lua { lua_version } => {
+                if let Some(lua_binary) =
+                    LuaInstallation::probe(&lua_version, &ExternalDependencySearchConfig::default())
+                        .and_then(|lua_installation| lua_installation.bin)
+                {
+                    return Ok(lua_binary);
+                }
+                if lua_version.is_luajit() {
+                    if let Ok(path) = which("luajit") {
+                        return Ok(path);
+                    }
+                }
+                match which("lua") {
+                    Ok(path) => {
+                        let installed_version = detect_installed_lua_version_from_path(&path)?;
+                        if lua_version
+                            .clone()
+                            .as_version_req()
+                            .matches(&installed_version)
+                        {
+                            Ok(path)
+                        } else {
+                            Err(Self::Error::LuaVersionMismatch {
+                                lua_cmd: path.to_slash_lossy().to_string(),
+                                installed_version,
+                                lua_version,
+                            })?
+                        }
+                    }
+                    Err(_) => Err(LuaBinaryError::LuaBinaryNotFound),
+                }
+            }
+            LuaBinary::Custom(bin) => match which(&bin) {
+                Ok(path) => Ok(path),
+                Err(_) => Err(LuaBinaryError::CustomBinaryNotFound(bin)),
+            },
+        }
+    }
+}
+
+pub fn detect_installed_lua_version() -> Option<LuaVersion> {
+    which("lua")
+        .ok()
+        .or(which("luajit").ok())
+        .and_then(|lua_cmd| {
+            detect_installed_lua_version_from_path(&lua_cmd)
+                .ok()
+                .and_then(|version| LuaVersion::from_version(version).ok())
+        })
 }
 
 fn find_lua_executable(bin_path: &Path) -> Option<PathBuf> {
@@ -355,6 +423,41 @@ fn get_lua_lib_name(lib_dir: &Path, lua_version: &LuaVersion) -> Option<String> 
         .map(|file| to_lib_name(&file))
 }
 
+fn detect_installed_lua_version_from_path(
+    lua_cmd: &Path,
+) -> Result<PackageVersion, DetectLuaVersionError> {
+    let output = match std::process::Command::new(lua_cmd).arg("-v").output() {
+        Ok(output) => Ok(output),
+        Err(err) => Err(DetectLuaVersionError::RunLuaCommand(
+            lua_cmd.to_string_lossy().to_string(),
+            err,
+        )),
+    }?;
+    let output_vec = if output.stderr.is_empty() {
+        output.stdout
+    } else {
+        // Yes, Lua 5.1 prints to stderr (-‸ლ)
+        output.stderr
+    };
+    let lua_output = String::from_utf8_lossy(&output_vec).to_string();
+    parse_lua_version_from_output(&lua_output)
+}
+
+fn parse_lua_version_from_output(
+    lua_output: &str,
+) -> Result<PackageVersion, DetectLuaVersionError> {
+    let lua_version_str = lua_output
+        .trim_start_matches("Lua")
+        .trim_start_matches("JIT")
+        .split_whitespace()
+        .next()
+        .map(|s| s.to_string())
+        .ok_or(DetectLuaVersionError::ParseLuaVersion(
+            lua_output.to_string(),
+        ))?;
+    Ok(PackageVersion::parse(&lua_version_str)?)
+}
+
 #[cfg(test)]
 mod test {
     use crate::config::ConfigBuilder;
@@ -385,9 +488,9 @@ mod test {
         let lua_installation = LuaInstallation::new(lua_version, &config);
         // FIXME: This fails when run in the nix checkPhase
         assert!(lua_installation.bin.is_some());
-        let pkg_version = detect_installed_lua_version(lua_installation.bin.unwrap().into())
-            .await
-            .unwrap();
+        let lua_binary: LuaBinary = lua_installation.bin.unwrap().into();
+        let lua_bin_path: PathBuf = lua_binary.try_into().unwrap();
+        let pkg_version = detect_installed_lua_version_from_path(&lua_bin_path).unwrap();
         assert_eq!(&LuaVersion::from_version(pkg_version).unwrap(), lua_version);
     }
 
