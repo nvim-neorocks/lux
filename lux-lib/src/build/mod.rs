@@ -48,7 +48,6 @@ mod treesitter_parser;
 pub(crate) mod utils;
 
 pub mod external_dependency;
-pub mod variables;
 
 /// A rocks package builder, providing fine-grained control
 /// over how a package should be built.
@@ -365,9 +364,10 @@ async fn install<R: Rockspec + HasIntegrity>(
     Ok(())
 }
 
-async fn do_build<R: Rockspec + HasIntegrity>(
-    build: Build<'_, R>,
-) -> Result<LocalPackage, BuildError> {
+async fn do_build<R>(build: Build<'_, R>) -> Result<LocalPackage, BuildError>
+where
+    R: Rockspec + HasIntegrity,
+{
     let rockspec = build.rockspec;
 
     build.progress.map(|p| {
@@ -399,9 +399,15 @@ async fn do_build<R: Rockspec + HasIntegrity>(
         &PackageSpec::new(rockspec.package().clone(), rockspec.version().clone()),
         build.constraint,
         rockspec.binaries(),
-        build.source.unwrap_or_else(|| {
-            RemotePackageSource::RockspecContent(rockspec.to_lua_rockspec_string())
-        }),
+        build
+            .source
+            .map(Result::Ok)
+            .unwrap_or_else(|| {
+                rockspec
+                    .to_lua_remote_rockspec_string()
+                    .map(RemotePackageSource::RockspecContent)
+            })
+            .unwrap_or(RemotePackageSource::Local),
         Some(source_metadata.source_url),
         hashes,
     );
@@ -503,10 +509,9 @@ async fn do_build<R: Rockspec + HasIntegrity>(
 
             recursive_copy_doc_dir(&output_paths, &build_dir)?;
 
-            std::fs::write(
-                output_paths.rockspec_path(),
-                rockspec.to_lua_rockspec_string(),
-            )?;
+            if let Ok(rockspec_str) = rockspec.to_lua_remote_rockspec_string() {
+                std::fs::write(output_paths.rockspec_path(), rockspec_str)?;
+            }
 
             Ok(package)
         }

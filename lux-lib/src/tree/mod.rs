@@ -1,8 +1,9 @@
 use crate::{
-    build::{utils::format_path, variables::HasVariables},
+    build::utils::format_path,
     config::{tree::RockLayoutConfig, Config, LuaVersion},
     lockfile::{LocalPackage, LocalPackageId, Lockfile, LockfileError, OptState, ReadOnly},
     package::PackageReq,
+    variables::HasVariables,
 };
 use std::{io, path::PathBuf};
 
@@ -375,13 +376,13 @@ mod tests {
     use insta::assert_yaml_snapshot;
 
     use crate::{
-        build::variables,
         config::{ConfigBuilder, LuaVersion},
         lockfile::{LocalPackage, LocalPackageHashes, LockConstraint},
         package::{PackageName, PackageSpec, PackageVersion},
         remote_package_source::RemotePackageSource,
         rockspec::RockBinaries,
         tree::RockLayout,
+        variables,
     };
 
     #[test]

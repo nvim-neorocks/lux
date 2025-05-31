@@ -28,6 +28,8 @@ pub enum LuarocksBuildError {
     ExecLuaRocksError(#[from] ExecLuaRocksError),
     #[error(transparent)]
     Tree(#[from] TreeError),
+    #[error("{0}")] // We don't know the concrete error type
+    Rockspec(String),
 }
 
 pub(crate) async fn build<R: Rockspec>(
@@ -52,7 +54,12 @@ pub(crate) async fn build<R: Rockspec>(
         rockspec.package(),
         rockspec.version()
     ));
-    std::fs::write(&rockspec_file, rockspec.to_lua_rockspec_string())?;
+    std::fs::write(
+        &rockspec_file,
+        rockspec
+            .to_lua_remote_rockspec_string()
+            .map_err(|err| LuarocksBuildError::Rockspec(err.to_string()))?,
+    )?;
     let luarocks = LuaRocksInstallation::new(config, tree.build_tree(config)?)?;
     let luarocks_tree = TempDir::new("luarocks-compat-tree")?;
     luarocks

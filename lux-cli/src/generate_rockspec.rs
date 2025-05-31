@@ -9,7 +9,7 @@ pub fn generate_rockspec(_data: GenerateRockspec) -> Result<()> {
     let project = Project::current()?.unwrap();
 
     let toml = project.toml().into_remote()?;
-    let rockspec = toml.to_lua_rockspec_string();
+    let rockspec = toml.to_lua_remote_rockspec_string()?;
 
     let path = project
         .root()

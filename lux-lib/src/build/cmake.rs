@@ -15,12 +15,10 @@ use crate::{
     lua_rockspec::{Build, BuildInfo, CMakeBuildSpec},
     progress::{Progress, ProgressBar},
     tree::{RockLayout, Tree},
-};
-
-use super::{
-    external_dependency::ExternalDependencyInfo,
     variables::{self, HasVariables, VariableSubstitutionError},
 };
+
+use super::external_dependency::ExternalDependencyInfo;
 
 const CMAKE_BUILD_FILE: &str = "build.lux";
 
