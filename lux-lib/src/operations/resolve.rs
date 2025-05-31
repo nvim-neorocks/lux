@@ -94,7 +94,6 @@ where
                             .dependencies()
                             .current_platform()
                             .iter()
-                            .filter(|dep| !dep.name().eq(&"lua".into()))
                             .map(|dep| {
                                 // If we're forcing a rebuild, retain the `EntryType`
                                 // of existing dependencies
