@@ -4,7 +4,7 @@ use assert_fs::prelude::PathCopy;
 use lux_lib::{
     config::{ConfigBuilder, LuaVersion},
     lua_installation::detect_installed_lua_version,
-    operations::{LuaBinary, Test},
+    operations::Test,
     project::Project,
 };
 
@@ -19,11 +19,7 @@ async fn run_busted_test() {
     let tree_root = project.root().to_path_buf().join(".lux");
     let _ = std::fs::remove_dir_all(&tree_root);
 
-    let lua_version = detect_installed_lua_version(LuaBinary::default())
-        .await
-        .ok()
-        .and_then(|version| LuaVersion::from_version(version).ok())
-        .or(Some(LuaVersion::Lua51));
+    let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
 
     let config = ConfigBuilder::new()
         .unwrap()
@@ -46,11 +42,7 @@ async fn run_busted_test_no_lock() {
     let tree_root = project.root().to_path_buf().join(".lux");
     let _ = std::fs::remove_dir_all(&tree_root);
 
-    let lua_version = detect_installed_lua_version(LuaBinary::default())
-        .await
-        .ok()
-        .and_then(|version| LuaVersion::from_version(version).ok())
-        .or(Some(LuaVersion::Lua51));
+    let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
 
     let config = ConfigBuilder::new()
         .unwrap()

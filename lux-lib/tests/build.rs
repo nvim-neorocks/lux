@@ -5,9 +5,8 @@ use assert_fs::TempDir;
 use lux_lib::{
     build::{Build, BuildBehaviour::Force},
     config::{ConfigBuilder, LuaVersion},
-    lua_installation::{detect_installed_lua_version, detect_installed_lua_version_sync},
+    lua_installation::detect_installed_lua_version,
     lua_rockspec::RemoteLuaRockspec,
-    operations::LuaBinary,
     progress::{MultiProgress, Progress},
     project::Project,
     tree,
@@ -23,11 +22,7 @@ async fn builtin_build() {
             .unwrap();
     let rockspec = RemoteLuaRockspec::new(&content).unwrap();
 
-    let lua_version = detect_installed_lua_version(LuaBinary::default())
-        .await
-        .ok()
-        .and_then(|version| LuaVersion::from_version(version).ok())
-        .or(Some(LuaVersion::Lua51));
+    let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
 
     let config = ConfigBuilder::new()
         .unwrap()
@@ -66,11 +61,7 @@ async fn make_build() {
     .unwrap();
     let rockspec = RemoteLuaRockspec::new(&content).unwrap();
 
-    let lua_version = detect_installed_lua_version(LuaBinary::default())
-        .await
-        .ok()
-        .and_then(|version| LuaVersion::from_version(version).ok())
-        .or(Some(LuaVersion::Lua51));
+    let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
 
     let config = ConfigBuilder::new()
         .unwrap()
@@ -123,11 +114,7 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
     let content = String::from_utf8(std::fs::read(rockspec_path).unwrap()).unwrap();
     let rockspec = RemoteLuaRockspec::new(&content).unwrap();
 
-    let lua_version = detect_installed_lua_version(LuaBinary::default())
-        .await
-        .ok()
-        .and_then(|version| LuaVersion::from_version(version).ok())
-        .or(Some(LuaVersion::Lua51));
+    let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
 
     let config = ConfigBuilder::new()
         .unwrap()
@@ -171,11 +158,7 @@ async fn treesitter_parser_build() {
     .unwrap();
     let rockspec = RemoteLuaRockspec::new(&content).unwrap();
 
-    let lua_version = detect_installed_lua_version(LuaBinary::default())
-        .await
-        .ok()
-        .and_then(|version| LuaVersion::from_version(version).ok())
-        .or(Some(LuaVersion::Lua51));
+    let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
 
     let config = ConfigBuilder::new()
         .unwrap()
@@ -213,11 +196,7 @@ async fn test_build_local_project_no_source() {
     let project = Project::from(&project_root).unwrap().unwrap();
     let project_toml = project.toml().into_local().unwrap();
 
-    let lua_version = detect_installed_lua_version(LuaBinary::default())
-        .await
-        .ok()
-        .and_then(|version| LuaVersion::from_version(version).ok())
-        .or(Some(LuaVersion::Lua51));
+    let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
 
     let config = ConfigBuilder::new()
         .unwrap()
@@ -251,11 +230,7 @@ async fn test_build_local_project_only_src() {
     let project = Project::from(&project_root).unwrap().unwrap();
     let project_toml = project.toml().into_local().unwrap();
 
-    let lua_version = detect_installed_lua_version(LuaBinary::default())
-        .await
-        .ok()
-        .and_then(|version| LuaVersion::from_version(version).ok())
-        .or(Some(LuaVersion::Lua51));
+    let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
 
     let config = ConfigBuilder::new()
         .unwrap()
@@ -295,10 +270,7 @@ fn test_build_multiple_treesitter_parsers() {
     .unwrap();
     let rockspec = RemoteLuaRockspec::new(&content).unwrap();
 
-    let lua_version = detect_installed_lua_version_sync(LuaBinary::default())
-        .ok()
-        .and_then(|version| LuaVersion::from_version(version).ok())
-        .or(Some(LuaVersion::Lua51));
+    let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
 
     let runtime = Builder::new_multi_thread()
         .worker_threads(4)
@@ -351,11 +323,7 @@ async fn build_project_with_git_dependency() {
     let project = Project::from(&project_root).unwrap().unwrap();
     let project_toml = project.toml().into_local().unwrap();
 
-    let lua_version = detect_installed_lua_version(LuaBinary::default())
-        .await
-        .ok()
-        .and_then(|version| LuaVersion::from_version(version).ok())
-        .or(Some(LuaVersion::Lua51));
+    let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
 
     let config = ConfigBuilder::new()
         .unwrap()
