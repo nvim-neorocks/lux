@@ -1,22 +1,92 @@
 use itertools::Itertools;
 use mlua::{FromLua, IntoLua, UserData};
+use path_slash::PathExt;
 use serde_enum_str::Serialize_enum_str;
-use std::{convert::Infallible, path::PathBuf};
+use std::{
+    convert::Infallible,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
 
 use serde::{Deserialize, Deserializer};
+
+use crate::package::PackageReq;
 
 use super::{
     DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue, FromPlatformOverridable, PartialOverride,
     PerPlatform, PerPlatformWrapper, PlatformOverridable,
 };
 
+#[derive(Error, Debug)]
+pub enum TestSpecDecodeError {
+    #[error("'command' test type must specify 'command' or 'script' field")]
+    NoCommandOrScript,
+    #[error("'command' test type cannot have both 'command' and 'script' fields")]
+    CommandAndScript,
+}
+
+#[derive(Error, Debug)]
+pub enum TestSpecError {
+    #[error("could not auto-detect test spec. Please add one to your lux.toml")]
+    NoTestSpecDetected,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum TestSpec {
     AutoDetect,
     Busted(BustedTestSpec),
     Command(CommandTestSpec),
-    Script(ScriptTestSpec),
+    Script(LuaScriptTestSpec),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum ValidatedTestSpec {
+    Busted(BustedTestSpec),
+    Command(CommandTestSpec),
+    LuaScript(LuaScriptTestSpec),
+}
+
+impl TestSpec {
+    pub(crate) fn runner(&self, project_root: &Path) -> Option<PackageReq> {
+        self.to_validated(project_root)
+            .ok()
+            .and_then(|spec| spec.runner())
+    }
+
+    pub(crate) fn to_validated(
+        &self,
+        project_root: &Path,
+    ) -> Result<ValidatedTestSpec, TestSpecError> {
+        match self {
+            Self::AutoDetect if project_root.join(".busted").is_file() => {
+                Ok(ValidatedTestSpec::Busted(BustedTestSpec::default()))
+            }
+            Self::Busted(spec) => Ok(ValidatedTestSpec::Busted(spec.clone())),
+            Self::Command(spec) => Ok(ValidatedTestSpec::Command(spec.clone())),
+            Self::Script(spec) => Ok(ValidatedTestSpec::LuaScript(spec.clone())),
+            Self::AutoDetect => Err(TestSpecError::NoTestSpecDetected),
+        }
+    }
+}
+
+impl ValidatedTestSpec {
+    pub fn args(&self) -> Vec<String> {
+        match self {
+            Self::Busted(spec) => spec.flags.clone(),
+            Self::Command(spec) => spec.flags.clone(),
+            Self::LuaScript(spec) => std::iter::once(spec.script.to_slash_lossy().to_string())
+                .chain(spec.flags.clone())
+                .collect_vec(),
+        }
+    }
+
+    fn runner(&self) -> Option<PackageReq> {
+        match self {
+            Self::Busted(_) => Some(PackageReq::new("busted".into(), None).unwrap()),
+            Self::Command(_) => None,
+            Self::LuaScript(_) => None,
+        }
+    }
 }
 
 impl Default for TestSpec {
@@ -38,25 +108,17 @@ impl IntoLua for TestSpec {
     }
 }
 
-#[derive(Error, Debug)]
-pub enum TestSpecError {
-    #[error("'command' test type must specify 'command' or 'script' field")]
-    NoCommandOrScript,
-    #[error("'command' test type cannot have both 'command' and 'script' fields")]
-    CommandAndScript,
-}
-
 impl FromPlatformOverridable<TestSpecInternal, Self> for TestSpec {
-    type Err = TestSpecError;
+    type Err = TestSpecDecodeError;
 
     fn from_platform_overridable(internal: TestSpecInternal) -> Result<Self, Self::Err> {
         let test_spec = match internal.test_type {
             Some(TestType::Busted) => Ok(Self::Busted(BustedTestSpec {
                 flags: internal.flags.unwrap_or_default(),
             })),
-            Some(TestType::Command) => match (internal.command, internal.script) {
-                (None, None) => Err(TestSpecError::NoCommandOrScript),
-                (None, Some(script)) => Ok(Self::Script(ScriptTestSpec {
+            Some(TestType::Command) => match (internal.command, internal.lua_script) {
+                (None, None) => Err(TestSpecDecodeError::NoCommandOrScript),
+                (None, Some(script)) => Ok(Self::Script(LuaScriptTestSpec {
                     script,
                     flags: internal.flags.unwrap_or_default(),
                 })),
@@ -64,7 +126,7 @@ impl FromPlatformOverridable<TestSpecInternal, Self> for TestSpec {
                     command,
                     flags: internal.flags.unwrap_or_default(),
                 })),
-                (Some(_), Some(_)) => Err(TestSpecError::CommandAndScript),
+                (Some(_), Some(_)) => Err(TestSpecDecodeError::CommandAndScript),
             },
             None => Ok(Self::default()),
         }?;
@@ -96,7 +158,7 @@ impl<'de> Deserialize<'de> for TestSpec {
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct BustedTestSpec {
-    flags: Vec<String>,
+    pub(crate) flags: Vec<String>,
 }
 
 impl UserData for BustedTestSpec {
@@ -107,8 +169,8 @@ impl UserData for BustedTestSpec {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CommandTestSpec {
-    command: String,
-    flags: Vec<String>,
+    pub(crate) command: String,
+    pub(crate) flags: Vec<String>,
 }
 
 impl UserData for CommandTestSpec {
@@ -119,12 +181,12 @@ impl UserData for CommandTestSpec {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ScriptTestSpec {
-    script: PathBuf,
-    flags: Vec<String>,
+pub struct LuaScriptTestSpec {
+    pub(crate) script: PathBuf,
+    pub(crate) flags: Vec<String>,
 }
 
-impl UserData for ScriptTestSpec {
+impl UserData for LuaScriptTestSpec {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("script", |_, this, _: ()| Ok(this.script.clone()));
         methods.add_method("flags", |_, this, _: ()| Ok(this.flags.clone()));
@@ -146,8 +208,8 @@ pub(crate) struct TestSpecInternal {
     pub(crate) flags: Option<Vec<String>>,
     #[serde(default)]
     pub(crate) command: Option<String>,
-    #[serde(default)]
-    pub(crate) script: Option<PathBuf>,
+    #[serde(default, rename = "script", alias = "lua_script")]
+    pub(crate) lua_script: Option<PathBuf>,
 }
 
 impl PartialOverride for TestSpecInternal {
@@ -166,13 +228,13 @@ impl PartialOverride for TestSpecInternal {
                 (override_vec @ Some(_), None) => override_vec,
                 _ => None,
             },
-            command: match override_spec.script.clone() {
+            command: match override_spec.lua_script.clone() {
                 Some(_) => None,
                 None => override_opt(&override_spec.command, &self.command),
             },
-            script: match override_spec.command.clone() {
+            lua_script: match override_spec.command.clone() {
                 Some(_) => None,
-                None => override_opt(&override_spec.script, &self.script),
+                None => override_opt(&override_spec.lua_script, &self.lua_script),
             },
         })
     }
@@ -224,7 +286,7 @@ impl DisplayAsLuaKV for TestSpecInternal {
                 value: DisplayLuaValue::String(command.clone()),
             });
         }
-        if let Some(script) = &self.script {
+        if let Some(script) = &self.lua_script {
             result.push(DisplayLuaKV {
                 key: "script".to_string(),
                 value: DisplayLuaValue::String(script.to_string_lossy().to_string()),
@@ -339,7 +401,7 @@ mod tests {
             PerPlatform::from_lua(lua.globals().get("test").unwrap(), &lua).unwrap();
         assert_eq!(
             test_spec.default,
-            TestSpec::Script(ScriptTestSpec {
+            TestSpec::Script(LuaScriptTestSpec {
                 script: PathBuf::from("test.lua"),
                 flags: vec!["foo".into(), "bar".into()],
             })
@@ -387,7 +449,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             *macosx,
-            TestSpec::Script(ScriptTestSpec {
+            TestSpec::Script(LuaScriptTestSpec {
                 script: "bat.lua".into(),
                 flags: vec!["foo".into(), "bar".into(), "bat".into(), "baz".into()],
             })

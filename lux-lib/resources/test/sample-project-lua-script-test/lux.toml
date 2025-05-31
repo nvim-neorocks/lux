@@ -4,3 +4,7 @@ lua = "5.1"
 
 [build]
 type = "builtin"
+
+[test]
+type = "command"
+script = "test.lua"

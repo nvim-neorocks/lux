@@ -33,7 +33,7 @@ use crate::{
         ExternalDependencySpec, FromPlatformOverridable, LuaVersionError, PartialLuaRockspec,
         PerPlatform, PlatformIdentifier, PlatformSupport, PlatformValidationError,
         RemoteRockSource, RockDescription, RockSourceError, RockspecFormat, TestSpec,
-        TestSpecError, TestSpecInternal,
+        TestSpecDecodeError, TestSpecInternal,
     },
     package::{
         BuildDependencies, Dependencies, PackageName, PackageReq, PackageVersion,
@@ -141,7 +141,7 @@ pub enum LocalProjectTomlValidationError {
     #[error("no lua version provided")]
     NoLuaVersion,
     #[error(transparent)]
-    TestSpecError(#[from] TestSpecError),
+    TestSpecError(#[from] TestSpecDecodeError),
     #[error(transparent)]
     BuildSpecInternal(#[from] BuildSpecInternalError),
     #[error(transparent)]

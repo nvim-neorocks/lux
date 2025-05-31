@@ -773,7 +773,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_add_various_dependencies() {
-        let sample_project: PathBuf = "resources/test/sample-project-busted/".into();
+        let sample_project: PathBuf = "resources/test/sample-project-no-build-spec/".into();
         let project_root = assert_fs::TempDir::new().unwrap();
         project_root.copy_from(&sample_project, &["**"]).unwrap();
         let project_root: PathBuf = project_root.path().into();

@@ -55,8 +55,17 @@ where
     }
 
     pub async fn sync_test_dependencies(mut self) -> Result<SyncReport, SyncError> {
-        let busted = PackageReq::new("busted".into(), None).unwrap();
-        self = self.add_package(busted);
+        let toml = self.project.toml().into_local()?;
+        if let Some(test_runner) = toml.test().current_platform().runner(self.project.root()) {
+            if !toml
+                .test_dependencies()
+                .current_platform()
+                .iter()
+                .any(|dep| dep.name() == test_runner.name())
+            {
+                self.extra_packages.push(test_runner);
+            }
+        }
         do_sync(self._build(), &LocalPackageLockType::Test).await
     }
 
