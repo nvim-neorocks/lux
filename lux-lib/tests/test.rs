@@ -61,6 +61,17 @@ async fn run_busted_test_no_lock() {
 #[cfg(not(target_env = "msvc"))]
 #[tokio::test]
 async fn run_busted_nlua_test() {
+    run_busted_nlua_test_impl(false).await
+}
+
+#[cfg(not(target_env = "msvc"))]
+#[tokio::test]
+async fn run_busted_nlua_test_no_lock() {
+    run_busted_nlua_test_impl(true).await
+}
+
+#[cfg(not(target_env = "msvc"))]
+async fn run_busted_nlua_test_impl(no_lock: bool) {
     use lux_lib::lua_installation::LuaInstallation;
 
     let project_root =
@@ -81,7 +92,7 @@ async fn run_busted_nlua_test() {
     let lua = LuaInstallation::new(&LuaVersion::Lua51, &config);
     if lua.lua_binary_or_config_override(&config).is_some() {
         Test::new(project, &config)
-            .no_lock(true)
+            .no_lock(no_lock)
             .run()
             .await
             .unwrap();

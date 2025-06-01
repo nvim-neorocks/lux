@@ -117,10 +117,6 @@ pub enum RunTestsError {
 
 async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
     let rocks = test.project.toml().into_local()?;
-    let project_tree = test.project.tree(test.config)?;
-    let test_tree = test.project.test_tree(test.config)?;
-    std::fs::create_dir_all(test_tree.root())?;
-
     let no_lock = test.no_lock.unwrap_or(false);
 
     // TODO(#204): Only ensure busted if running with busted (e.g. a .busted directory exists)
@@ -138,6 +134,9 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
         .only_deps(false)
         .build()
         .await?;
+
+    let project_tree = test.project.tree(test.config)?;
+    let test_tree = test.project.test_tree(test.config)?;
 
     let test_tree_root = &test_tree.root().clone();
     let mut paths = Paths::new(&project_tree)?;
@@ -251,7 +250,7 @@ async fn ensure_dependencies(
         .filter_map(|dep| {
             let build_behaviour = if test_tree
                 .match_rocks(dep.package_req())
-                .is_ok_and(|matches| matches.is_found())
+                .is_ok_and(|matches| !matches.is_found())
             {
                 Some(BuildBehaviour::Force)
             } else {
