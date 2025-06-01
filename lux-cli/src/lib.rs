@@ -1,4 +1,5 @@
 use crate::project::NewProject;
+use std::error::Error;
 use std::path::PathBuf;
 
 use add::Add;
@@ -110,6 +111,11 @@ pub struct Cli {
     /// Do not use project tree even if running from a project folder.
     #[arg(long)]
     pub no_project: bool,
+
+    /// Override config variables.{n}
+    /// Example: `lx -v "LUA=/path/to/lua" ...`
+    #[arg(long, value_name = "variable", visible_short_aliases = ['v'], value_parser = parse_key_val::<String, String>)]
+    pub variables: Option<Vec<(String, String)>>,
 
     /// Display verbose output of commands executed.
     #[arg(long)]
@@ -262,4 +268,18 @@ pub enum Commands {
     Upload(Upload),
     /// Tell which file corresponds to a given module name.
     Which(Which),
+}
+
+/// Parse a key=value pair.
+fn parse_key_val<T, U>(s: &str) -> Result<(T, U), Box<dyn Error + Send + Sync + 'static>>
+where
+    T: std::str::FromStr,
+    T::Err: Error + Send + Sync + 'static,
+    U: std::str::FromStr,
+    U::Err: Error + Send + Sync + 'static,
+{
+    let pos = s
+        .find('=')
+        .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{s}`"))?;
+    Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
 }

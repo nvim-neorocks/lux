@@ -35,6 +35,10 @@ async fn main() -> Result<()> {
                 .map(|duration| Duration::from_secs(duration as u64)),
         )
         .no_project(Some(cli.no_project))
+        .variables(
+            cli.variables
+                .map(|variables| variables.into_iter().collect()),
+        )
         .verbose(Some(cli.verbose));
 
     if cli.nvim {

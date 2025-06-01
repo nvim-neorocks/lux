@@ -419,6 +419,10 @@ impl ConfigBuilder {
         Self { no_project, ..self }
     }
 
+    pub fn variables(self, variables: Option<HashMap<String, String>>) -> Self {
+        Self { variables, ..self }
+    }
+
     pub fn verbose(self, verbose: Option<bool>) -> Self {
         Self { verbose, ..self }
     }
