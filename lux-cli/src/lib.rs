@@ -69,17 +69,15 @@ pub mod which;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None, arg_required_else_help = true)]
 pub struct Cli {
-    /// Enable the sub-repositories in luarocks servers for
-    /// rockspecs of in-development versions.
+    /// Enable the sub-repositories in luarocks servers forrockspecs of in-development versions.
     #[arg(long)]
     pub dev: bool,
 
-    /// Fetch rocks/rockspecs from this server (takes priority
-    /// over config file).
+    /// Fetch rocks/rockspecs from this server (takes priority over config file).
     #[arg(long, value_name = "server")]
     pub server: Option<Url>,
 
-    /// Fetch rocks/rockspecs from this server in addition to the main server
+    /// Fetch rocks/rockspecs from this server in addition to the main server{n}
     /// (overrides any entries in the config file).
     #[arg(long, value_name = "extra-server")]
     pub extra_servers: Option<Vec<Url>>,
@@ -96,7 +94,7 @@ pub struct Cli {
     #[arg(long, value_name = "prefix")]
     pub lua_dir: Option<PathBuf>,
 
-    /// Which Lua installation to use.
+    /// Which Lua installation to use.{n}
     /// Valid versions are: '5.1', '5.2', '5.3', '5.4', 'jit' and 'jit52'.
     #[arg(long, value_name = "ver")]
     pub lua_version: Option<LuaVersion>,
@@ -121,7 +119,7 @@ pub struct Cli {
     #[arg(long)]
     pub nvim: bool,
 
-    /// Timeout on network operations, in seconds.
+    /// Timeout on network operations, in seconds.{n}
     /// 0 means no timeout (wait forever). Default is 30.
     #[arg(long, value_name = "seconds")]
     pub timeout: Option<usize>,
@@ -192,7 +190,48 @@ pub enum Commands {
     /// Query the luarocks servers.
     #[command(arg_required_else_help = true)]
     Search(Search),
-    /// Run the test suite in the current directory.
+    /// Run the test suite in the current project directory.{n}
+    /// Lux supports the following test backends, specified by the `[test]` table in the lux.toml:{n}
+    /// {n}
+    ///   - busted:{n}
+    ///     {n}
+    ///     https://lunarmodules.github.io/busted/{n}
+    ///     {n}
+    ///     Example:{n}
+    ///     {n}
+    ///     ```toml{n}
+    ///     [test]{n}
+    ///     type = "busted"{n}
+    ///     flags = [ ] # Optional CLI flags to pass to busted{n}
+    ///     ```{n}
+    ///     {n}
+    ///     `lx test` will default to using `busted`{n}
+    ///     if there is a `.busted` file in the project root{n}
+    ///     and no test backend is specified.{n}
+    /// {n}
+    ///   - command:{n}
+    ///     {n}
+    ///     Name/file name of a shell command that will run the test suite.{n}
+    ///     Example:{n}
+    ///     {n}
+    ///     ```toml{n}
+    ///     [test]{n}
+    ///     type = "command"{n}
+    ///     command = "make"{n}
+    ///     flags = [ "test" ]{n}
+    ///     ```{n}
+    ///     {n}
+    ///   - script:{n}
+    ///     {n}
+    ///     Relative path to a Lua script that will run the test suite.{n}
+    ///     Example:{n}
+    ///     {n}
+    ///     ```toml{n}
+    ///     [test]{n}
+    ///     type = "script"{n}
+    ///     script = "tests.lua" # Expects a tests.lua file in the project root{n}
+    ///     flags = [ ] # Optional arguments passed to the test script{n}
+    ///     ```{n}
     Test(Test),
     /// Uninstall a rock from the system.
     Uninstall(Uninstall),
@@ -202,22 +241,22 @@ pub enum Commands {
     Update(Update),
     /// Generate a Lua rockspec for a Lux project and upload it to the public luarocks repository.{n}
     /// You can specify a source template for release and dev packages in the lux.toml.{n}
-    ///{n}
+    /// {n}
     /// Example:{n}
-    ///{n}
+    /// {n}
     /// ```toml{n}
     /// [source]{n}
     /// url = "https://host.com/owner/$(PACKAGE)/refs/tags/$(REF).zip"{n}
     /// dev = "git+https://host.com/owner/$(PACKAGE).git"{n}
     /// ```{n}
-    ///{n}
+    /// {n}
     /// You can use the following variables in the source template:{n}
-    ///{n}
-    /// - $(PACKAGE): The package name.{n}
-    /// - $(VERSION): The package version.{n}
-    /// - $(REF): The git tag or revision (if in a git repository).{n}
-    /// - You may also specify environment variables with `$(<VAR_NAME>)`.{n}
-    ///{n}
+    /// {n}
+    ///  - $(PACKAGE): The package name.{n}
+    ///  - $(VERSION): The package version.{n}
+    ///  - $(REF): The git tag or revision (if in a git repository).{n}
+    ///  - You may also specify environment variables with `$(<VAR_NAME>)`.{n}
+    /// {n}
     /// If the `version` is not set in the lux.toml, lux will search the current
     /// commit for SemVer tags and if found, will use it to generate the package version.
     Upload(Upload),

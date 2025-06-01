@@ -8,8 +8,9 @@ use lux_lib::{
 
 #[derive(Args)]
 pub struct Test {
-    /// Arguments to pass to the test runner.
+    /// Extra arguments to pass to the test runner or test script.
     test_args: Option<Vec<String>>,
+
     /// Don't isolate the user environment (keep `HOME` and `XDG` environment variables).
     #[arg(long)]
     impure: bool,
