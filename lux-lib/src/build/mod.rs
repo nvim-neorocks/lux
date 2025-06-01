@@ -342,10 +342,10 @@ async fn install<R: Rockspec + HasIntegrity>(
         )?;
         progress.map(|p| p.set_position(p.position() + 1));
     }
-    if lib_len > 0 {
-        progress.map(|p| p.set_message("Copying binaries..."));
-    }
-    if *entry_type == EntryType::Entrypoint {
+    if entry_type.is_entrypoint() {
+        if bin_len > 0 {
+            progress.map(|p| p.set_message("Installing binaries..."));
+        }
         let deploy_spec = rockspec.deploy().current_platform();
         for (target, source) in &install_spec.bin {
             utils::install_binary(

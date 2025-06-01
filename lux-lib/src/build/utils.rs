@@ -6,18 +6,18 @@ use crate::{
     variables::{self, Environment, VariableSubstitutionError},
 };
 use itertools::Itertools;
+use mlua::{Lua, LuaSerdeExt};
 use path_slash::PathExt;
 use shlex::try_quote;
 use std::{
     collections::HashMap,
     io,
     path::{Path, PathBuf},
-    process::{ExitStatus, Output, Stdio},
+    process::{ExitStatus, Output},
     string::FromUtf8Error,
 };
 use target_lexicon::Triple;
 use thiserror::Error;
-use tokio::process::Command;
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -545,23 +545,29 @@ async fn set_executable_permissions(script: &Path) -> std::io::Result<()> {
 /// But that's unlikely to be the case in practise.
 /// If a script is mistaken for a Lua script, package authors can disable
 /// wrapping with the `deploy.wrap_bin_scripts` rockspec config.
-async fn is_compatible_lua_script(file: &Path, lua: &LuaInstallation, config: &Config) -> bool {
-    if let Some(lua_bin) = lua.lua_binary_or_config_override(config) {
-        Command::new(lua_bin)
-            .arg("-e")
-            .arg(format!(
-                "if loadfile('{}') then os.exit(0) else os.exit(1) end",
-                // On Windows, Lua escapes path separators, so we ensure forward slashes
+async fn is_compatible_lua_script(
+    file: &Path,
+    lua_installation: &LuaInstallation,
+    config: &Config,
+) -> bool {
+    lua_installation
+        .lua_binary_or_config_override(config)
+        .is_some_and(|_| {
+            let lua = Lua::new();
+            lua.load(format!(
+                "is_compatible_lua_script = loadfile('{}') ~= nil",
                 file.to_slash_lossy()
             ))
-            .stderr(Stdio::null())
-            .stdout(Stdio::null())
-            .status()
-            .await
-            .is_ok_and(|status| status.success())
-    } else {
-        false
-    }
+            .exec()
+            .is_ok_and(|()| {
+                lua.globals()
+                    .get("is_compatible_lua_script")
+                    .is_ok_and(|value| {
+                        lua.from_value(value)
+                            .is_ok_and(|is_compatible| is_compatible)
+                    })
+            })
+        })
 }
 
 pub(crate) fn substitute_variables(
@@ -596,6 +602,8 @@ pub(crate) fn format_path(path: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
+    use tokio::process::Command;
+
     use crate::config::ConfigBuilder;
 
     use super::*;

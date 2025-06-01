@@ -336,6 +336,12 @@ pub enum EntryType {
     DependencyOnly,
 }
 
+impl EntryType {
+    pub fn is_entrypoint(&self) -> bool {
+        matches!(self, Self::Entrypoint)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum RockMatches {
     NotFound(PackageReq),
