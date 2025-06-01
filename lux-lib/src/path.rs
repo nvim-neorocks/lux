@@ -6,7 +6,7 @@ use thiserror::Error;
 
 use crate::{
     build::utils::c_dylib_extension,
-    config::{Config, LuaVersion},
+    config::LuaVersion,
     tree::{Tree, TreeError},
 };
 
@@ -63,28 +63,14 @@ impl Paths {
                 Ok::<Paths, TreeError>(paths)
             })?;
 
-        let lib_name = format!("lux-lua{}", tree.version());
-        let lib_path = option_env!("LUX_LIB_DIR")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| {
-                pkg_config::Config::new()
-                    .print_system_libs(false)
-                    .cargo_metadata(false)
-                    .env_metadata(false)
-                    .probe(&lib_name)
-                    .ok()
-                    .and_then(|library| library.link_paths.first().cloned())
-                    .unwrap_or_else(|| Config::get_default_data_path().unwrap())
-            })
-            .join(tree.version().to_string())
-            .join("?.so");
-
-        paths.prepend(&Paths {
-            version: tree.version().clone(),
-            src: <_>::default(),
-            bin: <_>::default(),
-            lib: PackagePath(vec![lib_path]),
-        });
+        if let Some(lib_path) = tree.version().lux_lib_dir() {
+            paths.prepend(&Paths {
+                version: tree.version().clone(),
+                src: <_>::default(),
+                bin: <_>::default(),
+                lib: PackagePath(vec![lib_path.join(".so")]),
+            });
+        }
 
         Ok(paths)
     }

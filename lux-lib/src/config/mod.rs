@@ -106,6 +106,23 @@ impl LuaVersion {
     pub(crate) fn is_luajit(&self) -> bool {
         matches!(self, Self::LuaJIT | Self::LuaJIT52)
     }
+
+    /// Searches for the path to the lux-lua library for this version
+    pub fn lux_lib_dir(&self) -> Option<PathBuf> {
+        let lib_name = format!("lux-lua{}", self);
+        option_env!("LUX_LIB_DIR")
+            .map(PathBuf::from)
+            .or_else(|| {
+                pkg_config::Config::new()
+                    .print_system_libs(false)
+                    .cargo_metadata(false)
+                    .env_metadata(false)
+                    .probe(&lib_name)
+                    .ok()
+                    .and_then(|library| library.link_paths.first().cloned())
+            })
+            .map(|path| path.join(self.to_string()))
+    }
 }
 
 #[derive(Error, Debug)]

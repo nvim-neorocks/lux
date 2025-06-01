@@ -26,8 +26,8 @@ pub struct Path {
 #[derive(Subcommand, PartialEq, Eq, Debug, Clone)]
 #[clap(rename_all = "kebab_case")]
 enum PathCmd {
-    /// Generate an export statement for all paths.
-    /// (formatted as a shell command) [Default]
+    /// Generate an export statement for all paths
+    /// (formatted as a shell command). [Default]
     Full(FullArgs),
     /// Generate a `LUA_PATH` expression for `lua` libraries in the lux tree.
     /// (not formatted as a shell command)
@@ -89,6 +89,19 @@ pub async fn path(path_data: Path, config: Config) -> Result<()> {
     match cmd {
         PathCmd::Full(args) => {
             let mut result = String::new();
+            let no_init = args.no_init || {
+                if tree.version().lux_lib_dir().is_none() {
+                    eprintln!(
+                        "⚠️ WARNING: lux-lua library not found.
+Cannot use the `lux.loader`.
+To suppress this warning, run `lx path full --no-init`.
+                "
+                    );
+                    true
+                } else {
+                    false
+                }
+            };
             let shell = args.shell;
             let package_path = mk_package_path(&paths, prepend)?;
             if !package_path.is_empty() {
@@ -107,7 +120,7 @@ pub async fn path(path_data: Path, config: Config) -> Result<()> {
                     result.push('\n')
                 }
             }
-            if !args.no_init {
+            if !no_init {
                 result.push_str(format_export(&shell, "LUA_INIT", &paths.init()).as_str());
                 result.push('\n')
             }
