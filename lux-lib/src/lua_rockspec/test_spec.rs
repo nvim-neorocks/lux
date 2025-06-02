@@ -2,20 +2,27 @@ use itertools::Itertools;
 use mlua::{FromLua, IntoLua, UserData};
 use path_slash::PathExt;
 use serde_enum_str::Serialize_enum_str;
-use std::{
-    convert::Infallible,
-    path::{Path, PathBuf},
-};
+use std::{convert::Infallible, path::PathBuf};
 use thiserror::Error;
 
 use serde::{Deserialize, Deserializer};
 
-use crate::package::PackageReq;
+use crate::{
+    config::{Config, ConfigBuilder, ConfigError, LuaVersion},
+    package::PackageReq,
+    project::{project_toml::LocalProjectTomlValidationError, Project},
+    rockspec::Rockspec,
+};
 
 use super::{
     DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue, FromPlatformOverridable, PartialOverride,
     PerPlatform, PerPlatformWrapper, PlatformOverridable,
 };
+
+#[cfg(target_family = "unix")]
+const NLUA_EXE: &str = "nlua";
+#[cfg(target_family = "windows")]
+const NLUA_EXE: &str = "nlua.bat";
 
 #[derive(Error, Debug)]
 pub enum TestSpecDecodeError {
@@ -29,12 +36,15 @@ pub enum TestSpecDecodeError {
 pub enum TestSpecError {
     #[error("could not auto-detect test spec. Please add one to your lux.toml")]
     NoTestSpecDetected,
+    #[error(transparent)]
+    LocalProjectTomlValidation(#[from] LocalProjectTomlValidationError),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TestSpec {
     AutoDetect,
     Busted(BustedTestSpec),
+    BustedNlua(BustedTestSpec),
     Command(CommandTestSpec),
     Script(LuaScriptTestSpec),
 }
@@ -42,26 +52,44 @@ pub enum TestSpec {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum ValidatedTestSpec {
     Busted(BustedTestSpec),
+    BustedNlua(BustedTestSpec),
     Command(CommandTestSpec),
     LuaScript(LuaScriptTestSpec),
 }
 
 impl TestSpec {
-    pub(crate) fn runner(&self, project_root: &Path) -> Option<PackageReq> {
-        self.to_validated(project_root)
+    pub(crate) fn test_dependencies(&self, project: &Project) -> Vec<PackageReq> {
+        self.to_validated(project)
             .ok()
-            .and_then(|spec| spec.runner())
+            .iter()
+            .flat_map(|spec| spec.test_dependencies())
+            .collect_vec()
     }
 
     pub(crate) fn to_validated(
         &self,
-        project_root: &Path,
+        project: &Project,
     ) -> Result<ValidatedTestSpec, TestSpecError> {
+        let project_root = project.root();
+        let toml = project.toml().into_local()?;
+        let test_dependencies = toml.test_dependencies().current_platform();
+        let is_busted = project_root.join(".busted").is_file()
+            || test_dependencies
+                .iter()
+                .any(|dep| dep.name().to_string() == "busted");
         match self {
-            Self::AutoDetect if project_root.join(".busted").is_file() => {
-                Ok(ValidatedTestSpec::Busted(BustedTestSpec::default()))
+            Self::AutoDetect if is_busted => {
+                if test_dependencies
+                    .iter()
+                    .any(|dep| dep.name().to_string() == "nlua")
+                {
+                    Ok(ValidatedTestSpec::BustedNlua(BustedTestSpec::default()))
+                } else {
+                    Ok(ValidatedTestSpec::Busted(BustedTestSpec::default()))
+                }
             }
             Self::Busted(spec) => Ok(ValidatedTestSpec::Busted(spec.clone())),
+            Self::BustedNlua(spec) => Ok(ValidatedTestSpec::BustedNlua(spec.clone())),
             Self::Command(spec) => Ok(ValidatedTestSpec::Command(spec.clone())),
             Self::Script(spec) => Ok(ValidatedTestSpec::LuaScript(spec.clone())),
             Self::AutoDetect => Err(TestSpecError::NoTestSpecDetected),
@@ -73,6 +101,7 @@ impl ValidatedTestSpec {
     pub fn args(&self) -> Vec<String> {
         match self {
             Self::Busted(spec) => spec.flags.clone(),
+            Self::BustedNlua(spec) => spec.flags.clone(),
             Self::Command(spec) => spec.flags.clone(),
             Self::LuaScript(spec) => std::iter::once(spec.script.to_slash_lossy().to_string())
                 .chain(spec.flags.clone())
@@ -80,11 +109,32 @@ impl ValidatedTestSpec {
         }
     }
 
-    fn runner(&self) -> Option<PackageReq> {
+    pub(crate) fn test_config(&self, config: &Config) -> Result<Config, ConfigError> {
         match self {
-            Self::Busted(_) => Some(PackageReq::new("busted".into(), None).unwrap()),
-            Self::Command(_) => None,
-            Self::LuaScript(_) => None,
+            Self::BustedNlua(_) => {
+                let config_builder: ConfigBuilder = config.clone().into();
+                Ok(config_builder
+                    .lua_version(Some(LuaVersion::Lua51))
+                    .variables(Some(
+                        vec![("LUA".to_string(), NLUA_EXE.to_string())]
+                            .into_iter()
+                            .collect(),
+                    ))
+                    .build()?)
+            }
+            _ => Ok(config.clone()),
+        }
+    }
+
+    fn test_dependencies(&self) -> Vec<PackageReq> {
+        match self {
+            Self::Busted(_) => vec![PackageReq::new("busted".into(), None).unwrap()],
+            Self::BustedNlua(_) => vec![
+                PackageReq::new("busted".into(), None).unwrap(),
+                PackageReq::new("nlua".into(), None).unwrap(),
+            ],
+            Self::Command(_) => Vec::new(),
+            Self::LuaScript(_) => Vec::new(),
         }
     }
 }
@@ -101,6 +151,7 @@ impl IntoLua for TestSpec {
         match self {
             TestSpec::AutoDetect => table.set("auto_detect", true)?,
             TestSpec::Busted(busted_test_spec) => table.set("busted", busted_test_spec)?,
+            TestSpec::BustedNlua(busted_test_spec) => table.set("busted-nlua", busted_test_spec)?,
             TestSpec::Command(command_test_spec) => table.set("command", command_test_spec)?,
             TestSpec::Script(script_test_spec) => table.set("script", script_test_spec)?,
         }
