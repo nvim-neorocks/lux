@@ -158,7 +158,11 @@ impl Display for DisplayLuaValue {
 
 impl Display for DisplayLuaKV {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.key.chars().contains(&'.') {
+        if !self
+            .key
+            .chars()
+            .all(|c| c == '_' || c.is_ascii_alphanumeric())
+        {
             write!(f, "['{}'] = {}", self.key, self.value)
         } else {
             write!(f, "{} = {}", self.key, self.value)
