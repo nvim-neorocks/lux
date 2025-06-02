@@ -22,6 +22,7 @@ use crate::{
     variables::HasVariables,
 };
 
+#[derive(Debug)]
 pub struct LuaInstallation {
     pub version: LuaVersion,
     dependency_info: ExternalDependencyInfo,
