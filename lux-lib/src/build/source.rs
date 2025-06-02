@@ -122,7 +122,7 @@ pub(crate) async fn build(
                 dir.file_name()
                     .is_some_and(|name| name != "doc" && name != "docs")
             }) {
-                recursive_copy_dir(&build_dir.join(directory), &output_paths.etc)?;
+                recursive_copy_dir(&build_dir.join(directory), &output_paths.etc).await?;
             }
         }
         None => {
@@ -149,7 +149,8 @@ pub(crate) async fn build(
                 recursive_copy_dir(
                     &build_dir.join(&subdirectory),
                     &output_paths.etc.join(&subdirectory),
-                )?;
+                )
+                .await?;
             }
         }
     }
