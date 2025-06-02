@@ -56,15 +56,21 @@ where
 
     pub async fn sync_test_dependencies(mut self) -> Result<SyncReport, SyncError> {
         let toml = self.project.toml().into_local()?;
-        if let Some(test_runner) = toml.test().current_platform().runner(self.project.root()) {
-            if !toml
-                .test_dependencies()
-                .current_platform()
-                .iter()
-                .any(|dep| dep.name() == test_runner.name())
-            {
-                self.extra_packages.push(test_runner);
-            }
+        for test_dep in toml
+            .test()
+            .current_platform()
+            .test_dependencies(self.project)
+            .iter()
+            .filter(|test_dep| {
+                !toml
+                    .test_dependencies()
+                    .current_platform()
+                    .iter()
+                    .any(|dep| dep.name() == test_dep.name())
+            })
+            .cloned()
+        {
+            self.extra_packages.push(test_dep);
         }
         do_sync(self._build(), &LocalPackageLockType::Test).await
     }

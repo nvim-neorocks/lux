@@ -1,24 +1,18 @@
-use std::{
-    io,
-    ops::Deref,
-    path::{Path, PathBuf},
-    process::Command,
-    sync::Arc,
-};
+use std::{io, ops::Deref, path::PathBuf, process::Command, sync::Arc};
 
 use crate::{
     build::BuildBehaviour,
-    config::Config,
+    config::{Config, ConfigError},
     lua_installation::{LuaBinary, LuaBinaryError},
-    lua_rockspec::{LuaVersionError, TestSpecError},
-    package::PackageVersionReqError,
+    lua_rockspec::{LuaVersionError, TestSpecError, ValidatedTestSpec},
+    package::{PackageName, PackageVersionReqError},
     path::{Paths, PathsError},
     progress::{MultiProgress, Progress},
     project::{
         project_toml::LocalProjectTomlValidationError, Project, ProjectError, ProjectTreeError,
     },
     rockspec::Rockspec,
-    tree::{self, Tree, TreeError},
+    tree::{self, TreeError},
 };
 use bon::Builder;
 use itertools::Itertools;
@@ -88,6 +82,8 @@ impl Default for TestEnv {
 #[derive(Error, Debug)]
 pub enum RunTestsError {
     #[error(transparent)]
+    Config(#[from] ConfigError),
+    #[error(transparent)]
     InstallTestDependencies(#[from] InstallTestDependenciesError),
     #[error("error building project:\n{0}")]
     BuildProject(#[from] BuildProjectError),
@@ -117,43 +113,44 @@ pub enum RunTestsError {
 
 async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
     let rocks = test.project.toml().into_local()?;
-    let project_tree = test.project.tree(test.config)?;
-    let test_tree = test.project.test_tree(test.config)?;
-    std::fs::create_dir_all(test_tree.root())?;
+
+    let test_spec = rocks
+        .test()
+        .current_platform()
+        .to_validated(&test.project)?;
+
+    let config = test_spec.test_config(test.config)?;
 
     let no_lock = test.no_lock.unwrap_or(false);
 
-    // TODO(#204): Only ensure busted if running with busted (e.g. a .busted directory exists)
     if no_lock {
-        ensure_dependencies(&test.project, &rocks, test.config, test.progress).await?;
+        ensure_test_dependencies(&test.project, &rocks, &config, test.progress).await?;
     } else {
-        Sync::new(&test.project, test.config)
+        Sync::new(&test.project, &config)
             .progress(test.progress.clone())
             .sync_test_dependencies()
             .await?;
     }
 
-    BuildProject::new(&test.project, test.config)
+    BuildProject::new(&test.project, &config)
         .no_lock(no_lock)
         .only_deps(false)
         .build()
         .await?;
 
-    let test_tree_root = &test_tree.root().clone();
+    let project_tree = test.project.tree(&config)?;
+    let test_tree = test.project.test_tree(&config)?;
     let mut paths = Paths::new(&project_tree)?;
     let test_tree_paths = Paths::new(&test_tree)?;
     paths.prepend(&test_tree_paths);
 
-    let test_spec = rocks
-        .test()
-        .current_platform()
-        .to_validated(test.project.root())?;
     let mut command = match &test_spec {
-        crate::lua_rockspec::ValidatedTestSpec::Busted(_) => Command::new(BUSTED_EXE),
-        crate::lua_rockspec::ValidatedTestSpec::Command(spec) => Command::new(spec.command.clone()),
-        crate::lua_rockspec::ValidatedTestSpec::LuaScript(_) => {
-            let lua_version = test.project.lua_version(test.config)?;
-            let lua_binary = LuaBinary::new(lua_version, test.config);
+        ValidatedTestSpec::Busted(_) => Command::new(BUSTED_EXE),
+        ValidatedTestSpec::BustedNlua(_) => Command::new(BUSTED_EXE),
+        ValidatedTestSpec::Command(spec) => Command::new(spec.command.clone()),
+        ValidatedTestSpec::LuaScript(_) => {
+            let lua_version = test.project.lua_version(&config)?;
+            let lua_binary = LuaBinary::new(lua_version, &config);
             let lua_bin_path: PathBuf = lua_binary.try_into()?;
             Command::new(lua_bin_path)
         }
@@ -168,7 +165,7 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
     if let TestEnv::Pure = test.env {
         // isolate the test runner from the user's own config/data files
         // by initialising empty HOME and XDG base directory paths
-        let home = test_tree_root.join("home");
+        let home = test_tree.root().join("home");
         let xdg = home.join("xdg");
         let _ = std::fs::remove_dir_all(&home);
         let xdg_config_home = xdg.join("config");
@@ -203,68 +200,67 @@ pub enum InstallTestDependenciesError {
     PackageVersionReq(#[from] PackageVersionReqError),
 }
 
-/// Ensure that the test runner is installed.
-async fn ensure_test_runner(
-    project_root: &Path,
-    rockspec: &impl Rockspec,
-    tree: Tree,
-    config: &Config,
-    progress: Arc<Progress<MultiProgress>>,
-) -> Result<(), InstallTestDependenciesError> {
-    if let Some(test_runner) = rockspec.test().current_platform().runner(project_root) {
-        if !tree.match_rocks(&test_runner)?.is_found() {
-            let install_spec =
-                PackageInstallSpec::new(test_runner, tree::EntryType::Entrypoint).build();
-            Install::new(config)
-                .package(install_spec)
-                .tree(tree)
-                .progress(progress)
-                .install()
-                .await?;
-        }
-    }
-    Ok(())
-}
-
-/// Ensure dependencies and test dependencies are installed
+/// Ensure test dependencies are installed
 /// This defaults to the local project tree if cwd is a project root.
-async fn ensure_dependencies(
+async fn ensure_test_dependencies(
     project: &Project,
     rockspec: &impl Rockspec,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<(), InstallTestDependenciesError> {
     let test_tree = project.test_tree(config)?;
-    ensure_test_runner(
-        project.root(),
-        rockspec,
-        test_tree.clone(),
-        config,
-        progress.clone(),
-    )
-    .await?;
+    let rockspec_dependencies = rockspec.test_dependencies().current_platform();
     let test_dependencies = rockspec
-        .test_dependencies()
+        .test()
         .current_platform()
+        .test_dependencies(project)
         .iter()
+        .filter(|test_dep| {
+            !rockspec_dependencies
+                .iter()
+                .any(|dep| dep.name() == test_dep.name())
+        })
         .filter_map(|dep| {
             let build_behaviour = if test_tree
-                .match_rocks(dep.package_req())
+                .match_rocks(dep)
                 .is_ok_and(|matches| matches.is_found())
             {
-                Some(BuildBehaviour::Force)
+                Some(BuildBehaviour::NoForce)
             } else {
-                None
+                Some(BuildBehaviour::Force)
             };
             build_behaviour.map(|build_behaviour| {
-                PackageInstallSpec::new(dep.package_req().clone(), tree::EntryType::Entrypoint)
+                PackageInstallSpec::new(dep.clone(), tree::EntryType::Entrypoint)
                     .build_behaviour(build_behaviour)
-                    .pin(*dep.pin())
-                    .opt(*dep.opt())
-                    .maybe_source(dep.source.clone())
                     .build()
             })
         })
+        .chain(
+            rockspec_dependencies
+                .iter()
+                .filter(|req| !req.name().eq(&PackageName::new("lua".into())))
+                .filter_map(|dep| {
+                    let build_behaviour = if test_tree
+                        .match_rocks(dep.package_req())
+                        .is_ok_and(|matches| matches.is_found())
+                    {
+                        Some(BuildBehaviour::NoForce)
+                    } else {
+                        Some(BuildBehaviour::Force)
+                    };
+                    build_behaviour.map(|build_behaviour| {
+                        PackageInstallSpec::new(
+                            dep.package_req().clone(),
+                            tree::EntryType::Entrypoint,
+                        )
+                        .build_behaviour(build_behaviour)
+                        .pin(*dep.pin())
+                        .opt(*dep.opt())
+                        .maybe_source(dep.source.clone())
+                        .build()
+                    })
+                }),
+        )
         .collect();
 
     Install::new(config)
@@ -279,6 +275,8 @@ async fn ensure_dependencies(
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use crate::{
         config::{ConfigBuilder, LuaVersion},
         lua_installation::detect_installed_lua_version,
