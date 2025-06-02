@@ -47,8 +47,8 @@ impl<State> PackBuilder<State>
 where
     State: pack_builder::State + pack_builder::IsComplete,
 {
-    pub fn pack(self) -> Result<PathBuf, PackError> {
-        do_pack(self._build())
+    pub async fn pack(self) -> Result<PathBuf, PackError> {
+        do_pack(self._build()).await
     }
 }
 
@@ -60,7 +60,7 @@ pub enum PackError {
     Walkdir(#[from] walkdir::Error),
 }
 
-fn do_pack(args: Pack) -> Result<PathBuf, PackError> {
+async fn do_pack(args: Pack) -> Result<PathBuf, PackError> {
     let package = args.package;
     let tree = args.tree;
     let layout = tree.entrypoint_layout(&package);
@@ -79,7 +79,7 @@ fn do_pack(args: Pack) -> Result<PathBuf, PackError> {
     let doc_entries = add_rock_entries(&mut zip, &layout.doc, "doc".into())?;
     // We copy entries from `etc` to the root directory, as luarocks doesn't have an etc directory.
     let temp_dir = TempDir::new("lux-pack-temp-root").unwrap().into_path();
-    utils::recursive_copy_dir(&layout.etc, &temp_dir)?;
+    utils::recursive_copy_dir(&layout.etc, &temp_dir).await?;
     // prevent duplicate doc entries
     let doc = temp_dir.join("doc");
     if doc.is_dir() {

@@ -7,20 +7,29 @@ use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 use target_lexicon::Triple;
+use tempdir::TempDir;
 use thiserror::Error;
 use which::which;
 
 use crate::build::external_dependency::to_lib_name;
 use crate::build::external_dependency::ExternalDependencyInfo;
+use crate::build::utils::recursive_copy_dir;
 use crate::build::utils::{c_lib_extension, format_path};
 use crate::config::external_deps::ExternalDependencySearchConfig;
 use crate::lua_rockspec::ExternalDependencySpec;
-use crate::project::Project;
 use crate::{
     config::{Config, LuaVersion},
     package::PackageVersion,
     variables::HasVariables,
 };
+use lazy_static::lazy_static;
+use tokio::sync::Mutex;
+
+// Because installing lua is not thread-safe, we have to synchronize with a global Mutex
+lazy_static! {
+    static ref NEW_MUTEX: Mutex<i32> = Mutex::new(0i32);
+    static ref INSTALL_MUTEX: Mutex<i32> = Mutex::new(0i32);
+}
 
 #[derive(Debug)]
 pub struct LuaInstallation {
@@ -64,23 +73,24 @@ pub enum DetectLuaVersionError {
 }
 
 impl LuaInstallation {
-    pub fn new(version: &LuaVersion, config: &Config) -> Self {
+    pub async fn new(version: &LuaVersion, config: &Config) -> Self {
+        let _lock = NEW_MUTEX.lock().await;
         if let Some(lua_intallation) = Self::probe(version, config.external_deps()) {
             return lua_intallation;
         }
         let output = Self::root_dir(version, config);
-        if output.join("include").is_dir() {
+        let include_dir = output.join("include");
+        let lib_dir = output.join("lib");
+        let lua_lib_name = get_lua_lib_name(&lib_dir, version);
+        if include_dir.is_dir() && lua_lib_name.is_some() {
             let bin_dir = Some(output.join("bin")).filter(|bin_path| bin_path.is_dir());
             let bin = bin_dir
                 .as_ref()
                 .and_then(|bin_path| find_lua_executable(bin_path));
-            let lib_dir = output.join("lib");
-            let lua_lib_name = get_lua_lib_name(&lib_dir, version);
-            let include_dir = Some(output.join("include"));
             LuaInstallation {
                 version: version.clone(),
                 dependency_info: ExternalDependencyInfo {
-                    include_dir,
+                    include_dir: Some(include_dir),
                     lib_dir: Some(lib_dir),
                     bin_dir,
                     lib_info: None,
@@ -89,7 +99,7 @@ impl LuaInstallation {
                 bin,
             }
         } else {
-            Self::install(version, config)
+            Self::install(version, config).await
         }
     }
 
@@ -134,12 +144,16 @@ impl LuaInstallation {
         }
     }
 
-    pub fn install(version: &LuaVersion, config: &Config) -> Self {
+    // XXX: lua_src and luajit_src panic on failure, so we just unwrap errors here.
+    pub async fn install(version: &LuaVersion, config: &Config) -> Self {
+        let _lock = INSTALL_MUTEX.lock().await;
         let host = Triple::host();
         let target = &host.to_string();
         let host_operating_system = &host.operating_system.to_string();
 
-        let output = Self::root_dir(version, config);
+        let output = TempDir::new("lux_lua_installation")
+            .expect("failed to create lua_installation temp directory");
+
         let (include_dir, lib_dir) = match version {
             LuaVersion::LuaJIT | LuaVersion::LuaJIT52 => {
                 // XXX: luajit_src panics if this is not set.
@@ -178,11 +192,17 @@ impl LuaInstallation {
             }
         };
 
-        let bin_dir = Some(output.join("bin")).filter(|bin_path| bin_path.is_dir());
+        let target = Self::root_dir(version, config);
+        recursive_copy_dir(&output.into_path(), &target)
+            .await
+            .expect("error copying lua installation");
+
+        let bin_dir = Some(target.join("bin")).filter(|bin_path| bin_path.is_dir());
         let bin = bin_dir
             .as_ref()
             .and_then(|bin_path| find_lua_executable(bin_path));
         let lua_lib_name = get_lua_lib_name(&lib_dir, version);
+
         LuaInstallation {
             version: version.clone(),
             dependency_info: ExternalDependencyInfo {
@@ -203,10 +223,6 @@ impl LuaInstallation {
     fn root_dir(version: &LuaVersion, config: &Config) -> PathBuf {
         if let Some(lua_dir) = config.lua_dir() {
             return lua_dir.clone();
-        } else if let Ok(Some(project)) = Project::current() {
-            if let Ok(tree) = project.tree(config) {
-                return tree.root().join(".lua");
-            }
         } else if let Ok(tree) = config.user_tree(version.clone()) {
             return tree.root().join(".lua");
         }
@@ -486,7 +502,7 @@ mod test {
         }
         let config = ConfigBuilder::new().unwrap().build().unwrap();
         let lua_version = config.lua_version().unwrap();
-        let lua_installation = LuaInstallation::new(lua_version, &config);
+        let lua_installation = LuaInstallation::new(lua_version, &config).await;
         // FIXME: This fails when run in the nix checkPhase
         assert!(lua_installation.bin.is_some());
         let lua_binary: LuaBinary = lua_installation.bin.unwrap().into();

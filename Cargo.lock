@@ -2280,6 +2280,7 @@ dependencies = [
  "insta",
  "is_executable",
  "itertools 0.14.0",
+ "lazy_static",
  "lets_find_up",
  "lua-src",
  "luajit-src",

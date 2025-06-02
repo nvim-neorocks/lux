@@ -422,7 +422,7 @@ where
                 tree::EntryType::DependencyOnly => tree.dependency(&package)?,
             };
 
-            let lua = LuaInstallation::new(&lua_version, build.config);
+            let lua = LuaInstallation::new(&lua_version, build.config).await;
 
             let rock_source = rockspec.source().current_platform();
             let build_dir = match &rock_source.unpack_dir {
@@ -504,10 +504,10 @@ where
                         .is_some_and(|name| name != "doc" && name != "docs")
                 })
             {
-                recursive_copy_dir(&build_dir.join(directory), &output_paths.etc)?;
+                recursive_copy_dir(&build_dir.join(directory), &output_paths.etc).await?;
             }
 
-            recursive_copy_doc_dir(&output_paths, &build_dir)?;
+            recursive_copy_doc_dir(&output_paths, &build_dir).await?;
 
             if let Ok(rockspec_str) = rockspec.to_lua_remote_rockspec_string() {
                 std::fs::write(output_paths.rockspec_path(), rockspec_str)?;
@@ -518,12 +518,15 @@ where
     }
 }
 
-fn recursive_copy_doc_dir(output_paths: &RockLayout, build_dir: &Path) -> Result<(), BuildError> {
+async fn recursive_copy_doc_dir(
+    output_paths: &RockLayout,
+    build_dir: &Path,
+) -> Result<(), BuildError> {
     let mut doc_dir = build_dir.join("doc");
     if !doc_dir.exists() {
         doc_dir = build_dir.join("docs");
     }
-    recursive_copy_dir(&doc_dir, &output_paths.doc)?;
+    recursive_copy_dir(&doc_dir, &output_paths.doc).await?;
     Ok(())
 }
 
@@ -572,7 +575,7 @@ mod tests {
             doc: dest_dir.join("doc"),
         };
         let lua_version = config.lua_version().unwrap_or(&LuaVersion::Lua51);
-        let lua = LuaInstallation::new(lua_version, &config);
+        let lua = LuaInstallation::new(lua_version, &config).await;
         let project = Project::from(&project_root).unwrap().unwrap();
         let rockspec = project.toml().into_remote().unwrap();
         let progress = Progress::Progress(MultiProgress::new());

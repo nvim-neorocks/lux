@@ -217,7 +217,7 @@ async fn install_manifest_entries<T>(
         let target = dest.join(relative_src_path);
         let src_path = src.join(relative_src_path);
         if src_path.is_dir() {
-            recursive_copy_dir(&src.to_path_buf(), &target)?;
+            recursive_copy_dir(&src.to_path_buf(), &target).await?;
         } else if src_path.is_file() {
             tokio::fs::create_dir_all(target.parent().unwrap()).await?;
             tokio::fs::copy(src.join(relative_src_path), target).await?;
@@ -312,6 +312,7 @@ mod test {
             local_package.clone(),
         )
         .pack()
+        .await
         .unwrap();
         assert_eq!(
             packed_rock

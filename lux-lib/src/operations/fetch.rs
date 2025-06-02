@@ -241,7 +241,7 @@ async fn do_fetch_src<R: Rockspec>(
         RockSourceSpec::File(path) => {
             let hash = if path.is_dir() {
                 progress.map(|p| p.set_message(format!("📋 Copying {}", path.display())));
-                recursive_copy_dir(&path.to_path_buf(), dest_dir)?;
+                recursive_copy_dir(&path.to_path_buf(), dest_dir).await?;
                 progress.map(|p| p.finish_and_clear());
                 dest_dir.hash()?
             } else {

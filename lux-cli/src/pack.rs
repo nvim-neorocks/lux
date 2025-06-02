@@ -83,23 +83,26 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
                         .install()
                         .await?;
                     let package = packages.first().unwrap();
-                    let rock_path =
-                        operations::Pack::new(dest_dir, tree, package.clone()).pack()?;
+                    let rock_path = operations::Pack::new(dest_dir, tree, package.clone())
+                        .pack()
+                        .await?;
                     Ok(rock_path)
                 }
                 lux_lib::tree::RockMatches::Single(local_package_id) => {
                     let lockfile = user_tree.lockfile()?;
                     let package = lockfile.get(&local_package_id).unwrap();
-                    let rock_path =
-                        operations::Pack::new(dest_dir, user_tree, package.clone()).pack()?;
+                    let rock_path = operations::Pack::new(dest_dir, user_tree, package.clone())
+                        .pack()
+                        .await?;
                     Ok(rock_path)
                 }
                 lux_lib::tree::RockMatches::Many(vec) => {
                     let local_package_id = vec.first().unwrap();
                     let lockfile = user_tree.lockfile()?;
                     let package = lockfile.get(local_package_id).unwrap();
-                    let rock_path =
-                        operations::Pack::new(dest_dir, user_tree, package.clone()).pack()?;
+                    let rock_path = operations::Pack::new(dest_dir, user_tree, package.clone())
+                        .pack()
+                        .await?;
                     Ok(rock_path)
                 }
             }
@@ -124,7 +127,9 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
             let package = Build::new(&rockspec, &tree, tree::EntryType::Entrypoint, &config, &bar)
                 .build()
                 .await?;
-            let rock_path = operations::Pack::new(dest_dir, tree, package).pack()?;
+            let rock_path = operations::Pack::new(dest_dir, tree, package)
+                .pack()
+                .await?;
             Ok(rock_path)
         }
     };

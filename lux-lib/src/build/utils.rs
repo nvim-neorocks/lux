@@ -54,16 +54,16 @@ pub(crate) fn project_files(src: &PathBuf) -> Vec<PathBuf> {
 
 /// Recursively copy a directory.
 /// This respects ignore files and excludes hidden files and directories.
-pub(crate) fn recursive_copy_dir(src: &PathBuf, dest: &Path) -> Result<(), io::Error> {
+pub(crate) async fn recursive_copy_dir(src: &PathBuf, dest: &Path) -> Result<(), io::Error> {
     if src.exists() {
         for file in project_files(src) {
             let relative_src_path: PathBuf =
                 pathdiff::diff_paths(src.join(&file), src).expect("failed to copy directories!");
             let target = dest.join(relative_src_path);
             if let Some(parent) = target.parent() {
-                std::fs::create_dir_all(parent)?;
+                tokio::fs::create_dir_all(parent).await?;
             }
-            std::fs::copy(&file, target)?;
+            tokio::fs::copy(&file, target).await?;
         }
     }
     Ok(())
@@ -612,7 +612,7 @@ mod tests {
     async fn test_is_compatible_lua_script() {
         let config = ConfigBuilder::new().unwrap().build().unwrap();
         let lua_version = config.lua_version().unwrap();
-        let lua = LuaInstallation::new(lua_version, &config);
+        let lua = LuaInstallation::new(lua_version, &config).await;
         let valid_script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("resources/test/sample_lua_bin_script_valid");
         assert!(is_compatible_lua_script(&valid_script, &lua, &config).await);
@@ -630,7 +630,7 @@ mod tests {
             .build()
             .unwrap();
         let lua_version = config.lua_version().unwrap();
-        let lua = LuaInstallation::new(lua_version, &config);
+        let lua = LuaInstallation::new(lua_version, &config).await;
         let tree = config.user_tree(lua_version.clone()).unwrap();
         let valid_script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("resources/test/sample_lua_bin_script_valid");
