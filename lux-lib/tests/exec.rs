@@ -3,21 +3,19 @@ use lux_lib::{
     config::ConfigBuilder,
     operations::{install_command, Exec},
 };
-#[cfg(not(target_env = "msvc"))]
-use tempdir::TempDir;
 
 #[cfg(not(target_env = "msvc"))]
 #[tokio::test]
 async fn run_nlua() {
     use lux_lib::{config::LuaVersion, lua_installation::detect_installed_lua_version};
 
-    let dir = TempDir::new("lux-test").unwrap();
+    let dir = assert_fs::TempDir::new().unwrap();
 
     let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
 
     let config = ConfigBuilder::new()
         .unwrap()
-        .user_tree(Some(dir.into_path()))
+        .user_tree(Some(dir.to_path_buf()))
         .lua_version(lua_version)
         .build()
         .unwrap();
