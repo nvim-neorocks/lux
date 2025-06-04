@@ -284,7 +284,7 @@ impl ManifestMetadata {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct Manifest {
     server_url: Url,
     metadata: ManifestMetadata,
