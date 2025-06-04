@@ -13,6 +13,11 @@ pub fn project(lua: &Lua) -> mlua::Result<Table> {
 
     table.set(
         "new",
+        lua.create_function(|_, path: PathBuf| Project::from_exact(path).into_lua_err())?,
+    )?;
+
+    table.set(
+        "new_fuzzy",
         lua.create_function(|_, path: PathBuf| Project::from(path).into_lua_err())?,
     )?;
 
