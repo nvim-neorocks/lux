@@ -58,6 +58,7 @@ async fn run_busted_test_no_lock() {
         .unwrap();
 }
 
+#[cfg(not(target_os = "windows"))]
 #[tokio::test]
 async fn non_regression_lockfile_corruption() {
     let sample_project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

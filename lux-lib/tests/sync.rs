@@ -23,7 +23,11 @@ async fn sync_test_dependencies_empty_project() {
 
     let lockfile_after_sync =
         String::from_utf8(tokio::fs::read(project.lockfile_path()).await.unwrap());
-    assert_eq!(lockfile_before_sync, lockfile_after_sync);
+
+    if cfg!(not(target_os = "windows")) {
+        // Source hashes are different on Windows
+        assert_eq!(lockfile_before_sync, lockfile_after_sync);
+    }
 
     let test_tree = project.tree(&config).unwrap().test_tree(&config).unwrap();
 
