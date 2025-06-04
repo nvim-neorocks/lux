@@ -14,10 +14,10 @@ use itertools::Itertools;
 use mlua::{FromLua, UserData};
 use thiserror::Error;
 
-#[derive(Clone, FromLua)]
+#[derive(Clone, FromLua, Debug)]
 pub struct RemotePackageDB(Impl);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Impl {
     LuarocksManifests(Vec<Manifest>),
     Lock(LocalPackageLock),

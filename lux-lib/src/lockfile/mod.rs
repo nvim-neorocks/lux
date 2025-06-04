@@ -1201,12 +1201,12 @@ impl ProjectLockfile<ReadOnly> {
 }
 
 impl Lockfile<ReadWrite> {
-    pub fn add_entrypoint(&mut self, rock: &LocalPackage) {
+    pub(crate) fn add_entrypoint(&mut self, rock: &LocalPackage) {
         self.add(rock);
         self.lock.entrypoints.push(rock.id().clone())
     }
 
-    pub fn remove_entrypoint(&mut self, rock: &LocalPackage) {
+    pub(crate) fn remove_entrypoint(&mut self, rock: &LocalPackage) {
         if let Some(index) = self
             .lock
             .entrypoints
@@ -1218,23 +1218,26 @@ impl Lockfile<ReadWrite> {
     }
 
     fn add(&mut self, rock: &LocalPackage) {
-        self.lock.rocks.insert(rock.id(), rock.clone());
-    }
-
-    pub fn add_dependency(&mut self, target: &LocalPackage, dependency: &LocalPackage) {
-        let target_id = target.id();
-        let dependency_id = dependency.id();
-
-        self.lock
-            .rocks
-            .entry(target_id)
-            .and_modify(|rock| rock.spec.dependencies.push(dependency_id));
-
         // Since rocks entries are mutable, we only add the dependency if it
         // has not already been added.
-        if !self.lock.rocks.contains_key(&dependency.id()) {
-            self.add(dependency);
-        }
+        self.lock
+            .rocks
+            .entry(rock.id())
+            .or_insert_with(|| rock.clone());
+    }
+
+    /// Add a dependency for a package.
+    pub(crate) fn add_dependency(&mut self, target: &LocalPackage, dependency: &LocalPackage) {
+        self.lock
+            .rocks
+            .entry(target.id())
+            .and_modify(|rock| rock.spec.dependencies.push(dependency.id()))
+            .or_insert_with(|| {
+                let mut target = target.clone();
+                target.spec.dependencies.push(dependency.id());
+                target
+            });
+        self.add(dependency);
     }
 
     pub(crate) fn remove(&mut self, target: &LocalPackage) {
@@ -1286,14 +1289,6 @@ impl UserData for LockfileGuard {
         methods.add_method("rocks", |_, this, _: ()| Ok(this.rocks().clone()));
         methods.add_method("get", |_, this, id: LocalPackageId| {
             Ok(this.get(&id).cloned())
-        });
-        methods.add_method_mut("add", |_, this, package: LocalPackage| {
-            this.add(&package);
-            Ok(())
-        });
-        methods.add_method_mut("add_dependency", |_, this, (target, dependency)| {
-            this.add_dependency(&target, &dependency);
-            Ok(())
         });
     }
 }
@@ -1380,22 +1375,6 @@ impl Drop for ProjectLockfileGuard {
 
 impl UserData for Lockfile<ReadWrite> {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method_mut("add", |_, this, package: LocalPackage| {
-            this.add(&package);
-            Ok(())
-        });
-        methods.add_method_mut(
-            "add_dependency",
-            |_, this, (target, dependency): (LocalPackage, LocalPackage)| {
-                this.add_dependency(&target, &dependency);
-                Ok(())
-            },
-        );
-        methods.add_method_mut("remove", |_, this, target: LocalPackage| {
-            this.remove(&target);
-            Ok(())
-        });
-
         methods.add_method("version", |_, this, ()| Ok(this.version().to_owned()));
         methods.add_method("rocks", |_, this, ()| {
             Ok(this
