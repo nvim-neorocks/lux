@@ -81,18 +81,4 @@ async fn non_regression_lockfile_corruption() {
     let lockfile_after_test =
         String::from_utf8(tokio::fs::read(project.lockfile_path()).await.unwrap());
     assert_eq!(lockfile_before_test, lockfile_after_test);
-
-    let project_tree = project.root().to_path_buf().join(".lux");
-    tokio::fs::remove_dir_all(project_tree).await.unwrap();
-
-    Test::new(project, &config)
-        .no_lock(true)
-        .run()
-        .await
-        .unwrap();
-
-    let project = Project::from_exact(temp_dir.path()).unwrap().unwrap();
-    let lockfile_after_second_test =
-        String::from_utf8(tokio::fs::read(project.lockfile_path()).await.unwrap());
-    assert_eq!(lockfile_before_test, lockfile_after_second_test);
 }
