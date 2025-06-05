@@ -2245,7 +2245,7 @@ dependencies = [
  "toml",
  "url",
  "walkdir",
- "which 7.0.3",
+ "which 8.0.0",
  "whoami",
 ]
 
@@ -2321,7 +2321,7 @@ dependencies = [
  "url",
  "vfs",
  "walkdir",
- "which 7.0.3",
+ "which 8.0.0",
  "zip",
 ]
 
@@ -4933,6 +4933,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24d643ce3fd3e5b54854602a080f34fb10ab75e0b813ee32d00ca2b44fa74762"
 dependencies = [
  "either",
+ "env_home",
+ "rustix 1.0.7",
+ "winsafe",
+]
+
+[[package]]
+name = "which"
+version = "8.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3fabb953106c3c8eea8306e4393700d7657561cb43122571b172bbfb7c7ba1d"
+dependencies = [
  "env_home",
  "rustix 1.0.7",
  "winsafe",

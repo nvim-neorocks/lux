@@ -37,7 +37,7 @@ text_trees = "0.1.2"
 tokio = { version = "1.45.0", features = ["full"] }
 toml = "0.8.22"
 walkdir = "2.5.0"
-which = "7.0.3"
+which = "8.0.0"
 indicatif = "0.17.11"
 path-absolutize = "3.1.1"
 url = "2.5.4"
