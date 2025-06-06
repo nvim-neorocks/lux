@@ -136,46 +136,45 @@ impl LuaInstallation {
     pub fn install(version: &LuaVersion, config: &Config) -> Self {
         let host = Triple::host();
         let target = &host.to_string();
-        let host_operating_system = &host.operating_system.to_string();
 
         let output = Self::root_dir(version, config);
-        let (include_dir, lib_dir) = match version {
-            LuaVersion::LuaJIT | LuaVersion::LuaJIT52 => {
-                // XXX: luajit_src panics if this is not set.
-                let target_pointer_width =
-                    std::env::var("CARGO_CFG_TARGET_POINTER_WIDTH").unwrap_or("64".into());
-                std::env::set_var("CARGO_CFG_TARGET_POINTER_WIDTH", target_pointer_width);
-                let build = luajit_src::Build::new()
-                    .target(target)
-                    .host(host_operating_system)
-                    .out_dir(&output)
-                    .lua52compat(matches!(version, LuaVersion::LuaJIT52))
-                    .build();
+        let (include_dir, lib_dir) =
+            match version {
+                LuaVersion::LuaJIT | LuaVersion::LuaJIT52 => {
+                    // XXX: luajit_src panics if this is not set.
+                    let target_pointer_width =
+                        std::env::var("CARGO_CFG_TARGET_POINTER_WIDTH").unwrap_or("64".into());
+                    std::env::set_var("CARGO_CFG_TARGET_POINTER_WIDTH", target_pointer_width);
+                    let host_operating_system = &host.operating_system.to_string();
+                    let build = luajit_src::Build::new()
+                        .target(target)
+                        .host(host_operating_system)
+                        .out_dir(&output)
+                        .lua52compat(matches!(version, LuaVersion::LuaJIT52))
+                        .build();
 
-                (
-                    build.include_dir().to_path_buf(),
-                    build.lib_dir().to_path_buf(),
-                )
-            }
-            _ => {
-                let build = lua_src::Build::new()
-                    .target(target)
-                    .host(host_operating_system)
-                    .out_dir(&output)
-                    .build(match version {
-                        LuaVersion::Lua51 => lua_src::Version::Lua51,
-                        LuaVersion::Lua52 => lua_src::Version::Lua52,
-                        LuaVersion::Lua53 => lua_src::Version::Lua53,
-                        LuaVersion::Lua54 => lua_src::Version::Lua54,
-                        _ => unreachable!(),
-                    });
+                    (
+                        build.include_dir().to_path_buf(),
+                        build.lib_dir().to_path_buf(),
+                    )
+                }
+                _ => {
+                    let build = lua_src::Build::new().target(target).out_dir(&output).build(
+                        match version {
+                            LuaVersion::Lua51 => lua_src::Version::Lua51,
+                            LuaVersion::Lua52 => lua_src::Version::Lua52,
+                            LuaVersion::Lua53 => lua_src::Version::Lua53,
+                            LuaVersion::Lua54 => lua_src::Version::Lua54,
+                            _ => unreachable!(),
+                        },
+                    );
 
-                (
-                    build.include_dir().to_path_buf(),
-                    build.lib_dir().to_path_buf(),
-                )
-            }
-        };
+                    (
+                        build.include_dir().to_path_buf(),
+                        build.lib_dir().to_path_buf(),
+                    )
+                }
+            };
 
         let bin_dir = Some(output.join("bin")).filter(|bin_path| bin_path.is_dir());
         let bin = bin_dir
