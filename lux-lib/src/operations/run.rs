@@ -79,13 +79,18 @@ async fn run_with_local_lua(
 ) -> Result<(), RunError> {
     let version = project.lua_version(config)?;
 
-    operations::run_lua(
-        project.root(),
-        &project.tree(config)?,
-        LuaBinary::new(version, config),
-        &args.into_iter().cloned().collect(),
-    )
-    .await?;
+    let tree = project.tree(config)?;
+    let args = &args.into_iter().cloned().collect();
+
+    let runluabuilder = operations::RunLuaBuilder::builder()
+        .root(project.root())
+        .tree(&tree)
+        .config(config)
+        .lua_cmd(LuaBinary::new(version, config))
+        .args(args)
+        .build();
+
+    runluabuilder.run_lua().await?;
 
     Ok(())
 }
