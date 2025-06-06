@@ -16,6 +16,12 @@ use crate::build::{self, Build};
 #[derive(Args, Default)]
 #[clap(disable_help_flag = true)]
 pub struct RunLua {
+    #[arg(long = "test")]
+    test_flag: Option<bool>,
+
+    #[arg(long = "build")]
+    build_flag: Option<bool>,
+
     /// Arguments to pass to Lua. See `lua -h`.
     args: Option<Vec<String>>,
 
@@ -62,7 +68,19 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
         build::build(run_lua.build, config.clone()).await?;
     }
 
-    operations::run_lua(&root, &tree, lua_cmd, &run_lua.args.unwrap_or_default()).await?;
+    let args = &run_lua.args.unwrap_or_default();
+
+    let runluabuilder = operations::RunLuaBuilder::builder()
+        .root(&root)
+        .tree(&tree)
+        .config(&config)
+        .lua_cmd(lua_cmd)
+        .args(args)
+        .test_depend(run_lua.test_flag.unwrap_or(false))
+        .build_depend(run_lua.build_flag.unwrap_or(false))
+        .build();
+    println!("worgu");
+    runluabuilder.run_lua().await?;
 
     Ok(())
 }
@@ -94,6 +112,8 @@ Arguments:
 Options:
   --lua       Path to the Lua interpreter to use
   --no-lock   When building a project, ignore the project's lockfile and don't create one
+  --test      Adds test dependencies to the LUA_PATH and LUA_CPATH.
+  --build     Adds build dependencies to the LUA_PATH and LUA_CPATH.
   -h, --help  Print help
 ",
         lua_help,

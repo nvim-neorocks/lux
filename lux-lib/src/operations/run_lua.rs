@@ -2,6 +2,10 @@
 //!
 //! The interfaces exposed here ensure that the correct version of Lua is being used.
 
+use bon::Builder;
+
+use crate::config::Config;
+
 use std::{
     io,
     path::{Path, PathBuf},
@@ -14,6 +18,7 @@ use crate::{
     lua_installation::{LuaBinary, LuaBinaryError},
     path::{Paths, PathsError},
     tree::Tree,
+    tree::TreeError,
 };
 
 #[derive(Error, Debug)]
@@ -33,39 +38,67 @@ pub enum RunLuaError {
     },
     #[error(transparent)]
     Paths(#[from] PathsError),
+
+    #[error(transparent)]
+    Tree(#[from] TreeError),
 }
 
-pub async fn run_lua(
-    root: &Path,
-    tree: &Tree,
+#[derive(Builder)]
+pub struct RunLuaBuilder<'a> {
+    root: &'a Path,
+    tree: &'a Tree,
+    config: &'a Config,
     lua_cmd: LuaBinary,
-    args: &Vec<String>,
-) -> Result<(), RunLuaError> {
-    let paths = Paths::new(tree)?;
+    args: &'a Vec<String>,
+    test_depend: Option<bool>,
+    build_depend: Option<bool>,
+}
 
-    let lua_cmd: PathBuf = lua_cmd.try_into()?;
+impl RunLuaBuilder<'_> {
+    // consumes
+    pub async fn run_lua(self) -> Result<(), RunLuaError> {
+        let mut paths = Paths::new(self.tree)?;
 
-    let status = match Command::new(&lua_cmd)
-        .current_dir(root)
-        .args(args)
-        .env("PATH", paths.path_prepended().joined())
-        .env("LUA_PATH", paths.package_path().joined())
-        .env("LUA_CPATH", paths.package_cpath().joined())
-        .status()
-        .await
-    {
-        Ok(status) => Ok(status),
-        Err(err) => Err(RunLuaError::LuaCommandFailed {
-            lua_cmd: lua_cmd.to_string_lossy().to_string(),
-            source: err,
-        }),
-    }?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(RunLuaError::LuaCommandNonZeroExitCode {
-            lua_cmd: lua_cmd.to_string_lossy().to_string(),
-            exit_code: status.code(),
-        })
+        if self.test_depend.unwrap_or(false) {
+            let test_tree_path = self.tree.test_tree(self.config)?;
+
+            let test_path = Paths::new(&test_tree_path)?;
+
+            paths.prepend(&test_path);
+        }
+
+        if self.build_depend.unwrap_or(false) {
+            let build_tree_path = self.tree.build_tree(self.config)?;
+
+            let build_path = Paths::new(&build_tree_path)?;
+
+            paths.prepend(&build_path);
+        }
+
+        let lua_cmd: PathBuf = self.lua_cmd.try_into()?;
+
+        let status = match Command::new(&lua_cmd)
+            .current_dir(self.root)
+            .args(self.args)
+            .env("PATH", paths.path_prepended().joined())
+            .env("LUA_PATH", paths.package_path().joined())
+            .env("LUA_CPATH", paths.package_cpath().joined())
+            .status()
+            .await
+        {
+            Ok(status) => Ok(status),
+            Err(err) => Err(RunLuaError::LuaCommandFailed {
+                lua_cmd: lua_cmd.to_string_lossy().to_string(),
+                source: err,
+            }),
+        }?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(RunLuaError::LuaCommandNonZeroExitCode {
+                lua_cmd: lua_cmd.to_string_lossy().to_string(),
+                exit_code: status.code(),
+            })
+        }
     }
 }
