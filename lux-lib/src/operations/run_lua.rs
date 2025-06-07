@@ -50,8 +50,8 @@ pub struct RunLuaBuilder<'a> {
     config: &'a Config,
     lua_cmd: LuaBinary,
     args: &'a Vec<String>,
-    test_depend: Option<bool>,
-    build_depend: Option<bool>,
+    prepend_test_paths: Option<bool>,
+    prepend_build_paths: Option<bool>,
 }
 
 impl RunLuaBuilder<'_> {
