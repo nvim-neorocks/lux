@@ -79,7 +79,6 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
         .test_depend(run_lua.test_flag.unwrap_or(false))
         .build_depend(run_lua.build_flag.unwrap_or(false))
         .build();
-    println!("worgu");
     runluabuilder.run_lua().await?;
 
     Ok(())
