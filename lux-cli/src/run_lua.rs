@@ -112,8 +112,8 @@ Arguments:
 Options:
   --lua       Path to the Lua interpreter to use
   --no-lock   When building a project, ignore the project's lockfile and don't create one
-  --test      Adds test dependencies to the LUA_PATH and LUA_CPATH.
-  --build     Adds build dependencies to the LUA_PATH and LUA_CPATH.
+  --test      Prepend test dependencies to the LUA_PATH and LUA_CPATH
+  --build     Prepend build dependencies to the LUA_PATH and LUA_CPATH
   -h, --help  Print help
 ",
         lua_help,
