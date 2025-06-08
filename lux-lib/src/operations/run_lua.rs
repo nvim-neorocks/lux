@@ -55,7 +55,9 @@ pub struct RunLuaBuilder<'a> {
     prepend_build_paths: Option<bool>,
 }
 
-impl RunLuaBuilder<'_> {
+impl<State> RunLuaBuilder<'_, State>
+where
+    State: run_lua_builder::State + run_lua_builder::IsComplete,
     // consumes
     pub async fn run_lua(self) -> Result<(), RunLuaError> {
         let mut paths = Paths::new(self.tree)?;
