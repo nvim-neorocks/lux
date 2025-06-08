@@ -44,6 +44,7 @@ pub enum RunLuaError {
 }
 
 #[derive(Builder)]
+#[builder(start_fn = new, finish_fn(name = run, vis = "pub"))]
 pub struct RunLuaBuilder<'a> {
     root: &'a Path,
     tree: &'a Tree,
@@ -59,7 +60,7 @@ impl RunLuaBuilder<'_> {
     pub async fn run_lua(self) -> Result<(), RunLuaError> {
         let mut paths = Paths::new(self.tree)?;
 
-        if self.test_depend.unwrap_or(false) {
+        if self.prepend_test_paths.unwrap_or(false) {
             let test_tree_path = self.tree.test_tree(self.config)?;
 
             let test_path = Paths::new(&test_tree_path)?;
@@ -67,7 +68,7 @@ impl RunLuaBuilder<'_> {
             paths.prepend(&test_path);
         }
 
-        if self.build_depend.unwrap_or(false) {
+        if self.prepend_build_paths.unwrap_or(false) {
             let build_tree_path = self.tree.build_tree(self.config)?;
 
             let build_path = Paths::new(&build_tree_path)?;

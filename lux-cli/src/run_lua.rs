@@ -16,11 +16,11 @@ use crate::build::{self, Build};
 #[derive(Args, Default)]
 #[clap(disable_help_flag = true)]
 pub struct RunLua {
-    #[arg(long = "test")]
-    test_flag: Option<bool>,
+    #[arg(long)]
+    test: Option<bool>,
 
-    #[arg(long = "build")]
-    build_flag: Option<bool>,
+    #[arg(long)]
+    build: Option<bool>,
 
     /// Arguments to pass to Lua. See `lua -h`.
     args: Option<Vec<String>>,
@@ -34,7 +34,7 @@ pub struct RunLua {
     help: bool,
 
     #[clap(flatten)]
-    build: Build,
+    build_args: Build,
 }
 
 pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
@@ -65,21 +65,22 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
     }
 
     if project.is_some() {
-        build::build(run_lua.build, config.clone()).await?;
+        build::build(run_lua.build_args, config.clone()).await?;
     }
 
     let args = &run_lua.args.unwrap_or_default();
 
-    let runluabuilder = operations::RunLuaBuilder::builder()
+    operations::RunLuaBuilder::new()
         .root(&root)
         .tree(&tree)
         .config(&config)
         .lua_cmd(lua_cmd)
         .args(args)
-        .test_depend(run_lua.test_flag.unwrap_or(false))
-        .build_depend(run_lua.build_flag.unwrap_or(false))
-        .build();
-    runluabuilder.run_lua().await?;
+        .prepend_test_paths(run_lua.test.unwrap_or(false))
+        .prepend_build_paths(run_lua.build.unwrap_or(false))
+        .run()
+        .run_lua()
+        .await?;
 
     Ok(())
 }
