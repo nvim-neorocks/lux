@@ -17,10 +17,10 @@ use crate::build::{self, Build};
 #[clap(disable_help_flag = true)]
 pub struct RunLua {
     #[arg(long)]
-    test: Option<bool>,
+    test: bool,
 
     #[arg(long)]
-    build: Option<bool>,
+    build: bool,
 
     /// Arguments to pass to Lua. See `lua -h`.
     args: Option<Vec<String>>,
@@ -70,15 +70,15 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
 
     let args = &run_lua.args.unwrap_or_default();
 
-    operations::RunLuaBuilder::new()
+    operations::RunLua::new()
         .root(&root)
         .tree(&tree)
         .config(&config)
         .lua_cmd(lua_cmd)
         .args(args)
-        .prepend_test_paths(run_lua.test.unwrap_or(false))
-        .prepend_build_paths(run_lua.build.unwrap_or(false))
-        .run()
+        .prepend_test_paths(run_lua.test)
+        .prepend_build_paths(run_lua.build)
+        .build()
         .run_lua()
         .await?;
 

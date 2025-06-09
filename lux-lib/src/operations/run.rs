@@ -10,7 +10,7 @@ use crate::{
     config::Config,
     lua_installation::LuaBinary,
     lua_rockspec::LuaVersionError,
-    operations::run_lua::RunLuaBuilder,
+    operations::run_lua::RunLua,
     path::{Paths, PathsError},
     project::{project_toml::LocalProjectTomlValidationError, Project, ProjectTreeError},
 };
@@ -82,13 +82,13 @@ async fn run_with_local_lua(
     let tree = project.tree(config)?;
     let args = &args.into_iter().cloned().collect();
 
-    RunLuaBuilder::new()
+    RunLua::new()
         .root(project.root())
         .tree(&tree)
         .config(config)
         .lua_cmd(LuaBinary::new(version, config))
         .args(args)
-        .run()
+        .build()
         .run_lua()
         .await?;
 
