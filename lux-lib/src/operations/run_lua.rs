@@ -56,7 +56,6 @@ pub struct RunLua<'a> {
 }
 
 impl RunLua<'_> {
-    // consumes
     pub async fn run_lua(self) -> Result<(), RunLuaError> {
         let mut paths = Paths::new(self.tree)?;
 
