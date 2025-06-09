@@ -88,7 +88,6 @@ async fn run_with_local_lua(
         .config(config)
         .lua_cmd(LuaBinary::new(version, config))
         .args(args)
-        .build()
         .run_lua()
         .await?;
 
