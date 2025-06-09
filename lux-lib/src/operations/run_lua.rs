@@ -55,31 +55,35 @@ pub struct RunLua<'a> {
     prepend_build_paths: Option<bool>,
 }
 
-impl RunLua<'_> {
+impl<State> RunLuaBuilder<'_, State>
+where
+    State: run_lua_builder::State + run_lua_builder::IsComplete,
+{
     pub async fn run_lua(self) -> Result<(), RunLuaError> {
-        let mut paths = Paths::new(self.tree)?;
+        let args = self._build();
+        let mut paths = Paths::new(args.tree)?;
 
-        if self.prepend_test_paths.unwrap_or(false) {
-            let test_tree_path = self.tree.test_tree(self.config)?;
+        if args.prepend_test_paths.unwrap_or(false) {
+            let test_tree_path = args.tree.test_tree(args.config)?;
 
             let test_path = Paths::new(&test_tree_path)?;
 
             paths.prepend(&test_path);
         }
 
-        if self.prepend_build_paths.unwrap_or(false) {
-            let build_tree_path = self.tree.build_tree(self.config)?;
+        if args.prepend_build_paths.unwrap_or(false) {
+            let build_tree_path = args.tree.build_tree(args.config)?;
 
             let build_path = Paths::new(&build_tree_path)?;
 
             paths.prepend(&build_path);
         }
 
-        let lua_cmd: PathBuf = self.lua_cmd.try_into()?;
+        let lua_cmd: PathBuf = args.lua_cmd.try_into()?;
 
         let status = match Command::new(&lua_cmd)
-            .current_dir(self.root)
-            .args(self.args)
+            .current_dir(args.root)
+            .args(args.args)
             .env("PATH", paths.path_prepended().joined())
             .env("LUA_PATH", paths.package_path().joined())
             .env("LUA_CPATH", paths.package_cpath().joined())
@@ -100,5 +104,7 @@ impl RunLua<'_> {
                 exit_code: status.code(),
             })
         }
+    }
+}
     }
 }
