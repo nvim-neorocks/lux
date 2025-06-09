@@ -44,7 +44,7 @@ pub enum RunLuaError {
 }
 
 #[derive(Builder)]
-#[builder(start_fn = new, finish_fn(name = build, vis = "pub"))]
+#[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
 pub struct RunLua<'a> {
     root: &'a Path,
     tree: &'a Tree,
