@@ -191,5 +191,5 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for a guide.
 
 ## :book: License
 
-- Lux is licensed under [MIT](./LICENSE).
+- Lux is licensed under [LGPL-3.0+](./LICENSE).
 - The Lux logo © 2025 by Kai Jakobi is licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).

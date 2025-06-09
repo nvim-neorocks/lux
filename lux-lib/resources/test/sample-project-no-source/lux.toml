@@ -5,7 +5,7 @@ lua = ">=5.1"
 [description]
 summary = "A luxurious package manager for Lua"
 maintainer = "vhyrro"
-license = "MIT"
+license = "LGPL-3.0+"
 labels = ["luarocks", "package-manager"]
 
 [dependencies]

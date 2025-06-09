@@ -8,7 +8,7 @@ name: Integration tests (Windows/MSVC)
 
 jobs:
   test:
-    runs-on: windows-2019
+    runs-on: windows-2025
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
