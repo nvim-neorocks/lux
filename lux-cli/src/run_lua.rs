@@ -78,7 +78,6 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
         .args(args)
         .prepend_test_paths(run_lua.test)
         .prepend_build_paths(run_lua.build)
-        .build()
         .run_lua()
         .await?;
 
