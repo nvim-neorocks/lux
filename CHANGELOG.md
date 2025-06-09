@@ -6,6 +6,36 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.7.0](https://github.com/nvim-neorocks/lux/compare/v0.6.0...v0.7.0) - 2025-06-09
+
+### Added
+- [**breaking**] `--test` and `--build` flags for `lx lua` ([#774](https://github.com/nvim-neorocks/lux/pull/774))
+- *(cli)* flag to override variables ([#765](https://github.com/nvim-neorocks/lux/pull/765))
+
+### Fixed
+- don't set `LUA_INIT` if lux-lua not present ([#763](https://github.com/nvim-neorocks/lux/pull/763))
+
+### Other
+- *(deps)* bump which from 7.0.3 to 8.0.0 ([#772](https://github.com/nvim-neorocks/lux/pull/772))
+- refactor!(lua-rockspec): split out lua from dependencies ([#730](https://github.com/nvim-neorocks/lux/pull/730))
+
+## `lux-lib` - [0.9.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.8.0...lux-lib-v0.9.0) - 2025-06-09
+
+### Added
+- [**breaking**] `--test` and `--build` flags for `lx lua` ([#774](https://github.com/nvim-neorocks/lux/pull/774))
+- *(cli)* flag to override variables ([#765](https://github.com/nvim-neorocks/lux/pull/765))
+
+### Fixed
+- fix!(install): properly link transitive dependencies ([#771](https://github.com/nvim-neorocks/lux/pull/771))
+- properly quote complex keys when generating rockspec
+- don't set `LUA_INIT` if lux-lua not present ([#763](https://github.com/nvim-neorocks/lux/pull/763))
+- *(build)* lua binaries not wrapped properly ([#766](https://github.com/nvim-neorocks/lux/pull/766))
+
+### Other
+- *(deps)* bump proptest from 1.6.0 to 1.7.0 ([#776](https://github.com/nvim-neorocks/lux/pull/776))
+- *(deps)* bump which from 7.0.3 to 8.0.0 ([#772](https://github.com/nvim-neorocks/lux/pull/772))
+- refactor!(lua-rockspec): split out lua from dependencies ([#730](https://github.com/nvim-neorocks/lux/pull/730))
+
 ## `lux-cli` - [0.6.0](https://github.com/nvim-neorocks/lux/compare/v0.5.3...v0.6.0) - 2025-06-01
 
 ### Added
