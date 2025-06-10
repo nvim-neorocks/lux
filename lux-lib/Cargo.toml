@@ -5,6 +5,7 @@ version = "0.9.0"
 description = "Library for the lux package manager for Lua"
 authors = ["vhyrro <vhyrro@gmail.com>", "mrcjkb <marc@jakobi.dev>"]
 repository = "https://github.com/nvim-neorocks/lux"
+homepage = "https://nvim-neorocks.github.io"
 license = "MIT"
 readme = "../README.md"
 keywords = ["lua", "luarocks", "neovim", "packagemanager", "build"]
