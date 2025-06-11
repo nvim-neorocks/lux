@@ -72,11 +72,17 @@ pub enum DetectLuaVersionError {
     LuaVersion(#[from] crate::config::LuaVersionError),
 }
 
+#[derive(Error, Debug)]
+pub enum LuaInstallationError {
+    #[error("error building Lua from source:\n{0}")]
+    Build(String),
+}
+
 impl LuaInstallation {
-    pub async fn new(version: &LuaVersion, config: &Config) -> Self {
+    pub async fn new(version: &LuaVersion, config: &Config) -> Result<Self, LuaInstallationError> {
         let _lock = NEW_MUTEX.lock().await;
         if let Some(lua_intallation) = Self::probe(version, config.external_deps()) {
-            return lua_intallation;
+            return Ok(lua_intallation);
         }
         let output = Self::root_dir(version, config);
         let include_dir = output.join("include");
@@ -87,17 +93,20 @@ impl LuaInstallation {
             let bin = bin_dir
                 .as_ref()
                 .and_then(|bin_path| find_lua_executable(bin_path));
-            LuaInstallation {
+            let lib_dir = output.join("lib");
+            let lua_lib_name = get_lua_lib_name(&lib_dir, version);
+            let include_dir = Some(output.join("include"));
+            Ok(LuaInstallation {
                 version: version.clone(),
                 dependency_info: ExternalDependencyInfo {
-                    include_dir: Some(include_dir),
+                    include_dir,
                     lib_dir: Some(lib_dir),
                     bin_dir,
                     lib_info: None,
                     lib_name: lua_lib_name,
                 },
                 bin,
-            }
+            })
         } else {
             Self::install(version, config).await
         }
@@ -145,7 +154,10 @@ impl LuaInstallation {
     }
 
     // XXX: lua_src and luajit_src panic on failure, so we just unwrap errors here.
-    pub async fn install(version: &LuaVersion, config: &Config) -> Self {
+    pub async fn install(
+        version: &LuaVersion,
+        config: &Config,
+    ) -> Result<Self, LuaInstallationError> {
         let _lock = INSTALL_MUTEX.lock().await;
         let host = Triple::host();
         let target = &host.to_string();
@@ -177,13 +189,14 @@ impl LuaInstallation {
                     .target(target)
                     .host(host_operating_system)
                     .out_dir(&output)
-                    .build(match version {
+                    .try_build(match version {
                         LuaVersion::Lua51 => lua_src::Version::Lua51,
                         LuaVersion::Lua52 => lua_src::Version::Lua52,
                         LuaVersion::Lua53 => lua_src::Version::Lua53,
                         LuaVersion::Lua54 => lua_src::Version::Lua54,
                         _ => unreachable!(),
-                    });
+                    })
+                    .map_err(|err| LuaInstallationError::Build(err.to_string()))?;
 
                 (
                     build.include_dir().to_path_buf(),
@@ -202,8 +215,7 @@ impl LuaInstallation {
             .as_ref()
             .and_then(|bin_path| find_lua_executable(bin_path));
         let lua_lib_name = get_lua_lib_name(&lib_dir, version);
-
-        LuaInstallation {
+        Ok(LuaInstallation {
             version: version.clone(),
             dependency_info: ExternalDependencyInfo {
                 include_dir: Some(include_dir),
@@ -213,7 +225,7 @@ impl LuaInstallation {
                 lib_name: lua_lib_name,
             },
             bin,
-        }
+        })
     }
 
     pub fn includes(&self) -> Vec<&PathBuf> {
@@ -502,7 +514,7 @@ mod test {
         }
         let config = ConfigBuilder::new().unwrap().build().unwrap();
         let lua_version = config.lua_version().unwrap();
-        let lua_installation = LuaInstallation::new(lua_version, &config).await;
+        let lua_installation = LuaInstallation::new(lua_version, &config).await.unwrap();
         // FIXME: This fails when run in the nix checkPhase
         assert!(lua_installation.bin.is_some());
         let lua_binary: LuaBinary = lua_installation.bin.unwrap().into();
