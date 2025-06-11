@@ -1,4 +1,5 @@
 use crate::lockfile::{LockfileError, OptState, RemotePackageSourceUrl};
+use crate::lua_installation::LuaInstallationError;
 use crate::lua_rockspec::LuaVersionError;
 use crate::rockspec::{LuaVersionCompatibility, Rockspec};
 use crate::tree::{self, EntryType, TreeError};
@@ -134,6 +135,8 @@ pub enum BuildError {
     FetchSrcError(#[from] FetchSrcError),
     #[error("failed to install binary {0}: {1}")]
     InstallBinary(String, InstallBinaryError),
+    #[error(transparent)]
+    LuaInstallation(#[from] LuaInstallationError),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -422,7 +425,7 @@ where
                 tree::EntryType::DependencyOnly => tree.dependency(&package)?,
             };
 
-            let lua = LuaInstallation::new(&lua_version, build.config);
+            let lua = LuaInstallation::new(&lua_version, build.config)?;
 
             let rock_source = rockspec.source().current_platform();
             let build_dir = match &rock_source.unpack_dir {
@@ -572,7 +575,7 @@ mod tests {
             doc: dest_dir.join("doc"),
         };
         let lua_version = config.lua_version().unwrap_or(&LuaVersion::Lua51);
-        let lua = LuaInstallation::new(lua_version, &config);
+        let lua = LuaInstallation::new(lua_version, &config).unwrap();
         let project = Project::from(&project_root).unwrap().unwrap();
         let rockspec = project.toml().into_remote().unwrap();
         let progress = Progress::Progress(MultiProgress::new());

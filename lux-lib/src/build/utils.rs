@@ -612,7 +612,7 @@ mod tests {
     async fn test_is_compatible_lua_script() {
         let config = ConfigBuilder::new().unwrap().build().unwrap();
         let lua_version = config.lua_version().unwrap();
-        let lua = LuaInstallation::new(lua_version, &config);
+        let lua = LuaInstallation::new(lua_version, &config).unwrap();
         let valid_script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("resources/test/sample_lua_bin_script_valid");
         assert!(is_compatible_lua_script(&valid_script, &lua, &config).await);
@@ -630,7 +630,7 @@ mod tests {
             .build()
             .unwrap();
         let lua_version = config.lua_version().unwrap();
-        let lua = LuaInstallation::new(lua_version, &config);
+        let lua = LuaInstallation::new(lua_version, &config).unwrap();
         let tree = config.user_tree(lua_version.clone()).unwrap();
         let valid_script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("resources/test/sample_lua_bin_script_valid");
