@@ -83,6 +83,7 @@ nonempty = { version = "0.11.0", features = ["serialize"] }
 is_executable = "1.0.4"
 path-slash = "0.2.1"
 chumsky = "0.10.1"
+lazy_static = "1.5.0"
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 gpgme = "0.11.0"

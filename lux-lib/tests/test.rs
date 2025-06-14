@@ -83,3 +83,41 @@ async fn non_regression_lockfile_corruption() {
         String::from_utf8(tokio::fs::read(project.lockfile_path()).await.unwrap());
     assert_eq!(lockfile_before_test, lockfile_after_test);
 }
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn run_busted_nlua_test() {
+    run_busted_nlua_test_impl(false).await
+}
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn run_busted_nlua_test_no_lock() {
+    run_busted_nlua_test_impl(true).await
+}
+
+// NOTE: The busted-nlua test backend is currently broken on macOS and Windows.
+// On macOS, it appears that Neovim segfaults when `require`ing `lfs` (luafilesystem).
+// Investigation is needed on Windows.
+#[cfg(target_os = "linux")]
+async fn run_busted_nlua_test_impl(no_lock: bool) {
+    let project_root =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-project-busted-nlua");
+    let temp_dir = assert_fs::TempDir::new().unwrap();
+    temp_dir.copy_from(&project_root, &["**"]).unwrap();
+    let project_root = temp_dir.path();
+    let project: Project = Project::from(project_root).unwrap().unwrap();
+    let tree_root = project.root().to_path_buf().join(".lux");
+    let _ = std::fs::remove_dir_all(&tree_root);
+
+    let config = ConfigBuilder::new()
+        .unwrap()
+        .user_tree(Some(tree_root))
+        .build()
+        .unwrap();
+    Test::new(project, &config)
+        .no_lock(no_lock)
+        .run()
+        .await
+        .unwrap();
+}

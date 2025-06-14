@@ -54,21 +54,22 @@ pub(crate) async fn build<R: Rockspec>(
         rockspec.package(),
         rockspec.version()
     ));
-    std::fs::write(
+    tokio::fs::write(
         &rockspec_file,
         rockspec
             .to_lua_remote_rockspec_string()
             .map_err(|err| LuarocksBuildError::Rockspec(err.to_string()))?,
-    )?;
+    )
+    .await?;
     let luarocks = LuaRocksInstallation::new(config, tree.build_tree(config)?)?;
     let luarocks_tree = TempDir::new("luarocks-compat-tree")?;
     luarocks
         .make(&rockspec_file, build_dir, luarocks_tree.path(), lua)
         .await?;
-    install(rockspec, &luarocks_tree.into_path(), output_paths, config)
+    install(rockspec, &luarocks_tree.into_path(), output_paths, config).await
 }
 
-fn install<R: Rockspec>(
+async fn install<R: Rockspec>(
     rockspec: &R,
     luarocks_tree: &Path,
     output_paths: &RockLayout,
@@ -85,17 +86,17 @@ fn install<R: Rockspec>(
         .join(format!("lux-{}", &lua_version.version_compatibility_str()))
         .join(format!("{}", rockspec.package()))
         .join(format!("{}", rockspec.version()));
-    recursive_copy_dir(&package_dir.join("doc"), &output_paths.doc)?;
-    recursive_copy_dir(&luarocks_tree.join("bin"), &output_paths.bin)?;
+    recursive_copy_dir(&package_dir.join("doc"), &output_paths.doc).await?;
+    recursive_copy_dir(&luarocks_tree.join("bin"), &output_paths.bin).await?;
     let src_dir = luarocks_tree
         .join("share")
         .join("lua")
         .join(lua_version.version_compatibility_str());
-    recursive_copy_dir(&src_dir, &output_paths.src)?;
+    recursive_copy_dir(&src_dir, &output_paths.src).await?;
     let lib_dir = luarocks_tree
         .join("lib")
         .join("lua")
         .join(lua_version.version_compatibility_str());
-    recursive_copy_dir(&lib_dir, &output_paths.lib)?;
+    recursive_copy_dir(&lib_dir, &output_paths.lib).await?;
     Ok(BuildInfo::default())
 }

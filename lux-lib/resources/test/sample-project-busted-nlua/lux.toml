@@ -1,0 +1,12 @@
+package = "sample-project"
+version = "0.1.0"
+lua = ">=5.1"
+
+[source]
+url = "https://github.com/nvim-neorocks/luarocks-stub"
+
+[build]
+type = "builtin"
+
+[test_dependencies]
+nlua = "0.3.2"

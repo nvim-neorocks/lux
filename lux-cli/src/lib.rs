@@ -211,9 +211,27 @@ pub enum Commands {
     ///     flags = [ ] # Optional CLI flags to pass to busted{n}
     ///     ```{n}
     ///     {n}
-    ///     `lx test` will default to using `busted`{n}
-    ///     if there is a `.busted` file in the project root{n}
-    ///     and no test backend is specified.{n}
+    ///     `lx test` will default to using `busted` if no test backend is specified and:{n}
+    ///         * there is a `.busted` file in the project root{n}
+    ///         * or `busted` is one of the `test_dependencies`).{n}
+    /// {n}
+    ///   - busted-nlua:{n}:
+    ///     {n}
+    ///     [currently broken on macOS and Windows]
+    ///     A build backend for running busted tests with Neovim as the Lua interpreter.
+    ///     Used for testing Neovim plugins.
+    ///     {n}
+    ///     Example:{n}
+    ///     {n}
+    ///     ```toml{n}
+    ///     [test]{n}
+    ///     type = "busted-nlua"{n}
+    ///     flags = [ ] # Optional CLI flags to pass to busted{n}
+    ///     ```{n}
+    ///     {n}
+    ///     `lx test` will default to using `busted-nlua` if no test backend is specified and:{n}
+    ///         * there is a `.busted` file in the project root{n}
+    ///         * or `busted` and `nlua` are `test_dependencies`.{n}
     /// {n}
     ///   - command:{n}
     ///     {n}
