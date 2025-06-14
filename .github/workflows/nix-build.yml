@@ -16,7 +16,6 @@ jobs:
       matrix:
         job:
           - { os: ubuntu-24.04, target: x86_64-linux }
-          - { os: macos-13, target: x86_64-darwin }
           - { os: macos-14, target: aarch64-darwin }
     steps:
     - uses: actions/checkout@v4
