@@ -308,7 +308,9 @@ pub enum SourceUrlError {
     SSCM,
     #[error("lux does not support rockspecs with SVN sources.")]
     SVN,
-    #[error("unsupported source url: {0}")]
+    #[error("unsupported source URL prefix: '{0}+' in URL {1}")]
+    UnsupportedPrefix(String, String),
+    #[error("unsupported source URL: {0}")]
     Unsupported(String),
 }
 
@@ -316,35 +318,37 @@ impl FromStr for SourceUrl {
     type Err = SourceUrlError;
 
     fn from_str(str: &str) -> Result<Self, Self::Err> {
-        match str {
-            s if s.starts_with("file://") => {
-                let path_buf: PathBuf = s.trim_start_matches("file://").into();
-                let path = fs::canonicalize(&path_buf)?;
-                Ok(Self::File(path))
-            }
-            s if s.starts_with("git://") => Ok(Self::Git(s.replacen("git", "https", 1).parse()?)),
-            s if starts_with_any(
-                s,
-                ["git+file://", "git+http://", "git+https://", "git+ssh://"].into(),
-            ) =>
-            {
-                Ok(Self::Git(s.trim_start_matches("git+").parse()?))
-            }
-            s if s.ends_with(".git") => Ok(Self::Git(s.parse()?)),
-            s if starts_with_any(s, ["https://", "http://", "ftp://"].into()) => {
-                Ok(Self::Url(s.parse().map_err(SourceUrlError::Url)?))
-            }
-            s if s.starts_with("cvs://") => Err(SourceUrlError::CVS),
-            s if starts_with_any(
-                s,
-                ["hg://", "hg+http://", "hg+https://", "hg+ssh://"].into(),
-            ) =>
-            {
-                Err(SourceUrlError::Mercurial)
-            }
-            s if s.starts_with("sscm://") => Err(SourceUrlError::SSCM),
-            s if s.starts_with("svn://") => Err(SourceUrlError::SVN),
-            s => Err(SourceUrlError::Unsupported(s.to_string())),
+        match str.split_once("+") {
+            Some(("git" | "gitrec", url)) => Ok(Self::Git(url.parse()?)),
+            Some((prefix, _)) => Err(SourceUrlError::UnsupportedPrefix(
+                prefix.to_string(),
+                str.to_string(),
+            )),
+            None => match str {
+                s if s.starts_with("file://") => {
+                    let path_buf: PathBuf = s.trim_start_matches("file://").into();
+                    let path = fs::canonicalize(&path_buf)?;
+                    Ok(Self::File(path))
+                }
+                s if s.starts_with("git://") => {
+                    Ok(Self::Git(s.replacen("git", "https", 1).parse()?))
+                }
+                s if s.ends_with(".git") => Ok(Self::Git(s.parse()?)),
+                s if starts_with_any(s, ["https://", "http://", "ftp://"].into()) => {
+                    Ok(Self::Url(s.parse().map_err(SourceUrlError::Url)?))
+                }
+                s if s.starts_with("cvs://") => Err(SourceUrlError::CVS),
+                s if starts_with_any(
+                    s,
+                    ["hg://", "hg+http://", "hg+https://", "hg+ssh://"].into(),
+                ) =>
+                {
+                    Err(SourceUrlError::Mercurial)
+                }
+                s if s.starts_with("sscm://") => Err(SourceUrlError::SSCM),
+                s if s.starts_with("svn://") => Err(SourceUrlError::SVN),
+                s => Err(SourceUrlError::Unsupported(s.to_string())),
+            },
         }
     }
 }
@@ -386,7 +390,8 @@ mod tests {
         assert!(matches!(url, SourceUrl::Git { .. }));
         let url: SourceUrl = "git+ssh://example.com/foo".parse().unwrap();
         assert!(matches!(url, SourceUrl::Git { .. }));
-        let _err = SourceUrl::from_str("git+foo://example.com/foo").unwrap_err();
+        let url: SourceUrl = "gitrec+https://example.com/foo".parse().unwrap();
+        assert!(matches!(url, SourceUrl::Git { .. }));
         let url: SourceUrl = "https://example.com/foo".parse().unwrap();
         assert!(matches!(url, SourceUrl::Url { .. }));
         let url: SourceUrl = "http://example.com/foo".parse().unwrap();
