@@ -490,7 +490,7 @@ impl Rockspec for RemoteLuaRockspec {
 
 #[derive(Error, Debug)]
 pub enum LuaVersionError {
-    #[error("The lua version {0} is not supported by {1} version {1}!")]
+    #[error("The lua version {0} is not supported by {1} version {2}!")]
     LuaVersionUnsupported(LuaVersion, PackageName, PackageVersion),
     #[error(transparent)]
     LuaVersionUnset(#[from] LuaVersionUnset),
