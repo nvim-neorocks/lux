@@ -315,9 +315,9 @@ mod helpers {
     ) -> Result<Url, url::ParseError> {
         let api_key = unsafe { api_key.get() };
         server_url
-            .join("api/1")
-            .expect("error constructing 'api/1' path")
-            .join(api_key)?
+            .join("api/1/")
+            .expect("error constructing 'api/1/' path")
+            .join(&format!("{}/", api_key))?
             .join(endpoint)
     }
 
