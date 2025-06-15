@@ -46,7 +46,7 @@ impl Build for RustMluaBuildSpec {
         build_dir: &Path,
         progress: &Progress<ProgressBar>,
     ) -> Result<BuildInfo, Self::Err> {
-        let lua_version = LuaVersion::from(config)?;
+        let lua_version = LuaVersion::from_current_project_or_config(config)?;
         let lua_feature = match lua_version {
             LuaVersion::Lua51 => "lua51",
             LuaVersion::Lua52 => "lua52",

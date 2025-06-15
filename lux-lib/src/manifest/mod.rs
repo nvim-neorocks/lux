@@ -86,10 +86,11 @@ async fn get_manifest(
 /// if the cache doesn't exist or is outdated.
 async fn manifest_from_cache_or_server(
     server_url: &Url,
+    manifest_version: &LuaVersion,
     config: &Config,
     bar: &Progress<ProgressBar>,
 ) -> Result<String, ManifestFromServerError> {
-    let manifest_version = LuaVersion::from(config)?.version_compatibility_str();
+    let manifest_version = manifest_version.version_compatibility_str();
     let url = mk_manifest_url(server_url, &manifest_version, config)?;
 
     // Stores a path to the manifest cache (this allows us to operate on a manifest without
@@ -135,10 +136,11 @@ async fn manifest_from_cache_or_server(
 /// This still populates the cache.
 pub(crate) async fn manifest_from_server_only(
     server_url: &Url,
+    manifest_version: &LuaVersion,
     config: &Config,
     bar: &Progress<ProgressBar>,
 ) -> Result<String, ManifestFromServerError> {
-    let manifest_version = LuaVersion::from(config)?.version_compatibility_str();
+    let manifest_version = manifest_version.version_compatibility_str();
     let url = mk_manifest_url(server_url, &manifest_version, config)?;
     let cache = mk_manifest_cache(&url, config).await?;
     let client = Client::new();
@@ -303,13 +305,16 @@ impl Manifest {
         config: &Config,
         progress: &Progress<ProgressBar>,
     ) -> Result<Self, ManifestError> {
+        let manifest_version = LuaVersion::from_current_project_or_config(config)
+            .map_err(|err| ManifestError::Server(err.into()))?;
+
         let content =
-            crate::manifest::manifest_from_cache_or_server(&server_url, config, progress).await?;
+            crate::manifest::manifest_from_cache_or_server(&server_url, &manifest_version, config, progress).await?;
         match ManifestMetadata::new(&content) {
             Ok(metadata) => Ok(Self::new(server_url, metadata)),
             Err(_) => {
                 let manifest =
-                    crate::manifest::manifest_from_server_only(&server_url, config, progress)
+                    crate::manifest::manifest_from_server_only(&server_url, &manifest_version, config, progress)
                         .await?;
                 Ok(Self::new(server_url, ManifestMetadata::new(&manifest)?))
             }
@@ -432,6 +437,7 @@ mod tests {
             .unwrap();
         manifest_from_cache_or_server(
             &Url::parse(&url_str).unwrap(),
+            &LuaVersion::LuaJIT,
             &config,
             &Progress::NoProgress,
         )
@@ -456,6 +462,7 @@ mod tests {
 
         manifest_from_cache_or_server(
             &Url::parse(&url_str).unwrap(),
+            &LuaVersion::Lua51,
             &config,
             &Progress::NoProgress,
         )
@@ -485,6 +492,7 @@ mod tests {
             .unwrap();
         let result = manifest_from_cache_or_server(
             &Url::parse(&url_str).unwrap(),
+            &LuaVersion::Lua51,
             &config,
             &Progress::NoProgress,
         )
