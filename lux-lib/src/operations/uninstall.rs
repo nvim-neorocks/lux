@@ -19,7 +19,7 @@ pub enum RemoveError {
     Tree(#[from] TreeError),
 }
 
-pub struct Remove<'a> {
+pub struct Uninstall<'a> {
     config: &'a Config,
     packages: Vec<LocalPackageId>,
     progress: Option<Arc<Progress<MultiProgress>>>,
@@ -27,7 +27,7 @@ pub struct Remove<'a> {
 
 /// A rocks package remover.
 /// Can remove multiple packages in parallel.
-impl<'a> Remove<'a> {
+impl<'a> Uninstall<'a> {
     /// Construct a new rocks package remover.
     pub fn new(config: &'a Config) -> Self {
         Self {

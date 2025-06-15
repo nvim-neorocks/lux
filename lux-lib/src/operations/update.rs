@@ -18,7 +18,7 @@ use crate::{
     tree::{self, Tree, TreeError},
 };
 
-use super::{Install, InstallError, PackageInstallSpec, Remove, RemoveError, SyncError};
+use super::{Install, InstallError, PackageInstallSpec, RemoveError, SyncError, Uninstall};
 
 #[derive(Error, Debug)]
 pub enum UpdateError {
@@ -271,7 +271,7 @@ async fn update(
     if updatable.is_empty() {
         Ok(Vec::new())
     } else {
-        Remove::new(config)
+        Uninstall::new(config)
             .packages(updatable.iter().map(|(package, _)| package.id()))
             .progress(progress.clone())
             .remove()

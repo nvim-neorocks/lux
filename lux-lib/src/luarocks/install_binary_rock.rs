@@ -244,7 +244,7 @@ mod test {
 
     use crate::{
         config::ConfigBuilder,
-        operations::{unpack_rockspec, DownloadedPackedRockBytes, Pack, Remove},
+        operations::{unpack_rockspec, DownloadedPackedRockBytes, Pack, Uninstall},
         progress::MultiProgress,
     };
 
@@ -379,7 +379,7 @@ mod test {
         );
 
         // let's make sure our own pack/unpack implementation roundtrips correctly
-        Remove::new(&config)
+        Uninstall::new(&config)
             .package(local_package.id())
             .remove()
             .await
