@@ -6,6 +6,7 @@ use crate::rockspec::Rockspec;
 use crate::TOOL_VERSION;
 use crate::{config::Config, project::Project};
 
+use reqwest::StatusCode;
 use reqwest::{
     multipart::{Form, Part},
     Client,
@@ -86,6 +87,8 @@ pub enum UserCheckError {
     Request(#[from] reqwest::Error),
     #[error("invalid API key provided")]
     UserNotFound,
+    #[error("server {0} responded with error status: {1}")]
+    Server(Url, StatusCode),
 }
 
 #[derive(Error, Debug)]
@@ -104,6 +107,10 @@ pub enum UploadError {
     ParseError(#[from] url::ParseError),
     Lua(#[from] mlua::Error),
     Request(#[from] reqwest::Error),
+    #[error("server {0} responded with error status: {1}")]
+    Server(Url, StatusCode),
+    #[error("client error when requesting {0}\nStatus code: {1}")]
+    Client(Url, StatusCode),
     RockCheck(#[from] RockCheckError),
     #[error("rock already exists on server: {0}")]
     RockExists(Url),
@@ -291,13 +298,20 @@ async fn upload_from_project(
         }
     };
 
-    client
-        .post(helpers::url_for_method(config.server(), api_key, "upload")?)
+    let response = client
+        .post(unsafe { helpers::url_for_method(config.server(), api_key, "upload")? })
         .multipart(multipart)
         .send()
         .await?;
 
-    Ok(())
+    let status = response.status();
+    if status.is_client_error() {
+        Err(UploadError::Client(config.server().clone(), status))
+    } else if status.is_server_error() {
+        Err(UploadError::Server(config.server().clone(), status))
+    } else {
+        Ok(())
+    }
 }
 
 mod helpers {
@@ -308,16 +322,19 @@ mod helpers {
     use reqwest::Client;
     use url::Url;
 
-    pub(crate) fn url_for_method(
+    /// WARNING: This function is unsafe,
+    /// because it adds the unmasked API key to the URL.
+    /// When using URLs created by this function,
+    /// pay attention not to leak the API key in errors.
+    pub(crate) unsafe fn url_for_method(
         server_url: &Url,
         api_key: &ApiKey,
         endpoint: &str,
     ) -> Result<Url, url::ParseError> {
-        let api_key = unsafe { api_key.get() };
         server_url
             .join("api/1/")
             .expect("error constructing 'api/1/' path")
-            .join(&format!("{}/", api_key))?
+            .join(&format!("{}/", api_key.get()))?
             .join(endpoint)
     }
 
@@ -349,13 +366,18 @@ mod helpers {
         api_key: &ApiKey,
         server_url: &Url,
     ) -> Result<(), UserCheckError> {
-        client
-            .get(url_for_method(server_url, api_key, "status")?)
+        let response = client
+            .get(unsafe { url_for_method(server_url, api_key, "status")? })
             .send()
-            .await?
-            .error_for_status()?;
-
-        Ok(())
+            .await?;
+        let status = response.status();
+        if status.is_client_error() {
+            Err(UserCheckError::UserNotFound)
+        } else if status.is_server_error() {
+            Err(UserCheckError::Server(server_url.clone(), status))
+        } else {
+            Ok(())
+        }
     }
 
     pub(crate) async fn rock_exists(
@@ -366,7 +388,7 @@ mod helpers {
         server: &Url,
     ) -> Result<bool, RockCheckError> {
         Ok(client
-            .get(url_for_method(server, api_key, "check_rockspec")?)
+            .get(unsafe { url_for_method(server, api_key, "check_rockspec")? })
             .query(&(
                 ("package", name.to_string()),
                 ("version", version.to_string()),
