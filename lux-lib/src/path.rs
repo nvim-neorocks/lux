@@ -96,6 +96,7 @@ impl Paths {
             r#"
         if _VERSION:find('{}') then {LUA_INIT} end
         exit = os.exit
+        setmetatable(exit, {__tostring = function(...) return os.exit() end})
         "#,
             self.version
         )
