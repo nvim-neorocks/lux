@@ -92,7 +92,13 @@ impl Paths {
 
     /// Get `$LUA_INIT`
     pub fn init(&self) -> String {
-        format!("if _VERSION:find('{}') then {LUA_INIT} end", self.version)
+        format!(
+            r#"
+        if _VERSION:find('{}') then {LUA_INIT} end
+        exit = os.exit
+        "#,
+            self.version
+        )
     }
 
     /// Get the `$PATH`, prepended to the existing `$PATH` environment.
