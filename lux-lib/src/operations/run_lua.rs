@@ -81,12 +81,35 @@ where
 
         let lua_cmd: PathBuf = args.lua_cmd.try_into()?;
 
+        let loader_init = if args.tree.version().lux_lib_dir().is_none() {
+            eprintln!(
+                "⚠️ WARNING: lux-lua library not found.
+Cannot use the `lux.loader`.
+                "
+            );
+            "".to_string()
+        } else {
+            paths.init()
+        };
+        let lua_init = format!(
+            r#"
+            {}
+            exit = os.exit
+            print([==[
+Welcome to the lux Lua repl.
+To exit type 'exit()' or <C-d>.
+]==])
+        "#,
+            loader_init
+        );
+
         let status = match Command::new(&lua_cmd)
             .current_dir(args.root)
             .args(args.args)
             .env("PATH", paths.path_prepended().joined())
             .env("LUA_PATH", paths.package_path().joined())
             .env("LUA_CPATH", paths.package_cpath().joined())
+            .env("LUA_INIT", lua_init)
             .status()
             .await
         {
