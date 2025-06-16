@@ -53,6 +53,7 @@ pub struct RunLua<'a> {
     args: &'a Vec<String>,
     prepend_test_paths: Option<bool>,
     prepend_build_paths: Option<bool>,
+    welcome_message: Option<String>,
 }
 
 impl<State> RunLuaBuilder<'_, State>
@@ -92,14 +93,14 @@ Cannot use the `lux.loader`.
             paths.init()
         };
         let lua_init = format!(
-            r#"
-            {}
+            r#"print([==[{}]==])
             exit = os.exit
             print([==[
-Welcome to the lux Lua repl.
+{}
 To exit type 'exit()' or <C-d>.
 ]==])
         "#,
+            args.welcome_message.unwrap_or_default(),
             loader_init
         );
 

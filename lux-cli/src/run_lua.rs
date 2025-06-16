@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use tokio::process::Command;
 
 use clap::Args;
@@ -39,11 +41,15 @@ pub struct RunLua {
 
 pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
     let project = Project::current()?;
-    let (lua_version, root, tree) = match &project {
+    let (lua_version, root, tree, mut welcome_message) = match &project {
         Some(project) => (
             project.toml().lua_version_matches(&config)?,
             project.root().to_path_buf(),
             project.tree(&config)?,
+            format!(
+                "Welcome to the lux Lua repl for {}.",
+                project.toml().package()
+            ),
         ),
         None => {
             let version = LuaVersion::from(&config)?.clone();
@@ -51,9 +57,16 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
                 version.clone(),
                 std::env::current_dir()?,
                 config.user_tree(version)?,
+                "Welcome to the lux Lua repl.".into(),
             )
         }
     };
+
+    welcome_message = format!(
+        r#"{}
+Run `lx lua --help` for options."#,
+        welcome_message
+    );
 
     let lua_cmd = run_lua
         .lua
@@ -78,6 +91,7 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
         .args(args)
         .prepend_test_paths(run_lua.test)
         .prepend_build_paths(run_lua.build)
+        .welcome_message(welcome_message)
         .run_lua()
         .await?;
 
@@ -85,7 +99,8 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
 }
 
 async fn print_lua_help(lua_cmd: &LuaBinary) -> Result<()> {
-    let output = match Command::new(lua_cmd.to_string())
+    let lua_cmd_path: PathBuf = lua_cmd.clone().try_into()?;
+    let output = match Command::new(lua_cmd_path.to_string_lossy().to_string())
         // HACK: This fails with exit 1, because lua doesn't actually have a help flag (╯°□°)╯︵ ┻━┻
         .arg("-h")
         .output()
