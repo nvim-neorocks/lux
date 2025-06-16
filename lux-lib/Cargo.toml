@@ -50,7 +50,6 @@ which = "8.0.0"
 lets_find_up = "0.0.4"
 remove_dir_all = "1.0.0"
 openssl = "0.10.72"
-lua-src = "548.1.0"
 luajit-src = "210.5.12"
 target-lexicon = "0.13.2"
 clap = { version = "4.5.38", features = ["derive"], optional = true }
@@ -83,6 +82,11 @@ nonempty = { version = "0.11.0", features = ["serialize"] }
 is_executable = "1.0.4"
 path-slash = "0.2.1"
 chumsky = "0.10.1"
+
+[dependencies.lua-src]
+version = "548.1.0"
+git = "https://github.com/mrcjkb/lua-src-rs.git"
+branch = "mj/push-nmyurxzqksyn"
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 gpgme = "0.11.0"
