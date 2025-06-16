@@ -27,7 +27,7 @@ pub struct RunLua {
     /// Arguments to pass to Lua. See `lua -h`.
     args: Option<Vec<String>>,
 
-    /// Path to the Lua interpreter to use
+    /// Path to the Lua interpreter to use.
     #[arg(long)]
     lua: Option<String>,
 
@@ -125,10 +125,13 @@ Arguments:
 
 Options:
   --lua       Path to the Lua interpreter to use
-  --no-lock   When building a project, ignore the project's lockfile and don't create one
+  -h, --help  Print help
+
+Build options (if running a repl for a project):
   --test      Prepend test dependencies to the LUA_PATH and LUA_CPATH
   --build     Prepend build dependencies to the LUA_PATH and LUA_CPATH
-  -h, --help  Print help
+  --no-lock   Ignore the project's lockfile and don't create one
+  --only-deps Build only the dependencies
 ",
         lua_help,
     );
