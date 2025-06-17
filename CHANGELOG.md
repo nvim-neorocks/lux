@@ -6,6 +6,25 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.7.3](https://github.com/nvim-neorocks/lux/compare/v0.7.2...v0.7.3) - 2025-06-17
+
+### Added
+- *(repl)* add project to welcome message
+
+### Fixed
+- broken `lx lua --help`
+
+## `lux-lib` - [0.10.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.9.2...lux-lib-v0.10.0) - 2025-06-17
+
+### Added
+- *(repl)* add project to welcome message
+
+### Fixed
+- [**breaking**] only alias `exit` to `os.exit()` in repl
+
+### Other
+- *(deps)* bump zip from 4.0.0 to 4.1.0 ([#800](https://github.com/nvim-neorocks/lux/pull/800))
+
 ## `lux-cli` - [0.7.2](https://github.com/nvim-neorocks/lux/compare/v0.7.1...v0.7.2) - 2025-06-16
 
 ### Other
