@@ -32,7 +32,7 @@ fn lux(lua: &Lua) -> LuaResult<LuaTable> {
     )?;
     exports.set("config", config::config(lua)?)?;
     exports.set("project", project::project(lua)?)?;
-    exports.set("state", operations::operations(lua)?)?;
+    exports.set("operations", operations::operations(lua)?)?;
 
     Ok(exports)
 }
