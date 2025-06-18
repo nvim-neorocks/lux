@@ -4,6 +4,7 @@ use mlua::prelude::*;
 
 mod config;
 mod loader;
+mod operations;
 mod project;
 
 #[cfg_attr(not(feature = "test"), mlua::lua_module)]
@@ -31,6 +32,7 @@ fn lux(lua: &Lua) -> LuaResult<LuaTable> {
     )?;
     exports.set("config", config::config(lua)?)?;
     exports.set("project", project::project(lua)?)?;
+    exports.set("operations", operations::operations(lua)?)?;
 
     Ok(exports)
 }
