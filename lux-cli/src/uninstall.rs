@@ -88,7 +88,7 @@ Cannot uninstall dependencies:
         .cloned()
         .partition(|pkg_id| lockfile.is_dependency(pkg_id));
 
-    operations::Remove::new(&config)
+    operations::Uninstall::new(&config)
         .packages(entrypoints)
         .remove()
         .await?;
@@ -139,7 +139,7 @@ Reinstall?
                 })
                 .collect_vec();
             let progress = MultiProgress::new_arc();
-            operations::Remove::new(&config)
+            operations::Uninstall::new(&config)
                 .packages(dependencies)
                 .progress(progress.clone())
                 .remove()
