@@ -1,0 +1,19 @@
+package = "Dockerfile-Test"
+version = "0.1.0"
+lua = ">=5.1"
+
+[description]
+summary = "A test project for the docker file"
+maintainer = "Cootshk"
+labels = [ "docker", "test" ]
+license = "LGPL-2.0"
+
+[dependencies]
+# Add your dependencies here
+# `busted = ">=2.0"`
+
+[run]
+args = [ "src/main.lua" ]
+
+[build]
+type = "builtin"
