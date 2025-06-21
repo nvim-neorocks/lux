@@ -2,6 +2,7 @@
 name: "Nix build"
 on:
   pull_request:
+    types: [opened, ready_for_review, reopened, synchronize]
   push:
     branches: [ master ]
 jobs:
