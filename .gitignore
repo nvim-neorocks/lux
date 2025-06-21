@@ -8,6 +8,10 @@
 
 /result*
 
+# Docker
+
+docker/target
+
 # For compat
 /.rocks/*
 /rocks.lock
