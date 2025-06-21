@@ -8,6 +8,7 @@ name: Integration tests (Windows/MSVC)
 
 jobs:
   test:
+    if: github.event.pull_request.draft == false
     runs-on: windows-2025
     steps:
       - name: Checkout repository
