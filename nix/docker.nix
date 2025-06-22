@@ -42,6 +42,9 @@ args @ {self, ...}: final: prev: let
         };
         config = {
           Cmd = ["lx" "run"];
+          # docker run -v /path/to/project:/data --rm lux:5.1-1.2.3 run
+          WorkingDir = "/data";
+          Volumes = {"/data" = {};};
         };
         # created = date;
       };
