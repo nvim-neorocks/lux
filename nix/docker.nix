@@ -1,4 +1,7 @@
-self: final: prev: let
+{
+  self,
+  date,
+}: final: prev: let
   pkgs = final;
   lux-cli-docker = with pkgs;
     dockerTools.buildImage {
@@ -12,6 +15,7 @@ self: final: prev: let
       config = {
         Cmd = ["/bin/lux"];
       };
+      created = date;
     };
   mk-lux-lua-docker = lua_pkg:
     with pkgs;
@@ -27,6 +31,7 @@ self: final: prev: let
         config = {
           Cmd = ["/bin/lux"];
         };
+        created = date;
       };
 in {
   lux-cli-docker = lux-cli-docker;
