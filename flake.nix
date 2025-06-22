@@ -81,6 +81,8 @@
                   cmakeMinimal
                   zlib
                   gnum4
+                  # Docker build tools
+                  nix-prefetch-docker
                 ])
                 ++ self.checks.${system}.git-hooks-check.enabledPackages
                 ++ pkgs.lux-cli.buildInputs
