@@ -24,11 +24,11 @@ args @ {self, ...}: final: prev: let
     };
   mk-lux-lua-docker = lux_pkg:
     with pkgs; let
-      isLuaJIT = lib.strings.hasInfix "jit" lux_pkg.pname;
-      lua = builtins.elemAt (builtins.filter (pkg: pkg.pname == "lua") lux_pkg.buildInputs) 0;
+      lua = builtins.elemAt (builtins.filter (pkg: pkg.pname == "lua" || pkg.pname == "luajit") lux_pkg.buildInputs) 0;
+      isLuaJIT = lua.pname == "luajit";
       luaVersion =
         if isLuaJIT
-        then "jit"
+        then "jit-${lua.version}"
         else lua.version;
     in
       dockerTools.buildImage {
@@ -48,5 +48,9 @@ args @ {self, ...}: final: prev: let
 in
   with pkgs; {
     lux-cli-docker = lux-cli-docker;
-    lux-lua51-docker = mk-lux-lua-docker pkgs.lux-lua51;
+    lux-lua51-docker = mk-lux-lua-docker lux-lua51;
+    lux-lua52-docker = mk-lux-lua-docker lux-lua52;
+    lux-lua53-docker = mk-lux-lua-docker lux-lua53;
+    lux-lua54-docker = mk-lux-lua-docker lux-lua54;
+    lux-luajit-docker = mk-lux-lua-docker lux-luajit;
   }
