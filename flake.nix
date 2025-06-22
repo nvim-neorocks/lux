@@ -112,8 +112,10 @@
           default = with inputs; import ./nix/overlay.nix {inherit self crane;};
           docker = with inputs;
             import ./nix/docker.nix {
-              inherit self;
-              date = builtins.substring 0 8 self.lastModifiedDate;
+              inherit
+                self
+                ;
+              # date = builtins.substring 0 8 self.lastModifiedDate;
             };
         };
       };
