@@ -22,10 +22,10 @@ args @ {self, ...}: final: prev: let
       };
       #   created = builtins.substring 0 8 self.lastModifiedDate;
     };
-  mk-lux-lua-docker = lua_pkg:
+  mk-lux-lua-docker = lux_pkg:
     with pkgs; let
-      isLuaJIT = lib.strings.hasInfix "jit" lua_pkg.pname;
-      lua = builtins.elemAt (builtins.filter (pkg: pkg.pname == "lua") lua_pkg.buildInputs) 0;
+      isLuaJIT = lib.strings.hasInfix "jit" lux_pkg.pname;
+      lua = builtins.elemAt (builtins.filter (pkg: pkg.pname == "lua") lux_pkg.buildInputs) 0;
       luaVersion =
         if isLuaJIT
         then "jit"
@@ -34,10 +34,10 @@ args @ {self, ...}: final: prev: let
       dockerTools.buildImage {
         name = "lux";
         fromImage = lux-cli-docker;
-        tag = "${luaVersion}-${lua_pkg.version}"; # 5.1-1.2.3
+        tag = "${luaVersion}-${lux_pkg.version}"; # 5.1-1.2.3
         copyToRoot = buildEnv {
-          name = "${lua_pkg.pname}-root";
-          paths = [lux-cli lua_pkg];
+          name = "${lux_pkg.pname}-root";
+          paths = [lux-cli lux_pkg];
           pathsToLink = ["/bin" "/lib"];
         };
         config = {
