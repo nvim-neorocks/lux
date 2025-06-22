@@ -17,7 +17,7 @@ test = false
 bench = false
 
 [dependencies]
-clap = { version = "4.5.38", features = ["derive"] }
+clap = { version = "4.5.38", features = ["derive", "cargo"] }
 eyre = "0.6.12"
 git-url-parse = "0.4.5"
 git2 = "0.20.2"

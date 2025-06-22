@@ -19,6 +19,11 @@ use lux_lib::{
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    println!("parsing");
+    if cli.version {
+        println!("version hit");
+        println!("{} {}", clap::crate_name!(), clap::crate_version!());
+    }
 
     let mut config_builder = ConfigBuilder::new()
         .unwrap()
