@@ -25,16 +25,16 @@ args @ {self, ...}: final: prev: let
   mk-lux-lua-docker = lua_pkg:
     with pkgs; let
       isLuaJIT = lib.strings.hasInfix "jit" lua_pkg.pname;
-      luaMajorMinor = lib.take 2 (lib.splitVersion luaPkg.version);
-      luaVersionDir =
+      lua = builtins.elemAt (builtins.filter (pkg: pkg.pname == "lua") lua_pkg.buildInputs) 0;
+      luaVersion =
         if isLuaJIT
         then "jit"
-        else lib.concatStringsSep "." luaMajorMinor;
+        else lua.version;
     in
       dockerTools.buildImage {
         name = "lux";
         fromImage = lux-cli-docker;
-        tag = "${lua_pkg.pname}";
+        tag = "${luaVersion}-${lua_pkg.version}"; # 5.1-1.2.3
         copyToRoot = buildEnv {
           name = "${lua_pkg.pname}-root";
           paths = [lux-cli lua_pkg];
