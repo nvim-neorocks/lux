@@ -43,7 +43,7 @@ jobs:
       - name: Build Docker image
         id: build
         run: | # result-docker-whatever is a symlink to the nix store
-            nix build .#lux-${{ matrix.lua.package }}-docker --accept-flake-config -Lv --out-link result-docker-${{ matrix.lua.package }}
+            nix build ".#lux-${{ matrix.lua.package }}-docker" --accept-flake-config -Lv --out-link result-docker-${{ matrix.lua.package }}
             docker load -i result-docker-${{ matrix.lua.package }}
       - name: Get Docker Image Tag # TODO: remove?
         id: get-image
