@@ -22,7 +22,14 @@ jobs:
       id-token: write
     strategy:
       matrix:
-        package: [ lua51, lua52, lua53, lua54, luajit ]
+        lua: [
+          {package: lua51,  tag: latest},
+          {package: lua51,  tag: 5.1},
+          {package: lua52,  tag: 5.2},
+          {package: lua53,  tag: 5.3},
+          {package: lua54,  tag: 5.4},
+          {package: luajit, tag: jit}
+        ]
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
@@ -35,12 +42,16 @@ jobs:
       - name: Build Docker image
         id: build
         run: | # result-docker-whatever is a symlink to the nix store
-            nix build .#${{ matrix.package }}-docker --accept-flake-config -Lv --out-link result-docker-${{ matrix.package }}
-            docker load -i result-docker-${{ matrix.package }}
+            nix build .#${{ matrix.lua.package }}-docker --accept-flake-config -Lv --out-link result-docker-${{ matrix.lua.package }}
+            docker load -i result-docker-${{ matrix.lua.package }}
       - name: Get Docker Image Tag # TODO: remove?
         id: get-image
         run: | # ${{ steps.get-image.outputs }} is the tag
           docker images --format "{{.Tag}}" lux
+      - name: Move images to be from ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        run: |
+          docker tag ${{ env.IMAGE_NAME }}:${{ steps.get-image.outputs }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get-image.outputs.tag }}
+          docker tag ${{ env.IMAGE_NAME }}:${{ steps.get-image.outputs }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.lua.tag }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
