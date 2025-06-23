@@ -24,12 +24,11 @@ jobs:
     strategy:
       matrix:
         lua: [
-          {package: lua51,  tag: latest},
-          {package: lua51,  tag: 5.1},
-          {package: lua52,  tag: 5.2},
-          {package: lua53,  tag: 5.3},
-          {package: lua54,  tag: 5.4},
-          {package: luajit, tag: jit}
+          {package: lua51,  tag: 5.1, latest: true},
+          {package: lua52,  tag: 5.2, latest: false},
+          {package: lua53,  tag: 5.3, latest: false},
+          {package: lua54,  tag: 5.4, latest: false},
+          {package: luajit, tag: jit, latest: false}
         ]
       fail-fast: false
     steps:
@@ -42,21 +41,28 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: Build Docker image
         id: build
-        run: | # result-docker-whatever is a symlink to the nix store
+        run: | # result-docker-lua51 is a symlink to the nix store
             nix build ".#lux-${{ matrix.lua.package }}-docker" --accept-flake-config -Lv --out-link result-docker-${{ matrix.lua.package }}
             docker load -i result-docker-${{ matrix.lua.package }}
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Extract the image tag
+        id: tag
+        run: echo "tag=$(docker images --format '{{.Tag}}' ${{ env.IMAGE_NAME }} | head -n 1)" >> $GITHUB_OUTPUT
+      - name: Move images to be from ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        run: |
+          # Testing:
+            echo "Tags: ${{ steps.tag.outputs.tags }}"
+          docker tag ${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+          docker tag ${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.lua.tag }}
+          docker rmi ${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+      - name: Make the `latest` tag point to the latest Lua version
+        if: matrix.lua.latest == true
+        run: |
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.lua.tag }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      - name: Extract metadata (tags, labels) for Push
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-      - name: Move images to be from ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        run: |
-          # Testing:
-            echo "Tags: ${{ steps.meta.outputs.tags }}"
-            echo "Labels: ${{ steps.meta.outputs.labels }}"
-          docker tag ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tags }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tags }}
-          docker tag ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.lua.tag }}
       - name: Install cosign
         uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 #v3.5.0
         with:
