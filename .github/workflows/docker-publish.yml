@@ -1,0 +1,72 @@
+name: Docker Build
+on:
+  release:
+    types: [ published ]
+env:
+  # Use docker.io for Docker Hub if empty
+  REGISTRY: ghcr.io
+  # github.repository as <account>/<repo>
+  IMAGE_NAME: ${{ github.repository }}
+  # Account to log into the repo as
+  USERNAME: ${{ github.repository_owner }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
+    strategy:
+      matrix:
+        package: [ lua51, lua52, lua53, lua54, luajit ]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - name: Setup cachix
+        uses: cachix/cachix-action@v16
+        with:
+          name: neorocks
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      - name: Build Docker image
+        id: build
+        run: | # result-docker-whatever is a symlink to the nix store
+            nix build .#${{ matrix.package }}-docker --accept-flake-config -Lv --out-link result-docker-${{ matrix.package }}
+            docker load -i result-docker-${{ matrix.package }}
+      - name: Get Docker Image Tag # TODO: remove?
+        id: get-image
+        run: | # ${{ steps.get-image.outputs }} is the tag
+          docker images --format "{{.Tag}}" lux
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      - name: Install cosign
+        uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 #v3.5.0
+        with:
+          cosign-release: 'v2.2.4'
+      - name: Log into registry ${{ env.REGISTRY }}
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.USERNAME }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Docker image
+        id: push
+        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
