@@ -45,7 +45,7 @@ jobs:
             docker load -i result-docker-${{ matrix.lua.package }}
       - name: Extract the image tag
         id: tag
-        run: echo "tag=\"$(docker images --format '{{.Tag}}' ${{ env.IMAGE_NAME }} | head -n 1)\"" >> "$GITHUB_OUTPUT"
+        run: echo "tag=$(docker images --format '{{.Tag}}' ${{ env.IMAGE_NAME }} | head -n 1)" >> "$GITHUB_OUTPUT"
       - name: Move images to be from ${{ env.REGISTRY }}/${{ env.USERNAME }}/${{ env.IMAGE_NAME }}:$TAG
         env:
           TAG: ${{ steps.tag.outputs.tag }}
