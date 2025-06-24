@@ -56,10 +56,12 @@ struct FullArgs {
     #[arg(long)]
     no_bin: bool,
 
-    /// Do not export `LUA_INIT` (`require('lux').loader()`).
+    /// Do not add `require('lux').loader()` to `LUA_INIT`.
+    /// If a rock has conflicting transitive dependencies,
+    /// disabling the Lux loader may result in the wrong modules being loaded.
     #[clap(default_value_t = false)]
     #[arg(long)]
-    no_init: bool,
+    no_loader: bool,
 
     /// The shell to format for.
     #[clap(default_value_t = Shell::default())]
@@ -89,12 +91,12 @@ pub async fn path(path_data: Path, config: Config) -> Result<()> {
     match cmd {
         PathCmd::Full(args) => {
             let mut result = String::new();
-            let no_init = args.no_init || {
+            let no_loader = args.no_loader || {
                 if tree.version().lux_lib_dir().is_none() {
                     eprintln!(
                         "⚠️ WARNING: lux-lua library not found.
 Cannot use the `lux.loader`.
-To suppress this warning, run `lx path full --no-init`.
+To suppress this warning, set the `--no-loader` option.
                 "
                     );
                     true
@@ -120,7 +122,7 @@ To suppress this warning, run `lx path full --no-init`.
                     result.push('\n')
                 }
             }
-            if !no_init {
+            if !no_loader {
                 result.push_str(format_export(&shell, "LUA_INIT", &paths.init()).as_str());
                 result.push('\n')
             }
