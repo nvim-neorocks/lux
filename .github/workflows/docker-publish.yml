@@ -23,11 +23,12 @@ jobs:
     strategy:
       matrix:
         lua: [
-          {package: lua51,  tag: 5.1, latest: true},
-          {package: lua52,  tag: 5.2, latest: false},
-          {package: lua53,  tag: 5.3, latest: false},
-          {package: lua54,  tag: 5.4, latest: false},
-          {package: luajit, tag: jit, latest: false}
+          {package: lua, tag: latest},
+          {package: lua51,  tag: 5.1},
+          {package: lua52,  tag: 5.2},
+          {package: lua53,  tag: 5.3},
+          {package: lua54,  tag: 5.4},
+          {package: luajit, tag: jit}
         ]
       fail-fast: false
     steps:
@@ -55,10 +56,6 @@ jobs:
           docker tag ${{ env.IMAGE_NAME }}:$TAG ${{ env.REGISTRY }}/${{ env.USERNAME }}/${{ env.IMAGE_NAME }}:$TAG
           docker tag ${{ env.IMAGE_NAME }}:$TAG ${{ env.REGISTRY }}/${{ env.USERNAME }}/${{ env.IMAGE_NAME }}:${{ matrix.lua.tag }}
           docker rmi ${{ env.IMAGE_NAME }}:$TAG
-      - name: Make the `latest` tag point to the latest Lua version
-        if: matrix.lua.latest == true
-        run: |
-          docker tag ${{ env.REGISTRY }}/${{ env.USERNAME }}/${{ env.IMAGE_NAME }}:${{ matrix.lua.tag }} ${{ env.REGISTRY }}/${{ env.USERNAME }}/${{ env.IMAGE_NAME }}:latest
       - name: Extract metadata (tags, labels) for Push
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
