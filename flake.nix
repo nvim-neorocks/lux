@@ -52,6 +52,7 @@
             lux-luajit
             # Docker images
             lux-cli-docker
+            lux-lua-docker
             lux-lua51-docker
             lux-lua52-docker
             lux-lua53-docker

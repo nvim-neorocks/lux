@@ -24,17 +24,23 @@ args @ {self, ...}: final: prev: let
     };
   mk-lux-lua-docker = lux_pkg:
     with pkgs; let
-      lua = builtins.elemAt (builtins.filter (pkg: pkg.pname == "lua" || pkg.pname == "luajit") lux_pkg.buildInputs) 0;
+      isFullBuild = lux_pkg.pname == "lux-lua-full";
+      lua =
+        if isFullBuild
+        then lua5_1
+        else builtins.elemAt (builtins.filter (pkg: pkg.pname == "lua" || pkg.pname == "luajit") lux_pkg.buildInputs) 0;
       isLuaJIT = lua.pname == "luajit";
       luaVersion =
-        if isLuaJIT
-        then "jit-${lua.version}"
-        else lua.version;
+        if isFullBuild
+        then ""
+        else if isLuaJIT
+        then "jit-${lua.version}-"
+        else "${lua.version}-";
     in
       dockerTools.buildImage {
         name = "lux";
         fromImage = lux-cli-docker;
-        tag = "${luaVersion}-${lux_pkg.version}"; # 5.1-1.2.3
+        tag = luaVersion + (lux_pkg.version or lux-cli.version); # 5.1-1.2.3 for versioned builds, 1.2.3 for full builds
         copyToRoot = buildEnv {
           name = "${lux_pkg.pname}-root";
           paths = [lux-cli lux_pkg];
@@ -48,9 +54,23 @@ args @ {self, ...}: final: prev: let
         };
         # created = date;
       };
+  lux-lua-full = with pkgs;
+    symlinkJoin {
+      name = "lux-lua-full";
+      pname = "lux-lua-full";
+      paths = [
+        lux-cli
+        lux-lua51
+        lux-lua52
+        lux-lua53
+        lux-lua54
+        lux-luajit
+      ];
+    };
 in
   with pkgs; {
     lux-cli-docker = lux-cli-docker;
+    lux-lua-docker = mk-lux-lua-docker lux-lua-full;
     lux-lua51-docker = mk-lux-lua-docker lux-lua51;
     lux-lua52-docker = mk-lux-lua-docker lux-lua52;
     lux-lua53-docker = mk-lux-lua-docker lux-lua53;
