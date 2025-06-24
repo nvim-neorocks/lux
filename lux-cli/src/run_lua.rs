@@ -64,7 +64,9 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
 
     welcome_message = format!(
         r#"{}
-Run `lx lua --help` for options."#,
+Run `lx lua --help` for options.
+To exit type 'exit()' or <C-d>.
+"#,
         welcome_message
     );
 
@@ -91,6 +93,7 @@ Run `lx lua --help` for options."#,
         .args(args)
         .prepend_test_paths(run_lua.test)
         .prepend_build_paths(run_lua.build)
+        .lua_init("exit = os.exit".to_string())
         .welcome_message(welcome_message)
         .run_lua()
         .await?;
