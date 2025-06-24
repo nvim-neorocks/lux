@@ -1,7 +1,10 @@
 name: Docker Build
 on:
-  release:
-    types: [ published ]
+  pull_request:
+    types: [closed]
+    branches:
+      - master
+
   workflow_dispatch:
 env:
   # Use docker.io for Docker Hub if empty
@@ -12,6 +15,7 @@ env:
 
 jobs:
   build:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-24.04
     permissions:
       contents: read
