@@ -25,17 +25,17 @@ args @ {self, ...}: final: prev: let
   mk-lux-lua-docker = lux_pkg:
     with pkgs; let
       isFullBuild = lux_pkg.pname == "lux-lua-full";
-      lua =
+      lua_pkg =
         if isFullBuild
         then lua5_1
         else builtins.elemAt (builtins.filter (pkg: pkg.pname == "lua" || pkg.pname == "luajit") lux_pkg.buildInputs) 0;
-      isLuaJIT = lua.pname == "luajit";
+      isLuaJIT = lua_pkg.pname == "luajit";
       luaVersion =
         if isFullBuild
         then ""
         else if isLuaJIT
-        then "jit-${lua.version}-"
-        else "${lua.version}-";
+        then "jit-${lua_pkg.version}-"
+        else "${lua_pkg.version}-";
     in
       dockerTools.buildImage {
         name = "lux";
@@ -43,8 +43,8 @@ args @ {self, ...}: final: prev: let
         tag = luaVersion + (lux_pkg.version or lux-cli.version); # 5.1-1.2.3 for versioned builds, 1.2.3 for full builds
         copyToRoot = buildEnv {
           name = "${lux_pkg.pname}-root";
-          paths = [lux-cli lux_pkg lua];
-          pathsToLink = ["/bin" "/lib"];
+          paths = [lux-cli lux_pkg lua_pkg];
+          pathsToLink = ["/bin" "/lib" "/nix" "/nix/store"];
         };
         config = {
           Cmd = ["lx" "run"];
