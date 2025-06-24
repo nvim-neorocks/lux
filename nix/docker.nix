@@ -43,7 +43,7 @@ args @ {self, ...}: final: prev: let
         tag = luaVersion + (lux_pkg.version or lux-cli.version); # 5.1-1.2.3 for versioned builds, 1.2.3 for full builds
         copyToRoot = buildEnv {
           name = "${lux_pkg.pname}-root";
-          paths = [lux-cli lux_pkg];
+          paths = [lux-cli lux_pkg lua];
           pathsToLink = ["/bin" "/lib"];
         };
         config = {
