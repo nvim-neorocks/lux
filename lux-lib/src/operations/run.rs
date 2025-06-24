@@ -12,7 +12,7 @@ use crate::{
     lua_installation::LuaBinary,
     lua_rockspec::LuaVersionError,
     operations::run_lua::RunLua,
-    path::{self, Paths, PathsError},
+    path::{Paths, PathsError},
     project::{project_toml::LocalProjectTomlValidationError, Project, ProjectTreeError},
 };
 
