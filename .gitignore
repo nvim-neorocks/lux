@@ -26,4 +26,7 @@
 /spec/
 /.busted
 
+# Editor Settings Files
+.idea/
+.vscode/
 .pre-commit-config.yaml
