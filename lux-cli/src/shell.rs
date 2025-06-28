@@ -63,7 +63,11 @@ Cannot use the `lux.loader`.
 To exit type 'exit()' or <C-d>.
 ]==])
     "#,
-        "hi", loader_init
+        format!(
+            "Welcome to the lux Lua Shell for {}.",
+            project.toml().package()
+        ),
+        loader_init
     );
 
     let _ = Command::new(&shell)
