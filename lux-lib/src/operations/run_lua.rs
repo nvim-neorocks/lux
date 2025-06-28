@@ -53,6 +53,8 @@ pub struct RunLua<'a> {
     args: &'a Vec<String>,
     prepend_test_paths: Option<bool>,
     prepend_build_paths: Option<bool>,
+    disable_loader: Option<bool>,
+    lua_init: Option<String>,
     welcome_message: Option<String>,
 }
 
@@ -82,10 +84,13 @@ where
 
         let lua_cmd: PathBuf = args.lua_cmd.try_into()?;
 
-        let loader_init = if args.tree.version().lux_lib_dir().is_none() {
+        let loader_init = if args.disable_loader.unwrap_or(false) {
+            "".to_string()
+        } else if args.tree.version().lux_lib_dir().is_none() {
             eprintln!(
                 "⚠️ WARNING: lux-lua library not found.
 Cannot use the `lux.loader`.
+To suppress this warning, set the `--no-loader` option.
                 "
             );
             "".to_string()
@@ -94,13 +99,13 @@ Cannot use the `lux.loader`.
         };
         let lua_init = format!(
             r#"print([==[{}]==])
-            exit = os.exit
+            {}
             print([==[
 {}
-To exit type 'exit()' or <C-d>.
 ]==])
         "#,
             args.welcome_message.unwrap_or_default(),
+            args.lua_init.unwrap_or_default(),
             loader_init
         );
 

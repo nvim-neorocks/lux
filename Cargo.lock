@@ -2219,7 +2219,7 @@ dependencies = [
 
 [[package]]
 name = "lux-cli"
-version = "0.7.3"
+version = "0.7.4"
 dependencies = [
  "assert_fs",
  "clap 4.5.38",
@@ -2260,7 +2260,7 @@ dependencies = [
 
 [[package]]
 name = "lux-lib"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "assert_fs",
  "async-recursion",
@@ -2337,7 +2337,7 @@ dependencies = [
 
 [[package]]
 name = "lux-lua"
-version = "0.7.3"
+version = "0.7.4"
 dependencies = [
  "assert_fs",
  "lux-lib",
@@ -2395,9 +2395,9 @@ checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 
 [[package]]
 name = "md5"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
+checksum = "ae960838283323069879657ca3de837e9f7bbb4c7bf6ea7f1b290d5e9476d2e0"
 
 [[package]]
 name = "memchr"
@@ -5458,9 +5458,9 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "4.1.0"
+version = "4.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af7dcdb4229c0e79c2531a24de7726a0e980417a74fb4d030a35f535665439a0"
+checksum = "95ab361742de920c5535880f89bbd611ee62002bf11341d16a5f057bb8ba6899"
 dependencies = [
  "aes",
  "arbitrary",

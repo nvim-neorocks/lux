@@ -6,6 +6,32 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.7.4](https://github.com/nvim-neorocks/lux/compare/v0.7.3...v0.7.4) - 2025-06-27
+
+### Added
+- *(cli)* set `LUA_INIT` for `lx exec`
+- feat!(cli): add `--no-loader` flag to repl and run commands
+
+### Fixed
+- only run repl initialisation in repl
+
+### Other
+- *(deps)* bump lua-src from 547.0.0 to 548.1.1 ([#782](https://github.com/nvim-neorocks/lux/pull/782))
+
+## `lux-lib` - [0.10.1](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.10.0...lux-lib-v0.10.1) - 2025-06-27
+
+### Added
+- *(cli)* set `LUA_INIT` for `lx exec`
+- feat!(cli): add `--no-loader` flag to repl and run commands
+
+### Fixed
+- only run repl initialisation in repl
+
+### Other
+- *(deps)* bump md5 from 0.7.0 to 0.8.0 ([#816](https://github.com/nvim-neorocks/lux/pull/816))
+- *(deps)* bump zip from 4.1.0 to 4.2.0 ([#814](https://github.com/nvim-neorocks/lux/pull/814))
+- *(deps)* bump lua-src from 547.0.0 to 548.1.1 ([#782](https://github.com/nvim-neorocks/lux/pull/782))
+
 ## `lux-cli` - [0.7.3](https://github.com/nvim-neorocks/lux/compare/v0.7.2...v0.7.3) - 2025-06-17
 
 ### Added
