@@ -70,14 +70,11 @@ pub mod which;
 
 /// A luxurious package manager for Lua.
 #[derive(Parser)]
-#[command(author, about, long_about = None, arg_required_else_help = true)]
+#[command(author, version, about, long_about = None, arg_required_else_help = true)]
 pub struct Cli {
     /// Enable the sub-repositories in luarocks servers forrockspecs of in-development versions.
     #[arg(long)]
     pub dev: bool,
-
-    #[arg(short = 'v', long = "version")]
-    pub version: bool,
 
     /// Fetch rocks/rockspecs from this server (takes priority over config file).
     #[arg(long, value_name = "server")]
@@ -119,7 +116,7 @@ pub struct Cli {
 
     /// Override config variables.{n}
     /// Example: `lx -v "LUA=/path/to/lua" ...`
-    #[arg(long, value_name = "variable", value_parser = parse_key_val::<String, String>)]
+    #[arg(long, value_name = "variable", visible_short_aliases = ['v'], value_parser = parse_key_val::<String, String>)]
     pub variables: Option<Vec<(String, String)>>,
 
     /// Display verbose output of commands executed.

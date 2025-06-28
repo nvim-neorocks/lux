@@ -20,10 +20,6 @@ use lux_lib::{
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    if cli.version {
-        println!("{} {}", clap::crate_name!(), clap::crate_version!());
-    }
-
     let mut config_builder = ConfigBuilder::new()
         .unwrap()
         .dev(Some(cli.dev))
