@@ -45,31 +45,6 @@ pub async fn shell(data: Shell, config: Config) -> Result<()> {
         path.prepend(&build_path);
     }
 
-    let loader_init = if project_tree.version().lux_lib_dir().is_none() {
-        eprintln!(
-            "⚠️ WARNING: lux-lua library not found.
-Cannot use the `lux.loader`.
-            "
-        );
-        "".to_string()
-    } else {
-        path.init()
-    };
-    let lua_init = format!(
-        r#"print([==[{}]==])
-        exit = os.exit
-        print([==[
-{}
-To exit type 'exit()' or <C-d>.
-]==])
-    "#,
-        format!(
-            "Welcome to the lux Lua Shell for {}.",
-            project.toml().package()
-        ),
-        loader_init
-    );
-
     let _ = Command::new(&shell)
         .env(
             "PATH",
@@ -81,7 +56,6 @@ To exit type 'exit()' or <C-d>.
         )
         .env("LUA_PATH", path.package_path().joined())
         .env("LUA_CPATH", path.package_cpath().joined())
-        .env("LUA_INIT", lua_init)
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
