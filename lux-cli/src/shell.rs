@@ -45,6 +45,11 @@ pub async fn shell(data: Shell, config: Config) -> Result<()> {
         path.prepend(&build_path);
     }
 
+    if project_tree.version().lux_lib_dir().is_none() {
+        eprintln!("⚠️ WARNING: lux-lua library not found.\nCannot use the `lux.loader`.");
+        std::process::exit(1);
+    }
+
     let _ = Command::new(&shell)
         .env(
             "PATH",
