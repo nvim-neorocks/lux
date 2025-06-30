@@ -141,7 +141,7 @@ in {
     isLuaJIT = false;
   };
   lux-lua54 = mk-lux-lua {
-    luaPkg = final.lua5_3;
+    luaPkg = final.lua5_4;
     isLuaJIT = false;
   };
   lux-luajit = mk-lux-lua {
