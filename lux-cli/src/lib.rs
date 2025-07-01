@@ -288,7 +288,7 @@ pub enum Commands {
     Upload(Upload),
     /// Tell which file corresponds to a given module name.
     Which(Which),
-    /// Makes a subshell that sets up PATH, LUA_PATH and LUA_CPATH.
+    /// Spawns an interactive shell with PATH, LUA_PATH, LUA_CPATH and LUA_INIT set.
     Shell(Shell),
 }
 
