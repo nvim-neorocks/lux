@@ -2,9 +2,12 @@ use crate::build::backend::{BuildBackend, BuildInfo};
 use crate::lockfile::{LockfileError, OptState, RemotePackageSourceUrl};
 use crate::lua_installation::LuaInstallationError;
 use crate::lua_rockspec::LuaVersionError;
+use crate::operations::{RemotePackageSourceMetadata, UnpackError};
 use crate::rockspec::{LuaVersionCompatibility, Rockspec};
 use crate::tree::{self, EntryType, TreeError};
+use bytes::Bytes;
 use std::collections::HashMap;
+use std::io::Cursor;
 use std::{io, path::Path};
 
 use crate::{
@@ -78,10 +81,22 @@ pub struct Build<'a, R: Rockspec + HasIntegrity> {
     #[builder(default)]
     behaviour: BuildBehaviour,
 
-    source_url: Option<RemotePackageSourceUrl>,
+    #[builder(setters(vis = "pub(crate)"))]
+    source_spec: Option<RemotePackageSourceSpec>,
 
     // TODO(vhyrro): Remove this and enforce that this is provided at a type level.
     source: Option<RemotePackageSource>,
+}
+
+pub(crate) enum RemotePackageSourceSpec {
+    RockSpec(Option<RemotePackageSourceUrl>),
+    SrcRock(SrcRockSource),
+}
+
+/// A packed .src.rock archive.
+pub(crate) struct SrcRockSource {
+    pub bytes: Bytes,
+    pub source_url: RemotePackageSourceUrl,
 }
 
 // Overwrite the `build()` function to use our own instead.
@@ -133,6 +148,8 @@ pub enum BuildError {
         expected: Integrity,
         actual: Integrity,
     },
+    #[error("failed to unpack src.rock: {0}")]
+    UnpackSrcRock(UnpackError),
     #[error("failed to fetch rock source: {0}")]
     FetchSrcError(#[from] FetchSrcError),
     #[error("failed to install binary {0}: {1}")]
@@ -389,11 +406,27 @@ where
 
     let temp_dir = tempdir::TempDir::new(&rockspec.package().to_string())?;
 
-    let source_metadata =
-        operations::FetchSrc::new(temp_dir.path(), rockspec, build.config, build.progress)
-            .source_url(build.source_url)
-            .fetch_internal()
-            .await?;
+    let source_metadata = match build.source_spec {
+        Some(RemotePackageSourceSpec::SrcRock(SrcRockSource { bytes, source_url })) => {
+            let hash = bytes.hash()?;
+            let cursor = Cursor::new(&bytes);
+            operations::unpack_src_rock(cursor, temp_dir.path().to_path_buf(), build.progress)
+                .await
+                .map_err(BuildError::UnpackSrcRock)?;
+            RemotePackageSourceMetadata { hash, source_url }
+        }
+        Some(RemotePackageSourceSpec::RockSpec(source_url)) => {
+            operations::FetchSrc::new(temp_dir.path(), rockspec, build.config, build.progress)
+                .maybe_source_url(source_url)
+                .fetch_internal()
+                .await?
+        }
+        None => {
+            operations::FetchSrc::new(temp_dir.path(), rockspec, build.config, build.progress)
+                .fetch_internal()
+                .await?
+        }
+    };
 
     let hashes = LocalPackageHashes {
         rockspec: rockspec.hash()?,

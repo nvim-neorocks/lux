@@ -18,6 +18,7 @@
 /lux-lib/proptest-regressions/
 /*.rockspec
 *.snap.new
+/*.rock
 
 # Lux project files
 /.lux/*

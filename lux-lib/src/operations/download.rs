@@ -145,7 +145,8 @@ pub(crate) enum RemoteRockDownload {
     },
     SrcRock {
         rockspec_download: DownloadedRockspec,
-        _src_rock: Bytes,
+        src_rock: Bytes,
+        source_url: RemotePackageSourceUrl,
     },
 }
 
@@ -289,11 +290,11 @@ async fn download_remote_rock(
             // prioritise lockfile source_url
             let url = if let Some(RemotePackageSourceUrl::Url { url }) = &remote_package.source_url
             {
-                url
+                url.clone()
             } else {
-                url
+                url.clone()
             };
-            let rock = download_src_rock(&remote_package.package, url, progress).await?;
+            let rock = download_src_rock(&remote_package.package, &url, progress).await?;
             let rockspec = DownloadedRockspec {
                 rockspec: unpack_rockspec(&rock).await?,
                 source: remote_package.source,
@@ -301,7 +302,8 @@ async fn download_remote_rock(
             };
             Ok(RemoteRockDownload::SrcRock {
                 rockspec_download: rockspec,
-                _src_rock: rock.bytes,
+                src_rock: rock.bytes,
+                source_url: RemotePackageSourceUrl::Url { url },
             })
         }
         RemotePackageSource::Local => Err(SearchAndDownloadError::LocalSource),
