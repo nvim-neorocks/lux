@@ -1,64 +1,75 @@
 use clap::Args;
 use eyre::Result;
-use lux_lib::config::Config;
+use lux_lib::{config::Config, path::Paths};
+use which::which;
 
-use std::env;
+use std::{env, path::PathBuf};
 use tokio::process::Command;
-
-use lux_lib::{path::Paths, project::Project};
 
 use std::process::Stdio;
 
+use super::utils::project::current_project_or_user_tree;
+
 #[derive(Args)]
 pub struct Shell {
+    /// Whether to load test dependencies into the new shell
     #[arg(long)]
     test: bool,
+
+    /// Whether to load build dependencies into the new shell
     #[arg(long)]
     build: bool,
+
+    /// Suppresses the warning for checking if the lux-lua lib exists
+    #[arg(long)]
+    no_loader: bool,
 }
 
 pub async fn shell(data: Shell, config: Config) -> Result<()> {
-    let project =
-        Project::current()?.ok_or_else(|| eyre::eyre!("Not in a Lux project directory"))?;
-    let project_tree = project.tree(&config)?;
+    let tree = current_project_or_user_tree(&config).unwrap();
 
-    let mut path = Paths::new(&project_tree)?;
+    let mut path = Paths::new(&tree)?;
 
-    let shell = env::var("SHELL").unwrap_or_else(|_| {
-        #[cfg(target_os = "linux")]
-        return "/bin/bash".to_string();
-        #[cfg(target_os = "windows")]
-        return "cmd.exe".to_string();
-        #[cfg(target_os = "macos")]
-        return "/bin/zsh".to_string();
-    });
+    let shell: PathBuf = match env::var("SHELL") {
+        Ok(val) => PathBuf::from(val),
+        Err(_) => {
+            #[cfg(target_os = "linux")]
+            let fallback = which("bash")
+                .map_err(|_| eyre::eyre!("Cannot find shell `bash` on your system!"))?;
+
+            #[cfg(target_os = "windows")]
+            let fallback = which("cmd.exe")
+                .map_err(|_| eyre::eyre!("Cannot find shell `cmd.exe` on your system!"))?;
+
+            #[cfg(target_os = "macos")]
+            let fallback =
+                which("zsh").map_err(|_| eyre::eyre!("Cannot find shell `zsh` on your system!"))?;
+
+            fallback
+        }
+    };
 
     if data.test {
-        let test_tree_path = project_tree.test_tree(&config)?;
+        let test_tree_path = tree.test_tree(&config)?;
         let test_path = Paths::new(&test_tree_path)?;
         path.prepend(&test_path);
     }
 
     if data.build {
-        let build_tree_path = project_tree.build_tree(&config)?;
+        let build_tree_path = tree.build_tree(&config)?;
         let build_path = Paths::new(&build_tree_path)?;
         path.prepend(&build_path);
     }
-
-    if project_tree.version().lux_lib_dir().is_none() {
-        eprintln!("⚠️ WARNING: lux-lua library not found.\nCannot use the `lux.loader`.");
-        std::process::exit(1);
+    if !data.no_loader {
+        if tree.version().lux_lib_dir().is_none() {
+            eprintln!("⚠️ WARNING: lux-lua library not found.\nCannot use the `lux.loader`.");
+            eprintln!("To suppress this warning, set the --no-loader option.");
+            std::process::exit(1);
+        }
     }
 
     let _ = Command::new(&shell)
-        .env(
-            "PATH",
-            format!(
-                "{}:{}",
-                path.path().joined(),
-                env::var("PATH").unwrap_or_default()
-            ),
-        )
+        .env("PATH", path.path_prepended().joined())
         .env("LUA_PATH", path.package_path().joined())
         .env("LUA_CPATH", path.package_cpath().joined())
         .stdin(Stdio::inherit())
