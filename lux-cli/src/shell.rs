@@ -1,5 +1,5 @@
 use clap::Args;
-use eyre::Result;
+use eyre::{Result, WrapErr};
 use lux_lib::{config::Config, path::Paths};
 use which::which;
 
@@ -34,16 +34,13 @@ pub async fn shell(data: Shell, config: Config) -> Result<()> {
         Ok(val) => PathBuf::from(val),
         Err(_) => {
             #[cfg(target_os = "linux")]
-            let fallback = which("bash")
-                .map_err(|_| eyre::eyre!("Cannot find shell `bash` on your system!"))?;
+            let fallback = which("bash").wrap_err("Cannot find `bash` on your system!")?;
 
             #[cfg(target_os = "windows")]
-            let fallback = which("cmd.exe")
-                .map_err(|_| eyre::eyre!("Cannot find shell `cmd.exe` on your system!"))?;
+            let fallback = which("cmd.exe").wrap_err("Cannot find `cmd.exe` on your system!")?;
 
             #[cfg(target_os = "macos")]
-            let fallback =
-                which("zsh").map_err(|_| eyre::eyre!("Cannot find shell `zsh` on your system!"))?;
+            let fallback = which("zsh").wrap_err("Cannot find `zsh` on your system!")?;
 
             fallback
         }
@@ -79,7 +76,7 @@ pub async fn shell(data: Shell, config: Config) -> Result<()> {
         .env("PATH", path.path_prepended().joined())
         .env("LUA_PATH", path.package_path().joined())
         .env("LUA_CPATH", path.package_cpath().joined())
-        .env("LUA_INIT", lua_init.unwrap_or_else(|| "".to_string()))
+        .env("LUA_INIT", lua_init.unwrap_or_default())
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
