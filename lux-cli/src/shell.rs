@@ -61,7 +61,7 @@ pub async fn shell(data: Shell, config: Config) -> Result<()> {
         path.prepend(&build_path);
     }
 
-    let lua_init = if data.no_loader.unwrap_or(false) {
+    let lua_init = if data.no_loader {
         None
     } else if tree.version().lux_lib_dir().is_none() {
         eprintln!(
@@ -79,7 +79,7 @@ pub async fn shell(data: Shell, config: Config) -> Result<()> {
         .env("PATH", path.path_prepended().joined())
         .env("LUA_PATH", path.package_path().joined())
         .env("LUA_CPATH", path.package_cpath().joined())
-        .env("LUA_INIT", lua_init)
+        .env("LUA_INIT", lua_init.unwrap_or_else(|| "".to_string()))
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
