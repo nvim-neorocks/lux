@@ -18,18 +18,20 @@ use crate::build::{self, Build};
 #[derive(Args, Default)]
 #[clap(disable_help_flag = true)]
 pub struct RunLua {
-    #[arg(long)]
-    test: bool,
-
-    #[arg(long)]
-    build: bool,
-
     /// Arguments to pass to Lua. See `lua -h`.
     args: Option<Vec<String>>,
 
     /// Path to the Lua interpreter to use.
     #[arg(long)]
     lua: Option<String>,
+
+    /// Add test dependencies to the `LUA_PATH` and `LUA_CPATH.
+    #[arg(long)]
+    test: bool,
+
+    /// Add build dependencies to the `LUA_PATH` and `LUA_CPATH.
+    #[arg(long)]
+    build: bool,
 
     /// Do not add `require('lux').loader()` to `LUA_INIT`.
     /// If a rock has conflicting transitive dependencies,
