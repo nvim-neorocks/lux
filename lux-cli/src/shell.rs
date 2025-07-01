@@ -60,18 +60,26 @@ pub async fn shell(data: Shell, config: Config) -> Result<()> {
         let build_path = Paths::new(&build_tree_path)?;
         path.prepend(&build_path);
     }
-    if !data.no_loader {
-        if tree.version().lux_lib_dir().is_none() {
-            eprintln!("⚠️ WARNING: lux-lua library not found.\nCannot use the `lux.loader`.");
-            eprintln!("To suppress this warning, set the --no-loader option.");
-            std::process::exit(1);
-        }
-    }
+
+    let lua_init = if data.no_loader.unwrap_or(false) {
+        None
+    } else if tree.version().lux_lib_dir().is_none() {
+        eprintln!(
+            "⚠️ WARNING: lux-lua library not found. 
+    Cannot use the `lux.loader`. 
+    To suppress this warning, set the `--no-loader` option. 
+                    "
+        );
+        None
+    } else {
+        Some(path.init())
+    };
 
     let _ = Command::new(&shell)
         .env("PATH", path.path_prepended().joined())
         .env("LUA_PATH", path.package_path().joined())
         .env("LUA_CPATH", path.package_cpath().joined())
+        .env("LUA_INIT", lua_init)
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
