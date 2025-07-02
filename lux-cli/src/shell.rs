@@ -20,7 +20,9 @@ pub struct Shell {
     #[arg(long)]
     build: bool,
 
-    /// Suppresses the warning for checking if the lux-lua lib exists
+    /// Disable the Lux loader.
+    /// If a rock has conflicting transitive dependencies,
+    /// disabling the Lux loader may result in the wrong modules being loaded.
     #[arg(long)]
     no_loader: bool,
 }
