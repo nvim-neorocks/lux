@@ -10,20 +10,14 @@ use walkdir::WalkDir;
 
 use crate::{
     build::{
-        backend::{BuildBackend, BuildInfo},
+        backend::{BuildBackend, BuildInfo, RunBuildArgs},
         utils,
     },
-    config::Config,
-    lua_installation::LuaInstallation,
     lua_rockspec::{BuiltinBuildSpec, DeploySpec, LuaModule, ModuleSpec},
-    progress::{Progress, ProgressBar},
-    tree::{RockLayout, Tree, TreeError},
+    tree::TreeError,
 };
 
-use super::{
-    external_dependency::ExternalDependencyInfo,
-    utils::{CompileCFilesError, CompileCModulesError, InstallBinaryError},
-};
+use super::utils::{CompileCFilesError, CompileCModulesError, InstallBinaryError};
 
 #[derive(Error, Debug)]
 pub enum BuiltinBuildError {
@@ -42,17 +36,15 @@ pub enum BuiltinBuildError {
 impl BuildBackend for BuiltinBuildSpec {
     type Err = BuiltinBuildError;
 
-    async fn run(
-        self,
-        output_paths: &RockLayout,
-        _no_install: bool,
-        lua: &LuaInstallation,
-        external_dependencies: &HashMap<String, ExternalDependencyInfo>,
-        config: &Config,
-        tree: &Tree,
-        build_dir: &Path,
-        progress: &Progress<ProgressBar>,
-    ) -> Result<BuildInfo, Self::Err> {
+    async fn run(self, args: RunBuildArgs<'_>) -> Result<BuildInfo, Self::Err> {
+        let output_paths = args.output_paths;
+        let lua = args.lua;
+        let external_dependencies = args.external_dependencies;
+        let config = args.config;
+        let tree = args.tree;
+        let build_dir = args.build_dir;
+        let progress = args.progress;
+
         // Detect all Lua modules
         let modules = autodetect_modules(build_dir, source_paths(build_dir, &self.modules))
             .into_iter()

@@ -9,12 +9,11 @@ use thiserror::Error;
 use tokio::process::Command;
 
 use crate::{
-    build::backend::{BuildBackend, BuildInfo},
+    build::backend::{BuildBackend, BuildInfo, RunBuildArgs},
     config::Config,
     lua_installation::LuaInstallation,
     lua_rockspec::CommandBuildSpec,
-    progress::{Progress, ProgressBar},
-    tree::{RockLayout, Tree},
+    tree::RockLayout,
     variables::VariableSubstitutionError,
 };
 
@@ -46,17 +45,16 @@ pub enum CommandError {
 impl BuildBackend for CommandBuildSpec {
     type Err = CommandError;
 
-    async fn run(
-        self,
-        output_paths: &RockLayout,
-        no_install: bool,
-        lua: &LuaInstallation,
-        external_dependencies: &HashMap<String, ExternalDependencyInfo>,
-        config: &Config,
-        _tree: &Tree,
-        build_dir: &Path,
-        progress: &Progress<ProgressBar>,
-    ) -> Result<BuildInfo, Self::Err> {
+    async fn run(self, args: RunBuildArgs<'_>) -> Result<BuildInfo, Self::Err> {
+        let output_paths = args.output_paths;
+        let no_install = args.no_install;
+        let lua = args.lua;
+        let external_dependencies = args.external_dependencies;
+        let config = args.config;
+        let build_dir = args.build_dir;
+        let progress = args.progress;
+
+        progress.map(|bar| bar.set_message("Running build_command..."));
         if let Some(build_command) = &self.build_command {
             progress.map(|bar| bar.set_message("Running build_command..."));
             run_command(

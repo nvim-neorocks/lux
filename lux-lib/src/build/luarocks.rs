@@ -1,15 +1,13 @@
 use crate::build::backend::BuildInfo;
+use crate::build::backend::RunBuildArgs;
 use crate::rockspec::LuaVersionCompatibility;
 use crate::rockspec::Rockspec;
-use crate::tree::Tree;
 use crate::tree::TreeError;
 use std::{io, path::Path};
 
 use crate::{
     config::Config,
-    lua_installation::LuaInstallation,
     luarocks::luarocks_installation::{ExecLuaRocksError, LuaRocksError, LuaRocksInstallation},
-    progress::{Progress, ProgressBar},
     tree::RockLayout,
 };
 
@@ -34,13 +32,14 @@ pub enum LuarocksBuildError {
 
 pub(crate) async fn build<R: Rockspec>(
     rockspec: &R,
-    output_paths: &RockLayout,
-    lua: &LuaInstallation,
-    config: &Config,
-    build_dir: &Path,
-    tree: &Tree,
-    progress: &Progress<ProgressBar>,
+    args: RunBuildArgs<'_>,
 ) -> Result<BuildInfo, LuarocksBuildError> {
+    let output_paths = args.output_paths;
+    let lua = args.lua;
+    let config = args.config;
+    let build_dir = args.build_dir;
+    let tree = args.tree;
+    let progress = args.progress;
     progress.map(|p| {
         p.set_message(format!(
             "Building {} {} with luarocks...",
