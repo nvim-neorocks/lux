@@ -1,25 +1,20 @@
-use std::{collections::HashMap, io, path::Path, string::FromUtf8Error};
+use std::{io, string::FromUtf8Error};
 
 use thiserror::Error;
 
 use crate::{
-    build::backend::{BuildBackend, BuildInfo},
-    config::Config,
-    lua_installation::LuaInstallation,
+    build::backend::{BuildBackend, BuildInfo, RunBuildArgs},
     lua_rockspec::{BuildBackendSpec, BuildSpec, LocalLuaRockspec, LuaRockspecError},
-    progress::{Progress, ProgressBar},
     project::{
         project_toml::{LocalProjectTomlValidationError, PartialProjectToml},
         ProjectRoot, PROJECT_TOML,
     },
     rockspec::Rockspec,
-    tree::{RockLayout, Tree},
 };
 
 use super::{
-    builtin::BuiltinBuildError, cmake::CMakeError, command::CommandError,
-    external_dependency::ExternalDependencyInfo, make::MakeError, rust_mlua::RustError,
-    treesitter_parser::TreesitterBuildError, utils::recursive_copy_dir,
+    builtin::BuiltinBuildError, cmake::CMakeError, command::CommandError, make::MakeError,
+    rust_mlua::RustError, treesitter_parser::TreesitterBuildError, utils::recursive_copy_dir,
 };
 
 #[derive(Error, Debug)]
@@ -50,15 +45,10 @@ pub enum SourceBuildError {
     UnsupporedLuarocksBuildBackend(String),
 }
 
-pub(crate) async fn build(
-    output_paths: &RockLayout,
-    lua: &LuaInstallation,
-    external_dependencies: &HashMap<String, ExternalDependencyInfo>,
-    config: &Config,
-    tree: &Tree,
-    build_dir: &Path,
-    progress: &Progress<ProgressBar>,
-) -> Result<BuildInfo, SourceBuildError> {
+pub(crate) async fn build(args: RunBuildArgs<'_>) -> Result<BuildInfo, SourceBuildError> {
+    let output_paths = args.output_paths;
+    let build_dir = args.build_dir;
+
     let mut build_spec = BuildSpec::default();
     let mut copy_directories = None;
     for path in std::fs::read_dir(build_dir)?
@@ -83,32 +73,32 @@ pub(crate) async fn build(
     let build_info = match build_spec.build_backend {
         Some(BuildBackendSpec::Builtin(build_spec)) => {
             build_spec
-                .run(output_paths, false, lua, external_dependencies, config, tree, build_dir, progress)
+                .run(args)
                 .await?
         }
         Some(BuildBackendSpec::Make(make_spec)) => {
             make_spec
-                .run(output_paths, false, lua, external_dependencies, config, tree, build_dir, progress)
+                .run(args)
                 .await?
         }
         Some(BuildBackendSpec::CMake(cmake_spec)) => {
             cmake_spec
-                .run(output_paths, false, lua, external_dependencies, config, tree, build_dir, progress)
+                .run(args)
                 .await?
         }
         Some(BuildBackendSpec::Command(command_spec)) => {
             command_spec
-                .run(output_paths, false, lua, external_dependencies, config, tree, build_dir, progress)
+                .run(args)
                 .await?
         }
         Some(BuildBackendSpec::RustMlua(rust_mlua_spec)) => {
             rust_mlua_spec
-                .run(output_paths, false, lua, external_dependencies, config, tree, build_dir, progress)
+                .run(args)
                 .await?
         }
         Some(BuildBackendSpec::TreesitterParser(treesitter_parser_spec)) => {
             treesitter_parser_spec
-                .run(output_paths, false, lua, external_dependencies, config, tree, build_dir, progress)
+                .run(args)
                 .await?
         }
         Some(BuildBackendSpec::LuaRock(build_backend)) => return Err(SourceBuildError::UnsupporedLuarocksBuildBackend(build_backend)),

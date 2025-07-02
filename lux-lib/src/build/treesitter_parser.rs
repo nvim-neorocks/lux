@@ -1,17 +1,11 @@
-use crate::build::backend::{BuildBackend, BuildInfo};
-use crate::config::{Config, LuaVersionUnset};
-use crate::lua_installation::LuaInstallation;
+use crate::build::backend::{BuildBackend, BuildInfo, RunBuildArgs};
+use crate::config::LuaVersionUnset;
 use crate::lua_rockspec::TreesitterParserBuildSpec;
-use crate::progress::{Progress, ProgressBar};
-use crate::tree::{RockLayout, Tree};
-use std::collections::HashMap;
 use std::io;
 use std::num::ParseIntError;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use thiserror::Error;
 use tree_sitter_generate::GenerateError;
-
-use super::external_dependency::ExternalDependencyInfo;
 
 const DEFAULT_GENERATE_ABI_VERSION: usize = tree_sitter::LANGUAGE_VERSION;
 
@@ -36,17 +30,10 @@ pub enum TreesitterBuildError {
 impl BuildBackend for TreesitterParserBuildSpec {
     type Err = TreesitterBuildError;
 
-    async fn run(
-        self,
-        output_paths: &RockLayout,
-        _no_install: bool,
-        _lua: &LuaInstallation,
-        _external_dependencies: &HashMap<String, ExternalDependencyInfo>,
-        _config: &Config,
-        _tree: &Tree,
-        build_dir: &Path,
-        progress: &Progress<ProgressBar>,
-    ) -> Result<BuildInfo, Self::Err> {
+    async fn run(self, args: RunBuildArgs<'_>) -> Result<BuildInfo, Self::Err> {
+        let output_paths = args.output_paths;
+        let build_dir = args.build_dir;
+        let progress = args.progress;
         let build_dir = self
             .location
             .map(|dir| build_dir.join(dir))
