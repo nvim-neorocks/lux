@@ -16,7 +16,7 @@ pub struct Shell {
     #[arg(long)]
     test: bool,
 
-    /// Whether to load build dependencies into the new shell
+    /// Add build dependencies to the shell's paths
     #[arg(long)]
     build: bool,
 
