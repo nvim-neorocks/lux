@@ -12,7 +12,7 @@ use super::utils::project::current_project_or_user_tree;
 
 #[derive(Args)]
 pub struct Shell {
-    /// Whether to load test dependencies into the new shell
+    /// Add test dependencies to the shell's paths
     #[arg(long)]
     test: bool,
 
