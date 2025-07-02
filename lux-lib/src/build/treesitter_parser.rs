@@ -1,7 +1,7 @@
+use crate::build::backend::{BuildBackend, BuildInfo};
 use crate::config::{Config, LuaVersionUnset};
 use crate::lua_installation::LuaInstallation;
-use crate::lua_rockspec::Build;
-use crate::lua_rockspec::{BuildInfo, TreesitterParserBuildSpec};
+use crate::lua_rockspec::TreesitterParserBuildSpec;
 use crate::progress::{Progress, ProgressBar};
 use crate::tree::{RockLayout, Tree};
 use std::collections::HashMap;
@@ -33,7 +33,7 @@ pub enum TreesitterBuildError {
     WriteQuery(io::Error),
 }
 
-impl Build for TreesitterParserBuildSpec {
+impl BuildBackend for TreesitterParserBuildSpec {
     type Err = TreesitterBuildError;
 
     async fn run(

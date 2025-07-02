@@ -9,10 +9,13 @@ use thiserror::Error;
 use tokio::process::Command;
 
 use crate::{
-    build::utils,
+    build::{
+        backend::{BuildBackend, BuildInfo},
+        utils,
+    },
     config::Config,
     lua_installation::LuaInstallation,
-    lua_rockspec::{Build, BuildInfo, CMakeBuildSpec},
+    lua_rockspec::CMakeBuildSpec,
     progress::{Progress, ProgressBar},
     tree::{RockLayout, Tree},
     variables::{self, HasVariables, VariableSubstitutionError},
@@ -54,7 +57,7 @@ impl HasVariables for CMakeVariables {
     }
 }
 
-impl Build for CMakeBuildSpec {
+impl BuildBackend for CMakeBuildSpec {
     type Err = CMakeError;
 
     async fn run(

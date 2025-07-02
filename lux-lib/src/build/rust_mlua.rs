@@ -1,13 +1,13 @@
 use super::external_dependency::ExternalDependencyInfo;
 use super::utils::c_dylib_extension;
+use crate::build::backend::{BuildBackend, BuildInfo};
 use crate::config::LuaVersionUnset;
-use crate::lua_rockspec::BuildInfo;
 use crate::progress::{Progress, ProgressBar};
 use crate::tree::Tree;
 use crate::{
     config::{Config, LuaVersion},
     lua_installation::LuaInstallation,
-    lua_rockspec::{Build, RustMluaBuildSpec},
+    lua_rockspec::RustMluaBuildSpec,
     tree::RockLayout,
 };
 use itertools::Itertools;
@@ -32,7 +32,7 @@ pub enum RustError {
     LuaVersionUnset(#[from] LuaVersionUnset),
 }
 
-impl Build for RustMluaBuildSpec {
+impl BuildBackend for RustMluaBuildSpec {
     type Err = RustError;
 
     async fn run(

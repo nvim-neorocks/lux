@@ -3,11 +3,10 @@ use std::{collections::HashMap, io, path::Path, string::FromUtf8Error};
 use thiserror::Error;
 
 use crate::{
+    build::backend::{BuildBackend, BuildInfo},
     config::Config,
     lua_installation::LuaInstallation,
-    lua_rockspec::{
-        Build, BuildBackendSpec, BuildInfo, BuildSpec, LocalLuaRockspec, LuaRockspecError,
-    },
+    lua_rockspec::{BuildBackendSpec, BuildSpec, LocalLuaRockspec, LuaRockspecError},
     progress::{Progress, ProgressBar},
     project::{
         project_toml::{LocalProjectTomlValidationError, PartialProjectToml},

@@ -10,10 +10,13 @@ use thiserror::Error;
 use tokio::process::Command;
 
 use crate::{
-    build::utils,
+    build::{
+        backend::{BuildBackend, BuildInfo},
+        utils,
+    },
     config::Config,
     lua_installation::LuaInstallation,
-    lua_rockspec::{Build, BuildInfo, MakeBuildSpec},
+    lua_rockspec::MakeBuildSpec,
     progress::{Progress, ProgressBar},
     tree::{RockLayout, Tree},
     variables::VariableSubstitutionError,
@@ -40,7 +43,7 @@ pub enum MakeError {
     MakefileNotFound(PathBuf),
 }
 
-impl Build for MakeBuildSpec {
+impl BuildBackend for MakeBuildSpec {
     type Err = MakeError;
 
     async fn run(

@@ -1,3 +1,4 @@
+use crate::build::backend::BuildInfo;
 use crate::rockspec::LuaVersionCompatibility;
 use crate::rockspec::Rockspec;
 use crate::tree::Tree;
@@ -7,7 +8,6 @@ use std::{io, path::Path};
 use crate::{
     config::Config,
     lua_installation::LuaInstallation,
-    lua_rockspec::BuildInfo,
     luarocks::luarocks_installation::{ExecLuaRocksError, LuaRocksError, LuaRocksInstallation},
     progress::{Progress, ProgressBar},
     tree::RockLayout,

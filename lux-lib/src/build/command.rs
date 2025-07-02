@@ -9,9 +9,10 @@ use thiserror::Error;
 use tokio::process::Command;
 
 use crate::{
+    build::backend::{BuildBackend, BuildInfo},
     config::Config,
     lua_installation::LuaInstallation,
-    lua_rockspec::{Build, BuildInfo, CommandBuildSpec},
+    lua_rockspec::CommandBuildSpec,
     progress::{Progress, ProgressBar},
     tree::{RockLayout, Tree},
     variables::VariableSubstitutionError,
@@ -42,7 +43,7 @@ pub enum CommandError {
     VariableSubstitutionError(#[from] VariableSubstitutionError),
 }
 
-impl Build for CommandBuildSpec {
+impl BuildBackend for CommandBuildSpec {
     type Err = CommandError;
 
     async fn run(

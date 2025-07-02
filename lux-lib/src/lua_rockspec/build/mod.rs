@@ -19,24 +19,11 @@ use itertools::Itertools;
 
 use mlua::{FromLua, IntoLua, Lua, LuaSerdeExt, UserData, Value};
 use std::{
-    collections::HashMap,
-    env::consts::DLL_EXTENSION,
-    fmt::Display,
-    future::Future,
-    path::{Path, PathBuf},
-    str::FromStr,
+    collections::HashMap, env::consts::DLL_EXTENSION, fmt::Display, path::PathBuf, str::FromStr,
 };
 use thiserror::Error;
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
-
-use crate::{
-    build::external_dependency::ExternalDependencyInfo,
-    config::Config,
-    lua_installation::LuaInstallation,
-    progress::{Progress, ProgressBar},
-    tree::{RockLayout, Tree},
-};
 
 use super::{
     mlua_json_value_to_map, mlua_json_value_to_vec, DisplayAsLuaKV, DisplayAsLuaValue,
@@ -972,29 +959,6 @@ impl Default for BuildType {
     fn default() -> Self {
         Self::Builtin
     }
-}
-
-#[derive(Default)]
-pub struct BuildInfo {
-    pub binaries: Vec<PathBuf>,
-}
-
-// TODO(vhyrro): Move this to the dedicated build.rs module
-pub trait Build {
-    type Err: std::error::Error;
-
-    #[allow(clippy::too_many_arguments)]
-    fn run(
-        self,
-        output_paths: &RockLayout,
-        no_install: bool,
-        lua: &LuaInstallation,
-        external_dependencies: &HashMap<String, ExternalDependencyInfo>,
-        config: &Config,
-        tree: &Tree,
-        build_dir: &Path,
-        progress: &Progress<ProgressBar>,
-    ) -> impl Future<Output = Result<BuildInfo, Self::Err>> + Send;
 }
 
 #[cfg(test)]

@@ -1,3 +1,4 @@
+use crate::build::backend::{BuildBackend, BuildInfo};
 use crate::lockfile::{LockfileError, OptState, RemotePackageSourceUrl};
 use crate::lua_installation::LuaInstallationError;
 use crate::lua_rockspec::LuaVersionError;
@@ -11,7 +12,7 @@ use crate::{
     hash::HasIntegrity,
     lockfile::{LocalPackage, LocalPackageHashes, LockConstraint, PinnedState},
     lua_installation::LuaInstallation,
-    lua_rockspec::{Build as _, BuildBackendSpec, BuildInfo},
+    lua_rockspec::BuildBackendSpec,
     operations::{self, FetchSrcError},
     package::PackageSpec,
     progress::{Progress, ProgressBar},
@@ -48,6 +49,7 @@ mod source;
 mod treesitter_parser;
 pub(crate) mod utils;
 
+pub mod backend;
 pub mod external_dependency;
 
 /// A rocks package builder, providing fine-grained control

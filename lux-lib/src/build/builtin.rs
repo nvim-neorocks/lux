@@ -9,10 +9,13 @@ use thiserror::Error;
 use walkdir::WalkDir;
 
 use crate::{
-    build::utils,
+    build::{
+        backend::{BuildBackend, BuildInfo},
+        utils,
+    },
     config::Config,
     lua_installation::LuaInstallation,
-    lua_rockspec::{Build, BuildInfo, BuiltinBuildSpec, DeploySpec, LuaModule, ModuleSpec},
+    lua_rockspec::{BuiltinBuildSpec, DeploySpec, LuaModule, ModuleSpec},
     progress::{Progress, ProgressBar},
     tree::{RockLayout, Tree, TreeError},
 };
@@ -36,7 +39,7 @@ pub enum BuiltinBuildError {
     Tree(#[from] TreeError),
 }
 
-impl Build for BuiltinBuildSpec {
+impl BuildBackend for BuiltinBuildSpec {
     type Err = BuiltinBuildError;
 
     async fn run(
