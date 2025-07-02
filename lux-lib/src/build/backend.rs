@@ -4,6 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use bon::Builder;
+
 use crate::{
     build::external_dependency::ExternalDependencyInfo,
     config::Config,
@@ -12,20 +14,25 @@ use crate::{
     tree::{RockLayout, Tree},
 };
 
+#[derive(Builder)]
+#[builder(start_fn(name = "new"))]
+pub struct RunBuildArgs<'a> {
+    pub(crate) output_paths: &'a RockLayout,
+    pub(crate) no_install: bool,
+    pub(crate) lua: &'a LuaInstallation,
+    pub(crate) external_dependencies: &'a HashMap<String, ExternalDependencyInfo>,
+    pub(crate) config: &'a Config,
+    pub(crate) tree: &'a Tree,
+    pub(crate) build_dir: &'a Path,
+    pub(crate) progress: &'a Progress<ProgressBar>,
+}
+
 pub trait BuildBackend {
     type Err: std::error::Error;
 
-    #[allow(clippy::too_many_arguments)]
     fn run(
         self,
-        output_paths: &RockLayout,
-        no_install: bool,
-        lua: &LuaInstallation,
-        external_dependencies: &HashMap<String, ExternalDependencyInfo>,
-        config: &Config,
-        tree: &Tree,
-        build_dir: &Path,
-        progress: &Progress<ProgressBar>,
+        args: RunBuildArgs<'_>,
     ) -> impl Future<Output = Result<BuildInfo, Self::Err>> + Send;
 }
 
