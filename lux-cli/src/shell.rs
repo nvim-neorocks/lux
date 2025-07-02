@@ -1,5 +1,5 @@
 use clap::Args;
-use eyre::{Result, WrapErr};
+use eyre::{eyre, Result, WrapErr};
 use lux_lib::{config::Config, path::Paths};
 use which::which;
 
@@ -26,6 +26,10 @@ pub struct Shell {
 }
 
 pub async fn shell(data: Shell, config: Config) -> Result<()> {
+    if env::var("LUX_SHELL").is_ok() {
+        return Err(eyre!("Already in a Lux shell."));
+    }
+
     let tree = current_project_or_user_tree(&config).unwrap();
 
     let mut path = Paths::new(&tree)?;
@@ -77,6 +81,7 @@ pub async fn shell(data: Shell, config: Config) -> Result<()> {
         .env("LUA_PATH", path.package_path().joined())
         .env("LUA_CPATH", path.package_cpath().joined())
         .env("LUA_INIT", lua_init.unwrap_or_default())
+        .env("LUX_SHELL", "")
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
