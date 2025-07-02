@@ -16,7 +16,7 @@ use crate::{
 
 #[derive(Builder)]
 #[builder(start_fn(name = "new"))]
-pub struct RunBuildArgs<'a> {
+pub(crate) struct RunBuildArgs<'a> {
     pub(crate) output_paths: &'a RockLayout,
     pub(crate) no_install: bool,
     pub(crate) lua: &'a LuaInstallation,
@@ -27,7 +27,7 @@ pub struct RunBuildArgs<'a> {
     pub(crate) progress: &'a Progress<ProgressBar>,
 }
 
-pub trait BuildBackend {
+pub(crate) trait BuildBackend {
     type Err: std::error::Error;
 
     fn run(
@@ -37,6 +37,6 @@ pub trait BuildBackend {
 }
 
 #[derive(Default)]
-pub struct BuildInfo {
+pub(crate) struct BuildInfo {
     pub binaries: Vec<PathBuf>,
 }

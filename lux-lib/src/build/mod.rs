@@ -50,9 +50,10 @@ mod patch;
 mod rust_mlua;
 mod source;
 mod treesitter_parser;
+
+pub(crate) mod backend;
 pub(crate) mod utils;
 
-pub mod backend;
 pub mod external_dependency;
 
 /// A rocks package builder, providing fine-grained control
