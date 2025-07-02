@@ -12,15 +12,17 @@ use super::utils::project::current_project_or_user_tree;
 
 #[derive(Args)]
 pub struct Shell {
-    /// Whether to load test dependencies into the new shell
+    /// Add test dependencies to the shell's paths
     #[arg(long)]
     test: bool,
 
-    /// Whether to load build dependencies into the new shell
+    /// Add build dependencies to the shell's paths
     #[arg(long)]
     build: bool,
 
-    /// Suppresses the warning for checking if the lux-lua lib exists
+    /// Disable the Lux loader.
+    /// If a rock has conflicting transitive dependencies,
+    /// disabling the Lux loader may result in the wrong modules being loaded.
     #[arg(long)]
     no_loader: bool,
 }
