@@ -6,6 +6,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.7.5](https://github.com/nvim-neorocks/lux/compare/v0.7.4...v0.7.5) - 2025-07-03
+
+### Added
+- add help for `lx lua` flags
+
+### Other
+- *(deps)* bump tokio from 1.45.0 to 1.46.0 ([#827](https://github.com/nvim-neorocks/lux/pull/827))
+
+## `lux-lib` - [0.10.2](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.10.1...lux-lib-v0.10.2) - 2025-07-03
+
+### Other
+- *(deps)* bump tokio from 1.45.0 to 1.46.0 ([#827](https://github.com/nvim-neorocks/lux/pull/827))
+
 ## `lux-cli` - [0.7.4](https://github.com/nvim-neorocks/lux/compare/v0.7.3...v0.7.4) - 2025-06-27
 
 ### Added
