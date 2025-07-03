@@ -25,6 +25,7 @@ use remove::Remove;
 use run::Run;
 use run_lua::RunLua;
 use search::Search;
+use shell::Shell;
 use test::Test;
 use uninstall::Uninstall;
 use update::Update;
@@ -58,6 +59,7 @@ pub mod remove;
 pub mod run;
 pub mod run_lua;
 pub mod search;
+pub mod shell;
 pub mod test;
 pub mod uninstall;
 pub mod unpack;
@@ -286,6 +288,8 @@ pub enum Commands {
     Upload(Upload),
     /// Tell which file corresponds to a given module name.
     Which(Which),
+    /// Spawns an interactive shell with PATH, LUA_PATH, LUA_CPATH and LUA_INIT set.
+    Shell(Shell),
 }
 
 /// Parse a key=value pair.
