@@ -45,7 +45,9 @@ pub async fn exec(run: Exec, config: Config) -> Result<()> {
     }
     if which(&run.command).is_err() {
         match project {
-            Some(_) => super::build::build(Build::default(), config.clone()).await?,
+            Some(_) => {
+                super::build::build(Build::default(), config.clone()).await?;
+            }
             None => install_command(&run.command, &config).await?,
         }
     };

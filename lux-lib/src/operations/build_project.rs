@@ -7,6 +7,7 @@ use thiserror::Error;
 use crate::{
     build::{Build, BuildBehaviour, BuildError},
     config::Config,
+    lockfile::LocalPackage,
     luarocks::luarocks_installation::{LuaRocksError, LuaRocksInstallError, LuaRocksInstallation},
     progress::{MultiProgress, Progress},
     project::{project_toml::LocalProjectTomlValidationError, Project, ProjectTreeError},
@@ -62,7 +63,8 @@ pub struct BuildProject<'a> {
 impl<State: build_project_builder::State + build_project_builder::IsComplete>
     BuildProjectBuilder<'_, State>
 {
-    pub async fn build(self) -> Result<(), BuildProjectError> {
+    /// Returns `Some` if the `only_deps` option is set to `false`.
+    pub async fn build(self) -> Result<Option<LocalPackage>, BuildProjectError> {
         let args = self._build();
         let project = args.project;
         let config = args.config;
@@ -192,8 +194,9 @@ impl<State: build_project_builder::State + build_project_builder::IsComplete>
                 lockfile.add_dependency(&package, &dep);
                 lockfile.remove_entrypoint(&dep);
             }
+            Ok(Some(package))
+        } else {
+            Ok(None)
         }
-
-        Ok(())
     }
 }

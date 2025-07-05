@@ -58,6 +58,8 @@ pub enum PackError {
     Zip(#[from] zip::result::ZipError),
     Io(#[from] io::Error),
     Walkdir(#[from] walkdir::Error),
+    #[error("expected a `package.rockspec` in the package root.")]
+    MissingRockspec,
 }
 
 async fn do_pack(args: Pack) -> Result<PathBuf, PackError> {
@@ -87,6 +89,9 @@ async fn do_pack(args: Pack) -> Result<PathBuf, PackError> {
     }
     // luarocks expects a <package>-<version>.rockspec,
     // so we copy it the package.rockspec to our temporary root directory and rename it
+    if !layout.rockspec_path().is_file() {
+        return Err(PackError::MissingRockspec);
+    }
     let packed_rockspec_name = format!("{}-{}.rockspec", &package.name(), &package.version());
     let renamed_rockspec_entry = temp_dir.join(packed_rockspec_name);
     std::fs::copy(layout.rockspec_path(), &renamed_rockspec_entry)?;

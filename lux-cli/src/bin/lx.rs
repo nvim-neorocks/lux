@@ -57,7 +57,9 @@ async fn main() -> Result<()> {
             Debug::Project(debug_project) => project::debug_project(debug_project)?,
         },
         Commands::New(project_data) => project::write_project_rockspec(project_data).await?,
-        Commands::Build(build_data) => build::build(build_data, config).await?,
+        Commands::Build(build_data) => {
+            build::build(build_data, config).await?;
+        }
         Commands::List(list_data) => list::list_installed(list_data, config)?,
         Commands::Lua(run_lua) => run_lua::run_lua(run_lua, config).await?,
         Commands::Install(install_data) => install::install(install_data, config).await?,

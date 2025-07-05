@@ -1,5 +1,6 @@
 use std::{path::PathBuf, str::FromStr};
 
+use crate::build;
 use clap::Args;
 use eyre::{eyre, Result};
 use lux_lib::{
@@ -10,6 +11,7 @@ use lux_lib::{
     package::PackageReq,
     progress::MultiProgress,
     project::Project,
+    rockspec::Rockspec as _,
     tree,
 };
 use tempdir::TempDir;
@@ -42,13 +44,20 @@ impl FromStr for PackageOrRockspec {
 
 #[derive(Args)]
 pub struct Pack {
-    /// Path to a RockSpec or a package query for a package to pack.
-    /// Prioritises installed rocks and will install a rock to a temporary
-    /// directory if none is found.
-    /// In case of multiple matches, the latest version will be packed.
-    /// Examples: "pkg", "pkg@1.0.0", "pkg>=1.0.0"
-    ///
-    /// If not set, rocks will pack the current project's lux.toml.
+    /// Path to a RockSpec or a package query for a package to pack.{n}
+    /// Prioritises installed rocks and will install a rock to a temporary{n}
+    /// directory if none is found.{n}
+    /// In case of multiple matches, the latest version will be packed.{n}
+    ///{n}
+    /// Examples:{n}
+    ///     - "pkg"{n}
+    ///     - "pkg@1.0.0"{n}
+    ///     - "pkg>=1.0.0"{n}
+    ///     - "/path/to/foo-1.0.0-1.rockspec"{n}
+    ///{n}
+    /// If not set, lux will build the current project and attempt to pack it.{n}
+    /// To be able to pack a project, lux must be able to generate a release or dev{n}
+    /// Lua rockspec.{n}
     #[clap(value_parser)]
     package_or_rockspec: Option<PackageOrRockspec>,
 }
@@ -57,15 +66,8 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
     let lua_version = LuaVersion::from(&config)?.clone();
     let dest_dir = std::env::current_dir()?;
     let progress = MultiProgress::new_arc();
-    let package_or_rockspec = match args.package_or_rockspec {
-        Some(package_or_rockspec) => package_or_rockspec,
-        None => {
-            let project = Project::current_or_err()?;
-            PackageOrRockspec::RockSpec(project.toml_path())
-        }
-    };
-    let result: Result<PathBuf> = match package_or_rockspec {
-        PackageOrRockspec::Package(package_req) => {
+    let result: Result<PathBuf> = match args.package_or_rockspec {
+        Some(PackageOrRockspec::Package(package_req)) => {
             let user_tree = config.user_tree(lua_version.clone())?;
             match user_tree.match_rocks(&package_req)? {
                 lux_lib::tree::RockMatches::NotFound(_) => {
@@ -107,7 +109,7 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
                 }
             }
         }
-        PackageOrRockspec::RockSpec(rockspec_path) => {
+        Some(PackageOrRockspec::RockSpec(rockspec_path)) => {
             let content = std::fs::read_to_string(&rockspec_path)?;
             let rockspec = match rockspec_path
                 .extension()
@@ -127,6 +129,23 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
             let package = Build::new(&rockspec, &tree, tree::EntryType::Entrypoint, &config, &bar)
                 .build()
                 .await?;
+            let rock_path = operations::Pack::new(dest_dir, tree, package)
+                .pack()
+                .await?;
+            Ok(rock_path)
+        }
+        None => {
+            let project = Project::current_or_err()?;
+            // luarocks expects a `<package>-<version>.rockspec` in the package root,
+            // so we add a guard that it can be created here.
+            project
+                .toml()
+                .into_remote()?
+                .to_lua_remote_rockspec_string()?;
+            let package = build::build(build::Build::default(), config.clone())
+                .await?
+                .expect("exptected a `LocalPackage`");
+            let tree = project.tree(&config)?;
             let rock_path = operations::Pack::new(dest_dir, tree, package)
                 .pack()
                 .await?;
