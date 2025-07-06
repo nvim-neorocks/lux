@@ -1,12 +1,13 @@
 use clap::Args;
 use eyre::{eyre, Result, WrapErr};
-use lux_lib::{config::Config, path::Paths};
+use lux_lib::{config::Config, path::PackagePath, path::Paths};
 use which::which;
 
 use std::{env, path::PathBuf};
 use tokio::process::Command;
 
 use std::process::Stdio;
+use std::str::FromStr;
 
 use super::utils::project::current_project_or_user_tree;
 
@@ -64,6 +65,14 @@ pub async fn shell(data: Shell, config: Config) -> Result<()> {
         path.prepend(&build_path);
     }
 
+    let mut lua_path = PackagePath::from_str(env::var("LUA_PATH").unwrap_or_default().as_str())
+        .unwrap_or_default();
+    lua_path.prepend(path.package_path());
+
+    let lua_cpath = PackagePath::from_str(env::var("LUA_CPATH").unwrap_or_default().as_str())
+        .unwrap_or_default();
+    lua_path.prepend(path.package_cpath());
+
     let lua_init = if data.no_loader {
         None
     } else if tree.version().lux_lib_dir().is_none() {
@@ -80,8 +89,8 @@ pub async fn shell(data: Shell, config: Config) -> Result<()> {
 
     let _ = Command::new(&shell)
         .env("PATH", path.path_prepended().joined())
-        .env("LUA_PATH", path.package_path().joined())
-        .env("LUA_CPATH", path.package_cpath().joined())
+        .env("LUA_PATH", lua_path.joined())
+        .env("LUA_CPATH", lua_cpath.joined())
         .env("LUA_INIT", lua_init.unwrap_or_default())
         .env("LUX_SHELL", "")
         .stdin(Stdio::inherit())
