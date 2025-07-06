@@ -34,7 +34,7 @@ strum_macros = "0.27.1"
 tempdir = "0.3.7"
 termcolor = "1.4.1"
 text_trees = "0.1.2"
-tokio = { version = "1.45.0", features = ["full"] }
+tokio = { version = "1.46.0", features = ["full"] }
 toml = "0.8.22"
 walkdir = "2.5.0"
 which = "8.0.0"
