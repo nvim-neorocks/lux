@@ -1127,7 +1127,7 @@ mod tests {
         }\n
         "
         .to_string();
-        let _rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap_err();
+        RemoteLuaRockspec::new(&rockspec_content).unwrap();
         let rockspec_content = "
         rockspec_format = '1.0'\n
         package = 'foo'\n
@@ -1141,7 +1141,7 @@ mod tests {
         }\n
         "
         .to_string();
-        let _rockspec = RemoteLuaRockspec::new(&rockspec_content).unwrap_err();
+        RemoteLuaRockspec::new(&rockspec_content).unwrap();
         // platform overrides
         let rockspec_content = "
         package = 'rocks'\n

@@ -78,10 +78,6 @@ impl UserData for BuildSpec {
 pub enum BuildSpecInternalError {
     #[error("'builtin' modules should not have list elements")]
     ModulesHaveListElements,
-    #[error("no 'build_command' specified for the 'command' build backend")]
-    NoBuildCommand,
-    #[error("no 'install_command' specified for the 'command' build backend")]
-    NoInstallCommand,
     #[error("no 'modules' specified for the 'rust-mlua' build backend")]
     NoModulesSpecified,
     #[error("no 'lang' specified for 'treesitter-parser' build backend")]
@@ -142,18 +138,10 @@ impl BuildSpec {
                     variables: internal.variables.unwrap_or_default(),
                 }))
             }
-            BuildType::Command => {
-                let build_command = internal
-                    .build_command
-                    .ok_or(BuildSpecInternalError::NoBuildCommand)?;
-                let install_command = internal
-                    .install_command
-                    .ok_or(BuildSpecInternalError::NoInstallCommand)?;
-                Some(BuildBackendSpec::Command(CommandBuildSpec {
-                    build_command,
-                    install_command,
-                }))
-            }
+            BuildType::Command => Some(BuildBackendSpec::Command(CommandBuildSpec {
+                build_command: internal.build_command,
+                install_command: internal.install_command,
+            })),
             BuildType::None => None,
             BuildType::LuaRock(s) => Some(BuildBackendSpec::LuaRock(s)),
             BuildType::RustMlua => Some(BuildBackendSpec::RustMlua(RustMluaBuildSpec {
@@ -287,8 +275,8 @@ impl IntoLua for BuildBackendSpec {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct CommandBuildSpec {
-    pub build_command: String,
-    pub install_command: String,
+    pub build_command: Option<String>,
+    pub install_command: Option<String>,
 }
 
 impl UserData for CommandBuildSpec {
