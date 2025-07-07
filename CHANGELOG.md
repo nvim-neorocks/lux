@@ -6,6 +6,38 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.8.0](https://github.com/nvim-neorocks/lux/compare/v0.7.4...v0.8.0) - 2025-07-07
+
+### Added
+- *(cli)* lx shell ([#817](https://github.com/nvim-neorocks/lux/pull/817))
+- add help for `lx lua` flags
+
+### Fixed
+- fix!(cli): `lx pack` broken in projects ([#821](https://github.com/nvim-neorocks/lux/pull/821))
+
+### Other
+- [**breaking**] `_prepended` for `PackagePath`
+- `lx shell` cleanup
+- *(deps)* bump tokio from 1.45.0 to 1.46.0 ([#827](https://github.com/nvim-neorocks/lux/pull/827))
+
+## `lux-lib` - [0.11.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.10.1...lux-lib-v0.11.0) - 2025-07-07
+
+### Added
+- *(lux-lua)* state functions and search functionality ([#781](https://github.com/nvim-neorocks/lux/pull/781))
+- use `--verbose` flag to enable compiler warnings ([#833](https://github.com/nvim-neorocks/lux/pull/833))
+- *(install)* support rocks with only .src.rock sources ([#823](https://github.com/nvim-neorocks/lux/pull/823))
+
+### Fixed
+- fix!(cli): `lx pack` broken in projects ([#821](https://github.com/nvim-neorocks/lux/pull/821))
+- *(build/command)* make `_command` fields optional ([#832](https://github.com/nvim-neorocks/lux/pull/832))
+
+### Other
+- *(build)* [**breaking**] don't expose `BuildBackend` trait ([#826](https://github.com/nvim-neorocks/lux/pull/826))
+- *(build)* [**breaking**] use Builder pattern for `BuildBackend` trait ([#825](https://github.com/nvim-neorocks/lux/pull/825))
+- [**breaking**] `_prepended` for `PackagePath`
+- *(build)* [**breaking**] `lua_rockspec::Build` -> `build::backend::BuildBackend` ([#824](https://github.com/nvim-neorocks/lux/pull/824))
+- *(deps)* bump tokio from 1.45.0 to 1.46.0 ([#827](https://github.com/nvim-neorocks/lux/pull/827))
+
 ## `lux-cli` - [0.7.4](https://github.com/nvim-neorocks/lux/compare/v0.7.3...v0.7.4) - 2025-06-27
 
 ### Added
