@@ -107,12 +107,13 @@ pub enum CompileCFilesError {
 /// Compiles a set of C files into a single dynamic library and places them under `{target_dir}/{target_file}`.
 /// # Panics
 /// Panics if no parent or no filename can be determined for the target path.
-pub(crate) fn compile_c_files(
+pub(crate) async fn compile_c_files(
     files: &Vec<PathBuf>,
     target_module: &LuaModule,
     target_dir: &Path,
     lua: &LuaInstallation,
     external_dependencies: &HashMap<String, ExternalDependencyInfo>,
+    config: &Config,
 ) -> Result<(), CompileCFilesError> {
     let target = target_dir.join(target_module.to_lib_path());
 
@@ -135,7 +136,7 @@ pub(crate) fn compile_c_files(
         .cargo_output(false)
         .cargo_metadata(false)
         .cargo_warnings(false)
-        .warnings(false)
+        .warnings(config.verbose())
         .files(files)
         .host(std::env::consts::OS)
         .includes(lua.includes())
@@ -168,9 +169,9 @@ pub(crate) fn compile_c_files(
     let output = if compiler.is_like_msvc() {
         let def_temp_dir = tempdir::TempDir::new("msvc-def")?.into_path().to_path_buf();
         let def_file = mk_def_file(def_temp_dir, &file, target_module)?;
-        compiler
-            .to_command()
-            .arg("/NOLOGO")
+        let cmd = compiler.to_command();
+        let mut cmd: tokio::process::Command = cmd.into();
+        cmd.arg("/NOLOGO")
             .args(&objects)
             .arg("/LD")
             .arg("/link")
@@ -182,13 +183,12 @@ pub(crate) fn compile_c_files(
                     .iter()
                     .flat_map(|(_, dep)| dep.lib_link_args(&compiler)),
             )
-            .output()?
+            .output()
+            .await?
     } else {
-        build
-            .shared_flag(true)
-            .try_get_compiler()?
-            .to_command()
-            .args(vec!["-o".into(), output_path.to_string_lossy().to_string()])
+        let cmd = build.shared_flag(true).try_get_compiler()?.to_command();
+        let mut cmd: tokio::process::Command = cmd.into();
+        cmd.args(vec!["-o".into(), output_path.to_string_lossy().to_string()])
             .args(lua.lib_link_args(&compiler))
             .args(
                 external_dependencies
@@ -196,8 +196,19 @@ pub(crate) fn compile_c_files(
                     .flat_map(|(_, dep)| dep.lib_link_args(&compiler)),
             )
             .args(&objects)
-            .output()?
+            .output()
+            .await?
     };
+
+    if config.verbose() {
+        if !&output.stdout.is_empty() {
+            println!("{}", String::from_utf8_lossy(&output.stdout));
+        }
+        if !&output.stderr.is_empty() {
+            eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+        }
+    }
+
     validate_output(output)?;
 
     if output_path.exists() {
@@ -296,13 +307,14 @@ pub enum CompileCModulesError {
 /// Compiles a set of C files (with extra metadata) to a given destination.
 /// # Panics
 /// Panics if no filename for the target path can be determined.
-pub(crate) fn compile_c_modules(
+pub(crate) async fn compile_c_modules(
     data: &ModulePaths,
     source_dir: &Path,
     target_module: &LuaModule,
     target_dir: &Path,
     lua: &LuaInstallation,
     external_dependencies: &HashMap<String, ExternalDependencyInfo>,
+    config: &Config,
 ) -> Result<(), CompileCModulesError> {
     let target = target_dir.join(target_module.to_lib_path());
 
@@ -333,7 +345,7 @@ pub(crate) fn compile_c_modules(
         .cargo_output(false)
         .cargo_metadata(false)
         .cargo_warnings(false)
-        .warnings(false)
+        .warnings(config.verbose())
         .files(source_files)
         .host(std::env::consts::OS)
         .includes(&include_dirs)
@@ -395,10 +407,9 @@ pub(crate) fn compile_c_modules(
     let output = if is_msvc {
         let def_temp_dir = tempdir::TempDir::new("msvc-def")?.into_path().to_path_buf();
         let def_file = mk_def_file(def_temp_dir, &file, target_module)?;
-        build
-            .try_get_compiler()?
-            .to_command()
-            .arg("/NOLOGO")
+        let cmd = build.try_get_compiler()?.to_command();
+        let mut cmd: tokio::process::Command = cmd.into();
+        cmd.arg("/NOLOGO")
             .args(&objects)
             .arg("/LD")
             .arg("/link")
@@ -412,13 +423,12 @@ pub(crate) fn compile_c_modules(
             )
             .args(libdir_args)
             .args(library_args)
-            .output()?
+            .output()
+            .await?
     } else {
-        build
-            .shared_flag(true)
-            .try_get_compiler()?
-            .to_command()
-            .args(vec!["-o".into(), output_path.to_string_lossy().to_string()])
+        let cmd = build.shared_flag(true).try_get_compiler()?.to_command();
+        let mut cmd: tokio::process::Command = cmd.into();
+        cmd.args(vec!["-o".into(), output_path.to_string_lossy().to_string()])
             .args(lua.lib_link_args(&build.try_get_compiler()?))
             .args(
                 external_dependencies
@@ -428,8 +438,19 @@ pub(crate) fn compile_c_modules(
             .args(&objects)
             .args(libdir_args)
             .args(library_args)
-            .output()?
+            .output()
+            .await?
     };
+
+    if config.verbose() {
+        if !&output.stdout.is_empty() {
+            println!("{}", String::from_utf8_lossy(&output.stdout));
+        }
+        if !&output.stderr.is_empty() {
+            eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+        }
+    }
+
     validate_output(output)?;
 
     if output_path.exists() {

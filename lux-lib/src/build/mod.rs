@@ -344,7 +344,9 @@ async fn install<R: Rockspec + HasIntegrity>(
             &output_paths.lib,
             lua,
             external_dependencies,
-        )?;
+            config,
+        )
+        .await?;
         progress.map(|p| p.set_position(p.position() + 1));
     }
     if entry_type.is_entrypoint() {
