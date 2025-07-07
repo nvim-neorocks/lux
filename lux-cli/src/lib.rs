@@ -1,4 +1,4 @@
-use crate::project::NewProject;
+use crate::{format::Fmt, project::NewProject};
 use std::error::Error;
 use std::path::PathBuf;
 
@@ -156,7 +156,7 @@ pub enum Commands {
     #[command(arg_required_else_help = true)]
     Download(Download),
     /// Formats the codebase with stylua.
-    Fmt,
+    Fmt(Fmt),
     /// Generate a rockspec file from a project.
     GenerateRockspec(GenerateRockspec),
     /// Show metadata for any rock.
