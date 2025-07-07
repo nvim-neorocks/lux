@@ -14,10 +14,10 @@ use path_slash::PathBufExt;
 use walkdir::WalkDir;
 
 #[derive(Args)]
-pub struct Check {
+pub struct Lint {
     /// Arguments to pass to the luacheck command.{n}
     /// If you pass arguments to luacheck, Lux will not pass any default arguments.
-    check_args: Option<Vec<String>>,
+    args: Option<Vec<String>>,
     /// By default, Lux will add top-level ignored files and directories{n}
     /// (like those in .gitignore) to luacheck's exclude files.{n}
     /// This flag disables that behaviour.{n}
@@ -25,7 +25,7 @@ pub struct Check {
     no_ignore: bool,
 }
 
-pub async fn check(check: Check, config: Config) -> Result<()> {
+pub async fn lint(lint_args: Lint, config: Config) -> Result<()> {
     let project = Project::current_or_err()?;
 
     let luacheck =
@@ -38,9 +38,9 @@ pub async fn check(check: Check, config: Config) -> Result<()> {
         .install()
         .await?;
 
-    let check_args: Vec<String> = match check.check_args {
+    let check_args: Vec<String> = match lint_args.args {
         Some(args) => args,
-        None if check.no_ignore => Vec::new(),
+        None if lint_args.no_ignore => Vec::new(),
         None => {
             let top_level_project_files = ignore::WalkBuilder::new(project.root())
                 .max_depth(Some(1))

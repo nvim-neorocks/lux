@@ -3,10 +3,10 @@ use std::time::Duration;
 use clap::Parser;
 use eyre::Result;
 use lux_cli::{
-    add, build, check, completion, config,
+    add, build, completion, config,
     debug::Debug,
     doc, download, exec, fetch, format, generate_rockspec, info, install, install_lua,
-    install_rockspec, list, outdated, pack, path, pin, project, purge, remove, run, run_lua,
+    install_rockspec, lint, list, outdated, pack, path, pin, project, purge, remove, run, run_lua,
     search, shell, test, uninstall, unpack, update,
     upload::{self},
     which, Cli, Commands,
@@ -81,15 +81,14 @@ async fn main() -> Result<()> {
         Commands::Test(test) => test::test(test, config).await?,
         Commands::Update(update_args) => update::update(update_args, config).await?,
         Commands::Info(info_data) => info::info(info_data, config).await?,
+        Commands::Lint(lint_args) => lint::lint(lint_args, config).await?,
         Commands::Path(path_data) => path::path(path_data, config).await?,
         Commands::Pin(pin_data) => pin::set_pinned_state(pin_data, config, Pinned).await?,
         Commands::Unpin(pin_data) => pin::set_pinned_state(pin_data, config, Unpinned).await?,
         Commands::Upload(upload_data) => upload::upload(upload_data, config).await?,
-        Commands::Check(check_args) => check::check(check_args, config).await?,
         Commands::Add(add_data) => add::add(add_data, config).await?,
         Commands::Config(config_cmd) => config::config(config_cmd, config)?,
         Commands::Doc(doc_args) => doc::doc(doc_args, config).await?,
-        Commands::Lint => unimplemented!(),
         Commands::Pack(pack_args) => pack::pack(pack_args, config).await?,
         Commands::Uninstall(uninstall_data) => {
             uninstall::uninstall(uninstall_data, config).await.unwrap()
