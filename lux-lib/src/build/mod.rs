@@ -237,7 +237,8 @@ async fn install<R: Rockspec + HasIntegrity>(
     let lua_len = install_spec.lua.len();
     let lib_len = install_spec.lib.len();
     let bin_len = install_spec.bin.len();
-    let total_len = lua_len + lib_len + bin_len;
+    let conf_len = install_spec.conf.len();
+    let total_len = lua_len + lib_len + bin_len + conf_len;
     progress.map(|p| p.set_position(total_len as u64));
 
     if lua_len > 0 {
@@ -279,6 +280,18 @@ async fn install<R: Rockspec + HasIntegrity>(
             )
             .await
             .map_err(|err| BuildError::InstallBinary(target.clone(), err))?;
+            progress.map(|p| p.set_position(p.position() + 1));
+        }
+    }
+    if conf_len > 0 {
+        progress.map(|p| p.set_message("Copying configuration files..."));
+        for (target, source) in &install_spec.conf {
+            let absolute_source = build_dir.join(source);
+            let target = output_paths.conf.join(target);
+            if let Some(parent_dir) = target.parent() {
+                tokio::fs::create_dir_all(parent_dir).await?;
+            }
+            tokio::fs::copy(absolute_source, target).await?;
             progress.map(|p| p.set_position(p.position() + 1));
         }
     }

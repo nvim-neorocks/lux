@@ -17,3 +17,6 @@ type = "builtin"
 
 [build.modules]
 "foo.main" = "lua/foo.lua"
+
+[build.install]
+conf = { "foo/bar.toml" = "bar.toml" }

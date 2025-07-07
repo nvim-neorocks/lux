@@ -208,7 +208,7 @@ async fn test_build_local_project_no_source() {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    Build::new(
+    let package = Build::new(
         &project_toml,
         &tree,
         tree::EntryType::Entrypoint,
@@ -219,6 +219,10 @@ async fn test_build_local_project_no_source() {
     .build()
     .await
     .unwrap();
+
+    let rock_layout = tree.installed_rock_layout(&package).unwrap();
+    let conf_file = rock_layout.conf.join("foo").join("bar.toml");
+    assert!(conf_file.is_file());
 }
 
 #[tokio::test]
