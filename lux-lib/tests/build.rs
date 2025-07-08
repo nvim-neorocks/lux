@@ -223,6 +223,9 @@ async fn test_build_local_project_no_source() {
     let rock_layout = tree.installed_rock_layout(&package).unwrap();
     let conf_file = rock_layout.conf.join("foo").join("bar.toml");
     assert!(conf_file.is_file());
+
+    let plugin_file = rock_layout.etc.join("plugin").join("foo.lua");
+    assert!(plugin_file.is_file());
 }
 
 #[tokio::test]

@@ -457,7 +457,11 @@ where
                         .is_some_and(|name| name != "doc" && name != "docs")
                 })
             {
-                recursive_copy_dir(&build_dir.join(directory), &output_paths.etc).await?;
+                recursive_copy_dir(
+                    &build_dir.join(directory),
+                    &output_paths.etc.join(directory),
+                )
+                .await?;
             }
 
             recursive_copy_doc_dir(&output_paths, &build_dir).await?;
