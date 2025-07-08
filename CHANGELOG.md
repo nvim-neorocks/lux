@@ -6,6 +6,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.8.1](https://github.com/nvim-neorocks/lux/compare/v0.8.0...v0.8.1) - 2025-07-08
+
+### Added
+- *(cli)* allow passing path to `fmt` ([#835](https://github.com/nvim-neorocks/lux/pull/835))
+
+## `lux-lib` - [0.12.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.11.0...lux-lib-v0.12.0) - 2025-07-08
+
+### Fixed
+- *(build)* [**breaking**] `copy_directorys` drops subdirectories ([#842](https://github.com/nvim-neorocks/lux/pull/842))
+- *(build)* install conf files to etc/conf ([#841](https://github.com/nvim-neorocks/lux/pull/841))
+
 ## `lux-cli` - [0.8.0](https://github.com/nvim-neorocks/lux/compare/v0.7.4...v0.8.0) - 2025-07-07
 
 ### Added
