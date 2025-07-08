@@ -6,6 +6,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.8.2](https://github.com/nvim-neorocks/lux/compare/v0.8.1...v0.8.2) - 2025-07-08
+
+### Added
+- expose shell completions in main binary ([#837](https://github.com/nvim-neorocks/lux/pull/837))
+
+### Other
+- *(cli/completion)* auto-detect shell ([#845](https://github.com/nvim-neorocks/lux/pull/845))
+
 ## `lux-cli` - [0.8.1](https://github.com/nvim-neorocks/lux/compare/v0.8.0...v0.8.1) - 2025-07-08
 
 ### Added

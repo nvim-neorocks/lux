@@ -11,7 +11,7 @@ default-members = ["lux-cli", "lux-lib"]
 resolver = "2"
 
 [workspace.package]
-version = "0.8.1"
+version = "0.8.2"
 
 [profile.release]
 lto = true
