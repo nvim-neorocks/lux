@@ -48,7 +48,7 @@ async fn main() -> Result<()> {
     let config = config_builder.build()?;
 
     match cli.command {
-        Commands::Completion { shell } => completion::generate(shell).await?,
+        Commands::Completion(completion_args) => completion::completion(completion_args).await?,
         Commands::Search(search_data) => search::search(search_data, config).await?,
         Commands::Download(download_data) => download::download(download_data, config).await?,
         Commands::Debug(debug) => match debug {

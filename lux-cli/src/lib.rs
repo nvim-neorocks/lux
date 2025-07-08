@@ -1,4 +1,4 @@
-use crate::{format::Fmt, project::NewProject};
+use crate::{completion::Completion, format::Fmt, project::NewProject};
 use std::error::Error;
 use std::path::PathBuf;
 
@@ -150,13 +150,7 @@ pub enum Commands {
     Config(ConfigCmd),
     /// Generate autocompletion scripts for the shell.{n}
     /// Example: `lx completion zsh > ~/.zsh/completions/_lx`
-    Completion {
-        /// The shell to generate the completion script for.{n}
-        /// If not set, Lux will try to detect the current shell.{n}
-        /// Possible values: "bash", "elvish", "fish", "powershell", "zsh"{n}
-        #[arg(value_enum, default_value = "bash")]
-        shell: clap_complete::Shell,
-    },
+    Completion(Completion),
     /// Internal commands for debugging Lux itself.
     #[command(subcommand, arg_required_else_help = true)]
     Debug(Debug),
