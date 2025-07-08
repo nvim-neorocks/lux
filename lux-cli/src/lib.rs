@@ -148,7 +148,8 @@ pub enum Commands {
     /// Interact with the lux configuration.
     #[command(subcommand, arg_required_else_help = true)]
     Config(ConfigCmd),
-    /// Generate autocompletion scripts for the shell.
+    /// Generate autocompletion scripts for the shell.{n}
+    /// Example: `lx completion zsh > ~/.zsh/completions/_lx`
     Completion {
         /// The shell to generate the completion script for.{n}
         /// If not set, Lux will try to detect the current shell.{n}
