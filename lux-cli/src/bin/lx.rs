@@ -69,7 +69,7 @@ async fn main() -> Result<()> {
         }
         Commands::Outdated(outdated) => outdated::outdated(outdated, config).await?,
         Commands::InstallLua => install_lua::install_lua(config).await?,
-        Commands::Fmt => format::format()?,
+        Commands::Fmt(fmt_args) => format::format(fmt_args)?,
         Commands::Purge => purge::purge(config).await?,
         Commands::Remove(remove_args) => remove::remove(remove_args, config).await?,
         Commands::Exec(run_args) => exec::exec(run_args, config).await?,

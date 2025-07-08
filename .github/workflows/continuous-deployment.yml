@@ -54,13 +54,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: cachix/cachix-action@v16
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        if: "!endsWith(matrix.target, 'windows-msvc')"
+
+      - name: Setup cachix
+        uses: cachix/cachix-action@v16
+        if: "!endsWith(matrix.target, 'windows-msvc')"
         with:
           name: neorocks
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
-      - uses: nicknovitski/nix-develop@v1.2.1
+      - name: Nix devShell
+        uses: nicknovitski/nix-develop@v1.2.1
+        if: "!endsWith(matrix.target, 'windows-msvc')"
+
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: ${{ matrix.target }}
