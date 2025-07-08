@@ -150,7 +150,9 @@ pub enum Commands {
     Config(ConfigCmd),
     /// Generate autocompletion scripts for the shell.
     Completion {
-        /// The shell to generate the completion script for.
+        /// The shell to generate the completion script for.{n}
+        /// If not set, Lux will try to detect the current shell.{n}
+        /// Possible values: "bash", "elvish", "fish", "powershell", "zsh"{n}
         #[arg(value_enum, default_value = "bash")]
         shell: clap_complete::Shell,
     },
