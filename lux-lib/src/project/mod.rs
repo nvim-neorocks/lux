@@ -320,7 +320,7 @@ impl Project {
     }
 
     /// Get the `.luarc.json` or `.emmyrc.json` path.
-    pub(crate) fn luarc_path(&self) -> PathBuf {
+    pub fn luarc_path(&self) -> PathBuf {
         let luarc_path = self.root.join(LUARC);
         if luarc_path.is_file() {
             luarc_path

@@ -31,12 +31,14 @@
 * Automatic generation of rockspecs
   - Say goodbye to managing 10 different rockspec files in your source code :tada:
 * Integrated code formatting via `lx fmt`
-  - Powered by [stylua](https://github.com/JohnnyMorganz/StyLua).
+  - Powered by [`stylua`](https://github.com/JohnnyMorganz/StyLua).
 * Easily specify compatible Lua versions
   - Lux will take care of Lua header installation automatically
   - Forget about users complaining they have the wrong Lua headers installed on their system
+* Automatic EmmyLua/LuaCATS based type checking via `lx check`
+  - Powered by [`emmylua-analyzer-rust`](https://github.com/EmmyLuaLs/emmylua-analyzer-rust)
 * Automatic code linting via `lx lint`
-  - Powered by `luacheck`.
+  - Powered by [`luacheck`](https://github.com/mpeterv/luacheck)
 * Powerful lockfile support
   - Makes for fully reproducible developer environments.
   - Makes Lux easy to integrate with Nix!
@@ -92,7 +94,8 @@ The following table provides a brief comparison:
 | luarocks.org dev packages                                             | :white_check_mark:           | :white_check_mark: |
 | versioning                                                            | SemVer[^3]                   | arbitrary          |
 | rockspecs with CVS/Mercurial/SVN/SSCM sources                         | :x: (YAGNI[^2])              | :white_check_mark: |
-| static type checking                                                  | :x: (planned)                | :x:                |
+| static type checking                                                  | :white_check_mark:           | :x:                |
+| generate a `.luarc` file with dependencies                            | :x: (planned)                | :x:                |
 | git dependencies in local projects                                    | :white_check_mark:           | :x:                |
 
 [^1]: Supported via a compatibility layer that uses luarocks as a backend.
