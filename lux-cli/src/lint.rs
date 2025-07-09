@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use clap::Args;
 use eyre::Result;
 use itertools::Itertools;
@@ -11,7 +9,8 @@ use lux_lib::{
     tree,
 };
 use path_slash::PathBufExt;
-use walkdir::WalkDir;
+
+use crate::project::top_level_ignored_files;
 
 #[derive(Args)]
 pub struct Lint {
@@ -42,38 +41,9 @@ pub async fn lint(lint_args: Lint, config: Config) -> Result<()> {
         Some(args) => args,
         None if lint_args.no_ignore => Vec::new(),
         None => {
-            let top_level_project_files = ignore::WalkBuilder::new(project.root())
-                .max_depth(Some(1))
-                .build()
-                .filter_map(Result::ok)
-                .filter_map(|entry| {
-                    let file = entry.into_path();
-                    if file.is_dir() || file.extension().is_some_and(|ext| ext == "lua") {
-                        Some(file)
-                    } else {
-                        None
-                    }
-                })
-                .collect::<HashSet<_>>();
-
-            let top_level_files = WalkDir::new(project.root())
-                .max_depth(1)
+            let ignored_files = top_level_ignored_files(&project)
                 .into_iter()
-                .filter_map(Result::ok)
-                .filter_map(|entry| {
-                    let file = entry.into_path();
-                    if file.is_dir() || file.extension().is_some_and(|ext| ext == "lua") {
-                        Some(file)
-                    } else {
-                        None
-                    }
-                })
-                .collect::<HashSet<_>>();
-
-            let ignored_files = top_level_files
-                .difference(&top_level_project_files)
                 .map(|file| file.to_slash_lossy().to_string());
-
             std::iter::once("--exclude-files".into())
                 .chain(ignored_files)
                 .collect_vec()

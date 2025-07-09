@@ -3,7 +3,7 @@ use std::time::Duration;
 use clap::Parser;
 use eyre::Result;
 use lux_cli::{
-    add, build, completion, config,
+    add, build, check, completion, config,
     debug::Debug,
     doc, download, exec, fetch, format, generate_rockspec, info, install, install_lua,
     install_rockspec, lint, list, outdated, pack, path, pin, project, purge, remove, run, run_lua,
@@ -53,6 +53,7 @@ async fn main() -> Result<()> {
     }
 
     match cli.command {
+        Commands::Check(check_args) => check::check(check_args, config).await?,
         Commands::Completion(completion_args) => completion::completion(completion_args).await?,
         Commands::Search(search_data) => search::search(search_data, config).await?,
         Commands::Download(download_data) => download::download(download_data, config).await?,

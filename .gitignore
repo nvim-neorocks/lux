@@ -28,5 +28,6 @@
 /.busted
 /*.rock
 /.luarc.json
+/src
 
 .pre-commit-config.yaml

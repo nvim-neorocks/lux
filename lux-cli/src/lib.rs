@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use add::Add;
 use build::Build;
+use check::Check;
 use clap::{Parser, Subcommand};
 use config::ConfigCmd;
 use debug::Debug;
@@ -35,6 +36,7 @@ use which::Which;
 
 pub mod add;
 pub mod build;
+pub mod check;
 pub mod completion;
 pub mod config;
 pub mod debug;
@@ -149,6 +151,10 @@ pub enum Commands {
     Add(Add),
     /// Build/compile a project.
     Build(Build),
+    /// [EXPERIMENTAL]{n}
+    /// Type check the current project based on EmmyLua/LuaCATS annotations.{n}
+    /// Respects `.emmyrc.json` and `.luarc.json` files in the project directory.
+    Check(Check),
     /// Interact with the lux configuration.
     #[command(subcommand, arg_required_else_help = true)]
     Config(ConfigCmd),
@@ -177,7 +183,7 @@ pub enum Commands {
     InstallRockspec(InstallRockspec),
     /// Manually install and manage Lua headers for various Lua versions.
     InstallLua,
-    /// Lints the current project using `luacheck`.
+    /// Lint the current project using `luacheck`.
     Lint(Lint),
     /// List currently installed rocks.
     List(ListCmd),
