@@ -69,7 +69,7 @@ url = "2.5.4"
 bon = { version = "3.6.3", features = ["implied-bounds"] }
 clean-path = "0.2.1"
 diffy = "0.4.2"
-toml = "0.8.22"
+toml = "0.9.0"
 md5 = "0.8.0"
 toml_edit = "0.22.26"
 nix-nar = "0.3.0"
