@@ -2335,7 +2335,7 @@ dependencies = [
  "thiserror 2.0.12",
  "tokio",
  "toml 0.9.0",
- "toml_edit",
+ "toml_edit 0.23.0",
  "tree-sitter",
  "tree-sitter-config",
  "tree-sitter-generate",
@@ -2395,7 +2395,7 @@ dependencies = [
  "time",
  "tokio",
  "tokio-util",
- "toml_edit",
+ "toml_edit 0.23.0",
  "tracing",
 ]
 
@@ -4448,7 +4448,7 @@ dependencies = [
  "serde",
  "serde_spanned 0.6.8",
  "toml_datetime 0.6.9",
- "toml_edit",
+ "toml_edit 0.22.26",
 ]
 
 [[package]]
@@ -4495,6 +4495,21 @@ dependencies = [
  "serde_spanned 0.6.8",
  "toml_datetime 0.6.9",
  "toml_write",
+ "winnow",
+]
+
+[[package]]
+name = "toml_edit"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54449f7f7569ce6f57cda7812361961c0f6a77f720802537b5618585b4a7ff4c"
+dependencies = [
+ "indexmap 2.9.0",
+ "serde",
+ "serde_spanned 1.0.0",
+ "toml_datetime 0.7.0",
+ "toml_parser",
+ "toml_writer",
  "winnow",
 ]
 
