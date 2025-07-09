@@ -51,6 +51,12 @@ whoami = "1.6.0"
 ignore = "0.4.23"
 path-slash = "0.2.1"
 
+# TODO: Use release when it has been published, before merging
+[dependencies.emmylua_check]
+git = "https://github.com/EmmyLuaLs/emmylua-analyzer-rust.git"
+rev = "8a629f239e85ad09e4e3d9f4e8da4e268842fe50"
+features = []
+
 [dev-dependencies]
 serial_test = { version = "3.2.0" }
 assert_fs = "1.1.3"
