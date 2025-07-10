@@ -35,7 +35,7 @@
 * Easily specify compatible Lua versions
   - Lux will take care of Lua header installation automatically
   - Forget about users complaining they have the wrong Lua headers installed on their system
-* Automatic code linting via `lx check`
+* Automatic code linting via `lx lint`
   - Powered by `luacheck`.
 * Powerful lockfile support
   - Makes for fully reproducible developer environments.
