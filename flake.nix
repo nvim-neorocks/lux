@@ -30,7 +30,7 @@
         pkgs,
         ...
       }: let
-        pkgs = attrs.pkgs.extend self.overlays.default;
+        pkgs = (attrs.pkgs.extend self.overlays.default).extend self.overlays.docker;
         git-hooks-check = git-hooks.lib.${system}.run {
           src = self;
           hooks = {
@@ -50,6 +50,14 @@
             lux-lua53
             lux-lua54
             lux-luajit
+            # Docker images
+            lux-cli-docker
+            lux-lua-docker
+            lux-lua51-docker
+            lux-lua52-docker
+            lux-lua53-docker
+            lux-lua54-docker
+            lux-luajit-docker
             ;
         };
 
@@ -75,6 +83,8 @@
                   cmakeMinimal
                   zlib
                   gnum4
+                  # Docker build tools
+                  nix-prefetch-docker
                 ])
                 ++ self.checks.${system}.git-hooks-check.enabledPackages
                 ++ pkgs.lux-cli.buildInputs
@@ -102,7 +112,16 @@
         };
       };
       flake = {
-        overlays.default = with inputs; import ./nix/overlay.nix {inherit self crane;};
+        overlays = {
+          default = with inputs; import ./nix/overlay.nix {inherit self crane;};
+          docker = with inputs;
+            import ./nix/docker.nix {
+              inherit
+                self
+                ;
+              # date = builtins.substring 0 8 self.lastModifiedDate;
+            };
+        };
       };
     };
 }
