@@ -7,7 +7,9 @@ pub fn update_luarc() -> Result<(), ()> {
 
 fn generate_luarc() -> String {
     let mut content = String::new();
-    content.push_str("{}");
+    content.push_str("{");
+    content.push_str("\n    \"workspace.library\": []\n");
+    content.push_str("}");
     content
 }
 
@@ -17,6 +19,11 @@ mod test {
     #[test]
     fn test_generate_luarc() {
         let content = super::generate_luarc();
-        assert_eq!(content, "{}");
+        assert_eq!(
+            content,
+            r#"{
+    "workspace.library": []
+}"#
+        );
     }
 }
