@@ -46,10 +46,14 @@ fn find_dependency_folders() -> Vec<String> {
             let source_dir = entry.path().join("src");
             let a = std::fs::read_dir(&source_dir);
             // Check if the folder contains a /src directory
-            // if folder_name.starts_with("dependency_") {
             if a.is_ok() && a.unwrap().count() > 0 {
                 // Add the folder path to the list
-                let folder_path = source_dir.to_str().unwrap().to_string();
+                let folder_path = source_dir
+                    .strip_prefix(project.root())
+                    .expect("could not strip prefix")
+                    .to_str()
+                    .unwrap()
+                    .to_string();
                 directories.push(folder_path);
             }
         }
