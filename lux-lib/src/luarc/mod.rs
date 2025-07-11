@@ -23,7 +23,7 @@ pub fn update_luarc() -> Result<(), ()> {
     let project = Project::current_or_err().expect("failed to get current project");
     let luarc_path = project.luarc_path();
 
-    let luarc_content = fs::read_to_string(&luarc_path).expect("failed to read luarc file");
+    let luarc_content = fs::read_to_string(&luarc_path).unwrap_or_else(|_| String::from("{}"));
 
     let dependency_folders = find_dependency_folders();
     let file = generate_luarc(luarc_content.as_str(), dependency_folders);
