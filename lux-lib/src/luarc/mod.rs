@@ -62,17 +62,16 @@ fn find_dependency_folders() -> Vec<String> {
 }
 
 fn generate_luarc(prev_contents: &str, extra_paths: Vec<String>) -> String {
-    // 1. Parse what we already have, or fall back to an empty struct
     let mut luarc: LuaRC = serde_json::from_str(prev_contents).unwrap();
 
-    // 2. Push the new paths, avoiding duplicates
     for p in extra_paths {
         if !luarc.workspace.library.contains(&p) {
             luarc.workspace.library.push(p);
         }
     }
 
-    // 3. Serialise back, pretty-printed
+    luarc.workspace.library.sort();
+
     serde_json::to_string_pretty(&luarc).expect("failed to serialize luarc")
 }
 
@@ -111,19 +110,19 @@ mod test {
             r#"{
   "workspace": {
     "library": [
-      "123abc-my-dep-lib@1.0.0/src"
+      "2-preexisting-lib"
     ]
   }
 }"#,
-            vec![String::from("some-lib-A"), String::from("some-lib-B")],
+            vec![String::from("1-some-lib-A"), String::from("3-some-lib-B")],
         );
 
         let expected = r#"{
   "workspace": {
     "library": [
-      "123abc-my-dep-lib@1.0.0/src",
-      "some-lib-A",
-      "some-lib-B"
+      "1-some-lib-A",
+      "2-preexisting-lib",
+      "3-some-lib-B"
     ]
   }
 }"#;
