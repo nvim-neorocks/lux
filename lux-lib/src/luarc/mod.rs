@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, PartialEq, Debug)]
 #[serde(default)]
-struct Luarc {
+struct LuaRC {
     #[serde(flatten)] // <-- capture any unknown keys here
     other: BTreeMap<String, serde_json::Value>,
 
@@ -13,7 +13,7 @@ struct Luarc {
     workspace: Workspace,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, PartialEq, Debug)]
 struct Workspace {
     #[serde(default)]
     library: Vec<String>,
@@ -45,7 +45,6 @@ fn find_dependency_folders() -> Vec<String> {
         if entry.path().is_dir() {
             let source_dir = entry.path().join("src");
             let a = std::fs::read_dir(&source_dir);
-            // Check if the folder contains a /src directory
             if a.is_ok_and(|read_dir| read_dir.count() > 0) {
                 // Add the folder path to the list
                 let folder_path = source_dir
@@ -64,7 +63,7 @@ fn find_dependency_folders() -> Vec<String> {
 
 fn generate_luarc(prev_contents: &str, extra_paths: Vec<String>) -> String {
     // 1. Parse what we already have, or fall back to an empty struct
-    let mut luarc: Luarc = serde_json::from_str(prev_contents).unwrap_or_default();
+    let mut luarc: LuaRC = serde_json::from_str(prev_contents).unwrap();
 
     // 2. Push the new paths, avoiding duplicates
     for p in extra_paths {
@@ -80,27 +79,57 @@ fn generate_luarc(prev_contents: &str, extra_paths: Vec<String>) -> String {
 #[cfg(test)]
 mod test {
 
+    use super::*;
+
     #[test]
-    fn test_generate_luarc() {
+    fn test_generate_luarc_from_previous_file_content() {
         let content = super::generate_luarc(
             r#"
-        {
-  "any-other-field": true
-        }
+        {"any-other-field": true}
         "#,
-            vec![String::from("hola"), String::from("mundo")],
+            vec![String::from("some-lib-A"), String::from("some-lib-B")],
         );
-        assert_eq!(
-            content,
-            r#"{
+        let expected = r#"{
   "any-other-field": true,
   "workspace": {
     "library": [
-      "hola",
-      "mundo"
+      "some-lib-A",
+      "some-lib-B"
     ]
   }
-}"#
+}"#;
+
+        assert_eq!(
+            serde_json::from_str::<LuaRC>(content.as_str()).unwrap(),
+            serde_json::from_str::<LuaRC>(expected.into()).unwrap(),
+        );
+    }
+
+    #[test]
+    fn test_generate_luarc_with_previous_libraries() {
+        let content = super::generate_luarc(
+            r#"{
+  "workspace": {
+    "library": [
+      "123abc-my-dep-lib@1.0.0/src"
+    ]
+  }
+}"#,
+            vec![String::from("some-lib-A"), String::from("some-lib-B")],
+        );
+
+        let expected = r#"{
+  "workspace": {
+    "library": [
+      "123abc-my-dep-lib@1.0.0/src",
+      "some-lib-A",
+      "some-lib-B"
+    ]
+  }
+}"#;
+        assert_eq!(
+            serde_json::from_str::<LuaRC>(content.as_str()).unwrap(),
+            serde_json::from_str::<LuaRC>(expected.into()).unwrap(),
         );
     }
 }
