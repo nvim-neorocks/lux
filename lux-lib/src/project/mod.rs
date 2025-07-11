@@ -4,7 +4,6 @@ use mlua::{ExternalResult, UserData};
 use path_slash::PathBufExt;
 use project_toml::{
     LocalProjectTomlValidationError, PartialProjectToml, RemoteProjectTomlValidationError,
-    PROJECT_LUARC,
 };
 use std::{
     io,
@@ -44,6 +43,7 @@ pub mod project_toml;
 pub use project_toml::PROJECT_TOML;
 
 pub const EXTRA_ROCKSPEC: &str = "extra.rockspec";
+pub const LUARC: &str = ".luarc.json";
 
 #[derive(Error, Debug)]
 #[error(transparent)]
@@ -319,7 +319,7 @@ impl Project {
 
     /// Get the `luarc.json` path.
     pub fn luarc_path(&self) -> PathBuf {
-        self.root.join(PROJECT_LUARC)
+        self.root.join(LUARC)
     }
 
     /// Get the `extra.rockspec` path.
