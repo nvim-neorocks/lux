@@ -4,6 +4,7 @@ use mlua::{ExternalResult, UserData};
 use path_slash::PathBufExt;
 use project_toml::{
     LocalProjectTomlValidationError, PartialProjectToml, RemoteProjectTomlValidationError,
+    PROJECT_LUARC,
 };
 use std::{
     io,
@@ -152,6 +153,7 @@ pub struct Project {
 impl UserData for Project {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("toml_path", |_, this, ()| Ok(this.toml_path()));
+        methods.add_method("luarc_path", |_, this, ()| Ok(this.luarc_path()));
         methods.add_method("extra_rockspec_path", |_, this, ()| {
             Ok(this.extra_rockspec_path())
         });
@@ -313,6 +315,11 @@ impl Project {
     /// Get the `lux.toml` path.
     pub fn toml_path(&self) -> PathBuf {
         self.root.join(PROJECT_TOML)
+    }
+
+    /// Get the `luarc.json` path.
+    pub fn luarc_path(&self) -> PathBuf {
+        self.root.join(PROJECT_LUARC)
     }
 
     /// Get the `extra.rockspec` path.

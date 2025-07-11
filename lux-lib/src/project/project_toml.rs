@@ -49,6 +49,7 @@ use super::r#gen::PackageVersionTemplate;
 use super::ProjectRoot;
 
 pub const PROJECT_TOML: &str = "lux.toml";
+pub const PROJECT_LUARC: &str = ".luarc.json";
 
 #[derive(Deserialize)]
 #[serde(untagged)]
