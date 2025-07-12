@@ -8,6 +8,7 @@ use std::io;
 use std::io::Cursor;
 use std::io::Read;
 use std::path::Path;
+use std::path::PathBuf;
 use thiserror::Error;
 
 use crate::build::utils::recursive_copy_dir;
@@ -45,6 +46,12 @@ pub struct FetchSrc<'a, R: Rockspec> {
 pub(crate) struct RemotePackageSourceMetadata {
     pub hash: Integrity,
     pub source_url: RemotePackageSourceUrl,
+}
+
+impl RemotePackageSourceMetadata {
+    pub(crate) fn archive_name(&self) -> Option<PathBuf> {
+        self.source_url.archive_name()
+    }
 }
 
 impl<R: Rockspec, State> FetchSrcBuilder<'_, R, State>
