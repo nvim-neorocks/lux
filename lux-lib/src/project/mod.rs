@@ -43,6 +43,7 @@ pub mod project_toml;
 pub use project_toml::PROJECT_TOML;
 
 pub const EXTRA_ROCKSPEC: &str = "extra.rockspec";
+pub const LUARC: &str = ".luarc.json";
 
 #[derive(Error, Debug)]
 #[error(transparent)]
@@ -152,6 +153,7 @@ pub struct Project {
 impl UserData for Project {
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("toml_path", |_, this, ()| Ok(this.toml_path()));
+        methods.add_method("luarc_path", |_, this, ()| Ok(this.luarc_path()));
         methods.add_method("extra_rockspec_path", |_, this, ()| {
             Ok(this.extra_rockspec_path())
         });
@@ -313,6 +315,11 @@ impl Project {
     /// Get the `lux.toml` path.
     pub fn toml_path(&self) -> PathBuf {
         self.root.join(PROJECT_TOML)
+    }
+
+    /// Get the `luarc.json` path.
+    pub fn luarc_path(&self) -> PathBuf {
+        self.root.join(LUARC)
     }
 
     /// Get the `extra.rockspec` path.
