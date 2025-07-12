@@ -6,6 +6,22 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.8.3](https://github.com/nvim-neorocks/lux/compare/v0.8.2...v0.8.3) - 2025-07-12
+
+### Other
+- *(deps)* bump toml from 0.8.22 to 0.9.0 ([#846](https://github.com/nvim-neorocks/lux/pull/846))
+
+## `lux-lib` - [0.12.1](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.12.0...lux-lib-v0.12.1) - 2025-07-12
+
+### Fixed
+- *(build)* relax `source.dir` inferring logic ([#859](https://github.com/nvim-neorocks/lux/pull/859))
+- *(config)* TOML configs overridden by defaults ([#858](https://github.com/nvim-neorocks/lux/pull/858))
+
+### Other
+- *(deps)* bump zip from 4.2.0 to 4.3.0 ([#850](https://github.com/nvim-neorocks/lux/pull/850))
+- *(deps)* bump toml_edit from 0.22.26 to 0.23.0 ([#847](https://github.com/nvim-neorocks/lux/pull/847))
+- *(deps)* bump toml from 0.8.22 to 0.9.0 ([#846](https://github.com/nvim-neorocks/lux/pull/846))
+
 ## `lux-cli` - [0.8.2](https://github.com/nvim-neorocks/lux/compare/v0.8.1...v0.8.2) - 2025-07-08
 
 ### Added
