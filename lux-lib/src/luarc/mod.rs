@@ -24,7 +24,6 @@ struct Workspace {
     library: Vec<String>,
 }
 
-// TODO: improve error handling
 pub fn update_luarc(config: &Config) -> Result<(), ()> {
     if !config.generate_luarc() {
         return Ok(());
@@ -101,15 +100,13 @@ fn generate_luarc(prev_contents: &str, extra_paths: Vec<PathBuf>) -> String {
     for p in extra_paths {
         let path = p.clone().into_os_string().into_string();
         if let Ok(path_str) = path {
-            if !luarc.workspace.library.contains(&path_str) {
-                luarc.workspace.library.push(path_str);
-            }
+            luarc.workspace.library.push(path_str);
         }
     }
 
     luarc.workspace.library.sort();
 
-    serde_json::to_string_pretty(&luarc).expect("failed to serialize luarc")
+    serde_json::to_string_pretty(&luarc).expect("failed to serialize .luarc.json")
 }
 
 #[cfg(test)]
