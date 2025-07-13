@@ -98,55 +98,66 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_generate_luarc_from_previous_file_content() {
-        let content = super::generate_luarc(
-            r#"
-        {"any-other-field": true}
-        "#,
-            vec!["some-lib-A".into(), "some-lib-B".into()],
-        );
-        let expected = r#"{
-  "any-other-field": true,
-  "workspace": {
-    "library": [
-      "some-lib-A",
-      "some-lib-B"
-    ]
-  }
-}"#;
+    fn test_generate_luarc_with_previous_libraries_parametrized() {
+        let cases = vec![
+            (
+                "Preexisting lib in the middle", // 📝 Description
+                r#"{
+                    "workspace": {
+                        "library": ["2-preexisting-lib"]
+                    }
+                }"#,
+                vec!["1-some-lib-A".into(), "3-some-lib-B".into()],
+                r#"{
+                    "workspace": {
+                        "library": ["1-some-lib-A", "2-preexisting-lib", "3-some-lib-B"]
+                    }
+                }"#,
+            ),
+            (
+                "Empty existing libraries, adding single lib", // 📝 Description
+                r#"{
+                    "workspace": {
+                        "library": []
+                    }
+                }"#,
+                vec!["my-lib".into()],
+                r#"{
+                    "workspace": {
+                        "library": ["my-lib"]
+                    }
+                }"#,
+            ),
+            (
+                "Other fields present, adding libs", // 📝 Description
+                r#"{
+                    "any-other-field": true,
+                    "workspace": {
+                        "library": []
+                    }
+                }"#,
+                vec!["lib-A".into(), "lib-B".into()],
+                r#"{
+                    "any-other-field": true,
+                    "workspace": {
+                        "library": ["lib-A", "lib-B"]
+                    }
+                }"#,
+            ),
+        ];
 
-        assert_eq!(
-            serde_json::from_str::<LuaRC>(content.as_str()).unwrap(),
-            serde_json::from_str::<LuaRC>(expected.into()).unwrap(),
-        );
-    }
+        for (description, initial, new_libs, expected) in cases {
+            let content = super::generate_luarc(initial, new_libs.clone());
 
-    #[test]
-    fn test_generate_luarc_with_previous_libraries() {
-        let content = super::generate_luarc(
-            r#"{
-  "workspace": {
-    "library": [
-      "2-preexisting-lib"
-    ]
-  }
-}"#,
-            vec!["1-some-lib-A".into(), "3-some-lib-B".into()],
-        );
-
-        let expected = r#"{
-  "workspace": {
-    "library": [
-      "1-some-lib-A",
-      "2-preexisting-lib",
-      "3-some-lib-B"
-    ]
-  }
-}"#;
-        assert_eq!(
-            serde_json::from_str::<LuaRC>(content.as_str()).unwrap(),
-            serde_json::from_str::<LuaRC>(expected.into()).unwrap(),
-        );
+            assert_eq!(
+                serde_json::from_str::<LuaRC>(&content).unwrap(),
+                serde_json::from_str::<LuaRC>(expected).unwrap(),
+                "Case failed: {}\nInitial input:\n{}\nNew libs: {:?}",
+                description,
+                initial,
+                &new_libs
+            );
+        }
     }
 
     #[test]
