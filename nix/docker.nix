@@ -1,6 +1,16 @@
 args @ {self, ...}: final: prev: let
   pkgs = final;
   lib = final.lib;
+  lux-deps = with pkgs; [
+    gcc
+    bash
+    pkg-config
+    libxcrypt
+    cmakeMinimal
+    zlib
+    gnum4
+    gnumake
+  ];
   lux-cli-docker = with pkgs;
     dockerTools.buildImage {
       name = "lux";
@@ -14,7 +24,7 @@ args @ {self, ...}: final: prev: let
       };
       copyToRoot = buildEnv {
         name = "lux-cli-root";
-        paths = [lux-cli bash pkg-config];
+        paths = [lux-cli] ++ lux-deps;
         pathsToLink = ["/bin" "/lib" "/nix" "/nix/store" "/usr/bin" "/usr/lib"];
       };
       config = {
@@ -46,7 +56,7 @@ args @ {self, ...}: final: prev: let
         tag = luaVersion + (lux_pkg.version or lux-cli.version); # 5.1-1.2.3 for versioned builds, 1.2.3 for full builds
         copyToRoot = buildEnv {
           name = "${lux_pkg.pname}-root";
-          paths = [lux-cli lux_pkg lua_pkg];
+          paths = [lux-cli lux_pkg lua_pkg] ++ lux-deps;
           pathsToLink = ["/bin" "/lib" "/nix" "/nix/store" "/usr/bin" "/usr/lib"];
         };
         config = {
