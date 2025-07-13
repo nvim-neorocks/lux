@@ -2,7 +2,6 @@ use eyre::{OptionExt, Result};
 use itertools::{Either, Itertools};
 use lux_lib::{
     config::Config,
-    luarc::update_luarc,
     progress::{MultiProgress, Progress, ProgressBar},
     project::Project,
     remote_package_db::RemotePackageDB,
@@ -96,7 +95,6 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
         sync_test_dependencies_if_locked(&project, progress.clone(), &config).await?;
     }
 
-    let _ = update_luarc();
     Ok(())
 }
 
