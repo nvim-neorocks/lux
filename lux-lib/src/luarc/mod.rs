@@ -1,3 +1,6 @@
+use crate::lockfile::LocalPackageLockType;
+use crate::lockfile::ProjectLockfile;
+use crate::lockfile::ReadOnly;
 use crate::project::Project;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -25,7 +28,8 @@ pub fn update_luarc() -> Result<(), ()> {
 
     let luarc_content = fs::read_to_string(&luarc_path).unwrap_or_else(|_| String::from("{}"));
 
-    let dependency_folders = find_dependency_folders();
+    let dependency_folders =
+        find_dependency_folders(&project.lockfile().expect("should have a lockfile"));
     let file = generate_luarc(luarc_content.as_str(), dependency_folders);
 
     std::fs::write(&luarc_path, file)
@@ -33,32 +37,15 @@ pub fn update_luarc() -> Result<(), ()> {
     Ok(())
 }
 
-fn find_dependency_folders() -> Vec<String> {
-    let project = Project::current_or_err().expect("failed to get current project");
-    // TODO: use version to find the correct folder
-    // dependency dirs look like ./lux/<lua_version>/<dependency_hash_name_and_version>/src
-    let base_folder = project.root().as_path().join(".lux/5.1/");
-    let mut directories = Vec::new();
+fn find_dependency_folders(lockfile: &ProjectLockfile<ReadOnly>) -> Vec<String> {
+    let rocks = lockfile
+        .local_pkg_lock(&LocalPackageLockType::Regular)
+        .rocks();
 
-    for entry in std::fs::read_dir(&base_folder).expect("failed to read lux directory") {
-        let entry = entry.expect("failed to read entry");
-        if entry.path().is_dir() {
-            let source_dir = entry.path().join("src");
-            let a = std::fs::read_dir(&source_dir);
-            if a.is_ok_and(|read_dir| read_dir.count() > 0) {
-                // Add the folder path to the list
-                let folder_path = source_dir
-                    .strip_prefix(project.root())
-                    .expect("could not strip prefix")
-                    .to_str()
-                    .unwrap()
-                    .to_string();
-                directories.push(folder_path);
-            }
-        }
-    }
-
-    directories
+    rocks
+        .iter()
+        .map(|t| format!(".lux/5.1/{}-{}@{}/src", t.0, t.1.name(), t.1.version()))
+        .collect()
 }
 
 fn generate_luarc(prev_contents: &str, extra_paths: Vec<String>) -> String {
@@ -130,5 +117,17 @@ mod test {
             serde_json::from_str::<LuaRC>(content.as_str()).unwrap(),
             serde_json::from_str::<LuaRC>(expected.into()).unwrap(),
         );
+    }
+
+    #[test]
+    fn test_find_deps() {
+        let lockfile_path = std::env::current_dir()
+            .unwrap()
+            .join("resources/test/lux.lock");
+        let result = find_dependency_folders(&ProjectLockfile::new(lockfile_path).unwrap());
+
+        result.iter().for_each(|name| {
+            println!("Found dependency folder: {}", name);
+        });
     }
 }
