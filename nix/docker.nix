@@ -14,11 +14,14 @@ args @ {self, ...}: final: prev: let
       };
       copyToRoot = buildEnv {
         name = "lux-cli-root";
-        paths = [lux-cli bash];
-        pathsToLink = ["/bin"];
+        paths = [lux-cli bash pkg-config];
+        pathsToLink = ["/bin" "/lib" "/nix" "/nix/store" "/usr/bin" "/usr/lib"];
       };
       config = {
         Cmd = ["lx"];
+        Env = [
+          "PKG_CONFIG_PATH=/lib/pkgconfig"
+        ];
       };
       #   created = builtins.substring 0 8 self.lastModifiedDate;
     };
@@ -44,13 +47,16 @@ args @ {self, ...}: final: prev: let
         copyToRoot = buildEnv {
           name = "${lux_pkg.pname}-root";
           paths = [lux-cli lux_pkg lua_pkg];
-          pathsToLink = ["/bin" "/lib" "/nix" "/nix/store"];
+          pathsToLink = ["/bin" "/lib" "/nix" "/nix/store" "/usr/bin" "/usr/lib"];
         };
         config = {
           Cmd = ["lx" "run"];
           # docker run -v /path/to/project:/data --rm lux:5.1-1.2.3 run
           WorkingDir = "/data";
           Volumes = {"/data" = {};};
+          Env = [
+            "PKG_CONFIG_PATH=/lib/pkgconfig"
+          ];
         };
         # created = date;
       };
