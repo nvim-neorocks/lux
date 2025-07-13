@@ -24,7 +24,11 @@ struct Workspace {
     library: Vec<String>,
 }
 
+// TODO: improve error handling
 pub fn update_luarc(config: &Config) -> Result<(), ()> {
+    if !config.generate_luarc() {
+        return Ok(());
+    }
     let project = Project::current_or_err().expect("failed to get current project");
     let tree = project.tree(&config).expect("failed to get project tree");
     let luarc_path = project.luarc_path();
@@ -41,7 +45,10 @@ pub fn update_luarc(config: &Config) -> Result<(), ()> {
     Ok(())
 }
 
-fn find_dependency_dirs(lockfile: &ProjectLockfile<ReadOnly>, lux_tree_base_dir: PathBuf) -> Vec<PathBuf> {
+fn find_dependency_dirs(
+    lockfile: &ProjectLockfile<ReadOnly>,
+    lux_tree_base_dir: PathBuf,
+) -> Vec<PathBuf> {
     let rocks = lockfile
         .local_pkg_lock(&LocalPackageLockType::Regular)
         .rocks();
