@@ -193,6 +193,7 @@ pub struct Config {
 
     cache_dir: PathBuf,
     data_dir: PathBuf,
+    generate_luarc: bool,
 }
 
 impl Config {
@@ -311,6 +312,10 @@ impl Config {
     pub fn data_dir(&self) -> &PathBuf {
         &self.data_dir
     }
+
+    pub fn generate_luarc(&self) -> bool {
+        self.generate_luarc
+    }
 }
 
 impl HasVariables for Config {
@@ -365,6 +370,7 @@ pub struct ConfigBuilder {
     /// Does not affect existing install trees.
     #[serde(default)]
     entrypoint_layout: RockLayoutConfig,
+    generate_luarc: Option<bool>,
 }
 
 /// A builder for the lux `Config`.
@@ -492,6 +498,13 @@ impl ConfigBuilder {
         }
     }
 
+    pub fn generate_luarc(self, generate: Option<bool>) -> Self {
+        Self {
+            generate_luarc: generate.or(self.generate_luarc),
+            ..self
+        }
+    }
+
     pub fn build(self) -> Result<Config, ConfigError> {
         let data_dir = self.data_dir.unwrap_or(Config::get_default_data_path()?);
         let cache_dir = self.cache_dir.unwrap_or(Config::get_default_cache_path()?);
@@ -522,6 +535,7 @@ impl ConfigBuilder {
             entrypoint_layout: self.entrypoint_layout,
             cache_dir,
             data_dir,
+            generate_luarc: self.generate_luarc.unwrap_or(true),
         })
     }
 }
@@ -546,6 +560,7 @@ impl From<Config> for ConfigBuilder {
             data_dir: Some(value.data_dir),
             external_deps: value.external_deps,
             entrypoint_layout: value.entrypoint_layout,
+            generate_luarc: Some(value.generate_luarc),
         }
     }
 }
@@ -721,6 +736,9 @@ impl UserData for ConfigBuilder {
                     .entrypoint_layout(entrypoint_layout.unwrap_or_default()))
             },
         );
+        methods.add_method("generate_luarc", |_, this, generate: Option<bool>| {
+            Ok(this.clone().generate_luarc(generate))
+        });
         methods.add_method("build", |_, this, ()| this.clone().build().into_lua_err());
     }
 }
