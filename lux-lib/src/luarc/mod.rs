@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::lockfile::LocalPackageLockType;
 use crate::lockfile::ProjectLockfile;
 use crate::lockfile::ReadOnly;
@@ -23,36 +24,31 @@ struct Workspace {
     library: Vec<String>,
 }
 
-pub fn update_luarc() -> Result<(), ()> {
+pub fn update_luarc(config: &Config) -> Result<(), ()> {
     let project = Project::current_or_err().expect("failed to get current project");
+    let tree = project.tree(&config).expect("failed to get project tree");
     let luarc_path = project.luarc_path();
 
     let luarc_content = fs::read_to_string(&luarc_path).unwrap_or_else(|_| String::from("{}"));
+    let lockfile = project.lockfile().expect("should have a lockfile");
 
-    let dependency_dirs =
-        find_dependency_dirs(&project.lockfile().expect("should have a lockfile"));
+    let dependency_dirs = find_dependency_dirs(&lockfile, tree.root());
     let file = generate_luarc(luarc_content.as_str(), dependency_dirs);
 
-    std::fs::write(&luarc_path, file)
+    fs::write(&luarc_path, file)
         .expect(format!("failed to write {} file", luarc_path.display()).as_str());
+
     Ok(())
 }
 
-fn find_dependency_dirs(lockfile: &ProjectLockfile<ReadOnly>) -> Vec<PathBuf> {
+fn find_dependency_dirs(lockfile: &ProjectLockfile<ReadOnly>, lux_tree_base_dir: PathBuf) -> Vec<PathBuf> {
     let rocks = lockfile
         .local_pkg_lock(&LocalPackageLockType::Regular)
         .rocks();
 
     let directories: Vec<PathBuf> = rocks
         .iter()
-        .map(|t| {
-            PathBuf::from(format!(
-                ".lux/5.1/{}-{}@{}/src",
-                t.0,
-                t.1.name(),
-                t.1.version()
-            ))
-        })
+        .map(|t| lux_tree_base_dir.join(format!("/{}-{}@{}/src", t.0, t.1.name(), t.1.version())))
         .collect();
 
     let test_rocks = lockfile.local_pkg_lock(&LocalPackageLockType::Test).rocks();
@@ -60,8 +56,8 @@ fn find_dependency_dirs(lockfile: &ProjectLockfile<ReadOnly>) -> Vec<PathBuf> {
     let test_directories: Vec<PathBuf> = test_rocks
         .iter()
         .map(|t| {
-            PathBuf::from(format!(
-                ".lux/5.1/test-dependencies/{}-{}@{}/src",
+            lux_tree_base_dir.join(format!(
+                "/test-dependencies/{}-{}@{}/src",
                 t.0,
                 t.1.name(),
                 t.1.version()
@@ -165,7 +161,10 @@ mod test {
         let lockfile_path = std::env::current_dir()
             .unwrap()
             .join("resources/test/lux.lock");
-        let result = find_dependency_dirs(&ProjectLockfile::new(lockfile_path).unwrap());
+        let result = find_dependency_dirs(
+            &ProjectLockfile::new(lockfile_path).unwrap(),
+            "resources/test".into(),
+        );
 
         result.iter().for_each(|name| {
             println!("Found dependency folder: {}", name.display());
