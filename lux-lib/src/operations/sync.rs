@@ -282,7 +282,7 @@ async fn do_sync(
         project_lockfile.sync(dest_lockfile.local_pkg_lock(), lock_type);
     }
 
-    let _ = luarc::update_luarc();
+    let _ = luarc::update_luarc(args.config);
 
     Ok(report)
 }
