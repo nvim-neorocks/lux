@@ -31,7 +31,7 @@ pub(crate) struct RockSourceTemplate {
 
     /// File name of the source archive.
     /// Can be omitted if it can be inferred from the generated URL.
-    file: Option<String>,
+    file: Option<PathBuf>,
 
     /// Name of the directory created when the source archive is unpacked.
     /// Can be omitted if it can be inferred from the `file` field.

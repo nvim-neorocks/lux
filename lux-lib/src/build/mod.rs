@@ -342,7 +342,7 @@ where
 
     let hashes = LocalPackageHashes {
         rockspec: rockspec.hash()?,
-        source: source_metadata.hash,
+        source: source_metadata.hash.clone(),
     };
 
     let mut package = LocalPackage::from(
@@ -358,7 +358,7 @@ where
                     .map(RemotePackageSource::RockspecContent)
             })
             .unwrap_or(RemotePackageSource::Local),
-        Some(source_metadata.source_url),
+        Some(source_metadata.source_url.clone()),
         hashes,
     );
     package.spec.pinned = build.pin;
@@ -378,21 +378,29 @@ where
             let build_dir = match &rock_source.unpack_dir {
                 Some(unpack_dir) => temp_dir.path().join(unpack_dir),
                 None => {
-                    // Some older rockspecs don't specify a source.dir.
-                    // If there exists a single directory and a rockspec
-                    // after unpacking, we assume it's the source directory.
+                    // Some older/off-spec rockspecs don't specify a source.dir.
+                    // If there exists a single directory with the archive name
+                    // after unpacking an archive, we assume it's the source directory.
                     let dir_entries = std::fs::read_dir(temp_dir.path())?
                         .filter_map(Result::ok)
                         .filter(|f| f.path().is_dir())
                         .collect_vec();
-                    let rockspec_entries = std::fs::read_dir(temp_dir.path())?
-                        .filter_map(Result::ok)
-                        .filter(|f| {
-                            let path = f.path();
-                            path.is_file() && path.extension().is_some_and(|ext| ext == "rockspec")
+                    let archive_name = rock_source
+                        .archive_name
+                        .clone()
+                        .or(source_metadata.archive_name());
+                    if dir_entries.len() == 1
+                        && archive_name.is_some_and(|archive_name| {
+                            archive_name.to_string_lossy().starts_with(
+                                &dir_entries
+                                    .first()
+                                    .unwrap()
+                                    .file_name()
+                                    .to_string_lossy()
+                                    .to_string(),
+                            )
                         })
-                        .collect_vec();
-                    if dir_entries.len() == 1 && rockspec_entries.len() == 1 {
+                    {
                         temp_dir.path().join(dir_entries.first().unwrap().path())
                     } else {
                         temp_dir.path().into()

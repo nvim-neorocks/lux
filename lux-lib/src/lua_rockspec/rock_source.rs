@@ -1,5 +1,6 @@
 use git_url_parse::{GitUrl, GitUrlParseError};
 use mlua::{FromLua, IntoLua, Lua, UserData, Value};
+use path_slash::PathBufExt;
 use reqwest::Url;
 use serde::{de, Deserialize, Deserializer};
 use std::{convert::Infallible, fs, io, ops::Deref, path::PathBuf, str::FromStr};
@@ -14,7 +15,7 @@ use super::{
 
 #[derive(Default, Deserialize, Clone, Debug, PartialEq)]
 pub struct LocalRockSource {
-    pub archive_name: Option<String>,
+    pub archive_name: Option<PathBuf>,
     pub unpack_dir: Option<PathBuf>,
 }
 
@@ -196,7 +197,7 @@ impl DisplayAsLuaKV for RockSourceSpec {
 pub(crate) struct RockSourceInternal {
     #[serde(default)]
     pub(crate) url: Option<String>,
-    pub(crate) file: Option<String>,
+    pub(crate) file: Option<PathBuf>,
     pub(crate) dir: Option<PathBuf>,
     pub(crate) tag: Option<String>,
     pub(crate) branch: Option<String>,
@@ -235,13 +236,13 @@ impl DisplayAsLuaKV for RockSourceInternal {
         if let Some(file) = &self.file {
             result.push(DisplayLuaKV {
                 key: "file".to_string(),
-                value: DisplayLuaValue::String(file.clone()),
+                value: DisplayLuaValue::String(file.to_slash_lossy().to_string()),
             });
         }
         if let Some(dir) = &self.dir {
             result.push(DisplayLuaKV {
                 key: "dir".to_string(),
-                value: DisplayLuaValue::String(dir.to_string_lossy().to_string()),
+                value: DisplayLuaValue::String(dir.to_slash_lossy().to_string()),
             });
         }
         if let Some(tag) = &self.tag {
