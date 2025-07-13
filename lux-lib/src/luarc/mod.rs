@@ -42,10 +42,29 @@ fn find_dependency_folders(lockfile: &ProjectLockfile<ReadOnly>) -> Vec<String> 
         .local_pkg_lock(&LocalPackageLockType::Regular)
         .rocks();
 
-    rocks
+    let directories: Vec<String> = rocks
         .iter()
         .map(|t| format!(".lux/5.1/{}-{}@{}/src", t.0, t.1.name(), t.1.version()))
-        .collect()
+        .collect();
+
+    let test_rocks = lockfile.local_pkg_lock(&LocalPackageLockType::Test).rocks();
+
+    let test_directories = test_rocks
+        .iter()
+        .map(|t| {
+            format!(
+                ".lux/5.1/test-dependencies/{}-{}@{}/src",
+                t.0,
+                t.1.name(),
+                t.1.version()
+            )
+        })
+        .collect::<Vec<String>>();
+
+    return directories
+        .into_iter()
+        .chain(test_directories.into_iter())
+        .collect();
 }
 
 fn generate_luarc(prev_contents: &str, extra_paths: Vec<String>) -> String {
