@@ -94,7 +94,8 @@ pub struct Cli {
     #[arg(long, value_name = "namespace")]
     pub namespace: Option<String>,
 
-    /// Specify the luarocks server namespace to use.
+    /// Specify the directory in which to install Lua{n}
+    /// if not found.
     #[arg(long, value_name = "prefix")]
     pub lua_dir: Option<PathBuf>,
 
