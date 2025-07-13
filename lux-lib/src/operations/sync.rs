@@ -4,6 +4,7 @@ use crate::{
     build::BuildBehaviour,
     config::Config,
     lockfile::{LocalPackage, LocalPackageLockType, LockfileIntegrityError},
+    luarc,
     luarocks::luarocks_installation::LUAROCKS_VERSION,
     package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress},
@@ -280,6 +281,8 @@ async fn do_sync(
         let dest_lockfile = tree.lockfile()?;
         project_lockfile.sync(dest_lockfile.local_pkg_lock(), lock_type);
     }
+
+    let _ = luarc::update_luarc();
 
     Ok(report)
 }
