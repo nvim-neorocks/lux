@@ -1,5 +1,6 @@
 use std::ops::Deref;
 
+use bon::Builder;
 use itertools::Itertools;
 use nonempty::NonEmpty;
 use serde::Deserialize;
@@ -72,8 +73,50 @@ pub enum RunError {
     NoRunField,
 }
 
+#[derive(Builder)]
+#[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
+pub struct Run<'a> {
+    project: &'a Project,
+    args: &'a [String],
+    config: &'a Config,
+    disable_loader: Option<bool>,
+}
+
+impl<State> RunBuilder<'_, State>
+where
+    State: run_builder::State + run_builder::IsComplete,
+{
+    pub async fn run(self) -> Result<(), RunError> {
+        let run = self._build();
+        let project = run.project;
+        let config = run.config;
+        let extra_args = run.args;
+        let toml = project.toml().into_local()?;
+
+        let run_spec = toml
+            .run()
+            .ok_or(RunError::NoRunField)?
+            .current_platform()
+            .clone();
+
+        let mut args = run_spec.args.unwrap_or_default();
+
+        if !extra_args.is_empty() {
+            args.extend(extra_args.iter().cloned());
+        }
+        let disable_loader = run.disable_loader.unwrap_or(false);
+        match &run_spec.command {
+            Some(command) => {
+                run_with_command(project, command, disable_loader, &args, config).await
+            }
+            None => run_with_local_lua(project, disable_loader, &args, config).await,
+        }
+    }
+}
+
 async fn run_with_local_lua(
     project: &Project,
+    disable_loader: bool,
     args: &NonEmpty<String>,
     config: &Config,
 ) -> Result<(), RunError> {
@@ -87,6 +130,7 @@ async fn run_with_local_lua(
         .tree(&tree)
         .config(config)
         .lua_cmd(LuaBinary::new(version, config))
+        .disable_loader(disable_loader)
         .args(args)
         .run_lua()
         .await?;
@@ -97,16 +141,32 @@ async fn run_with_local_lua(
 async fn run_with_command(
     project: &Project,
     command: &RunCommand,
+    disable_loader: bool,
     args: &NonEmpty<String>,
     config: &Config,
 ) -> Result<(), RunError> {
     let tree = project.tree(config)?;
     let paths = Paths::new(&tree)?;
 
+    let lua_init = if disable_loader {
+        None
+    } else if tree.version().lux_lib_dir().is_none() {
+        eprintln!(
+            "⚠️ WARNING: lux-lua library not found.
+    Cannot use the `lux.loader`.
+    To suppress this warning, set the `--no-loader` option.
+                    "
+        );
+        None
+    } else {
+        Some(paths.init())
+    };
+
     match Command::new(command.deref())
         .args(args.into_iter().cloned().collect_vec())
         .current_dir(project.root().deref())
         .env("PATH", paths.path_prepended().joined())
+        .env("LUA_INIT", lua_init.unwrap_or_default())
         .env("LUA_PATH", paths.package_path().joined())
         .env("LUA_CPATH", paths.package_cpath().joined())
         .status()
@@ -119,30 +179,5 @@ async fn run_with_command(
             exit_code: code,
         }
         .into()),
-    }
-}
-
-pub async fn run(
-    project: &Project,
-    extra_args: &[String],
-    config: &Config,
-) -> Result<(), RunError> {
-    let toml = project.toml().into_local()?;
-
-    let run_spec = toml
-        .run()
-        .ok_or(RunError::NoRunField)?
-        .current_platform()
-        .clone();
-
-    let mut args = run_spec.args.unwrap_or_default();
-
-    if !extra_args.is_empty() {
-        args.extend(extra_args.iter().cloned());
-    }
-
-    match &run_spec.command {
-        Some(command) => run_with_command(project, command, &args, config).await,
-        None => run_with_local_lua(project, &args, config).await,
     }
 }

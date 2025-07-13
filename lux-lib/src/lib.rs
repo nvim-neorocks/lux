@@ -3,6 +3,7 @@ pub mod config;
 pub mod git;
 pub mod hash;
 pub mod lockfile;
+pub mod lua;
 pub mod lua_installation;
 pub mod lua_rockspec;
 pub mod luarocks;
@@ -18,7 +19,6 @@ pub mod tree;
 pub mod upload;
 pub mod which;
 
-pub(crate) mod lua;
 pub(crate) mod remote_package_source;
 pub(crate) mod variables;
 

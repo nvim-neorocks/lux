@@ -8,6 +8,7 @@ use std::io;
 use std::io::Cursor;
 use std::io::Read;
 use std::path::Path;
+use std::path::PathBuf;
 use thiserror::Error;
 
 use crate::build::utils::recursive_copy_dir;
@@ -38,24 +39,19 @@ pub struct FetchSrc<'a, R: Rockspec> {
     config: &'a Config,
     #[builder(start_fn)]
     progress: &'a Progress<ProgressBar>,
-    #[builder(field)]
     source_url: Option<RemotePackageSourceUrl>,
-}
-
-impl<R: Rockspec, State> FetchSrcBuilder<'_, R, State>
-where
-    State: fetch_src_builder::State,
-{
-    /// Override the source URL with one potentially from a lockfile
-    pub(crate) fn source_url(self, source_url: Option<RemotePackageSourceUrl>) -> Self {
-        Self { source_url, ..self }
-    }
 }
 
 #[derive(Debug)]
 pub(crate) struct RemotePackageSourceMetadata {
     pub hash: Integrity,
     pub source_url: RemotePackageSourceUrl,
+}
+
+impl RemotePackageSourceMetadata {
+    pub(crate) fn archive_name(&self) -> Option<PathBuf> {
+        self.source_url.archive_name()
+    }
 }
 
 impl<R: Rockspec, State> FetchSrcBuilder<'_, R, State>

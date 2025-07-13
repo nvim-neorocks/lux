@@ -366,6 +366,7 @@ pub struct ConfigBuilder {
     entrypoint_layout: RockLayoutConfig,
 }
 
+/// A builder for the lux `Config`.
 impl ConfigBuilder {
     /// Create a new `ConfigBuilder` from a config file by deserializing from a config file
     /// if present, or otherwise by instantiating the default config.
@@ -387,73 +388,100 @@ impl ConfigBuilder {
 
     pub fn dev(self, dev: Option<bool>) -> Self {
         Self {
-            enable_development_packages: dev,
+            enable_development_packages: dev.or(self.enable_development_packages),
             ..self
         }
     }
 
     pub fn server(self, server: Option<Url>) -> Self {
-        Self { server, ..self }
+        Self {
+            server: server.or(self.server),
+            ..self
+        }
     }
 
     pub fn extra_servers(self, extra_servers: Option<Vec<Url>>) -> Self {
         Self {
-            extra_servers,
+            extra_servers: extra_servers.or(self.extra_servers),
             ..self
         }
     }
 
     pub fn only_sources(self, sources: Option<String>) -> Self {
         Self {
-            only_sources: sources,
+            only_sources: sources.or(self.only_sources),
             ..self
         }
     }
 
     pub fn namespace(self, namespace: Option<String>) -> Self {
-        Self { namespace, ..self }
+        Self {
+            namespace: namespace.or(self.namespace),
+            ..self
+        }
     }
 
     pub fn lua_dir(self, lua_dir: Option<PathBuf>) -> Self {
-        Self { lua_dir, ..self }
+        Self {
+            lua_dir: lua_dir.or(self.lua_dir),
+            ..self
+        }
     }
 
     pub fn lua_version(self, lua_version: Option<LuaVersion>) -> Self {
         Self {
-            lua_version,
+            lua_version: lua_version.or(self.lua_version),
             ..self
         }
     }
 
     pub fn user_tree(self, tree: Option<PathBuf>) -> Self {
         Self {
-            user_tree: tree,
+            user_tree: tree.or(self.user_tree),
             ..self
         }
     }
 
     pub fn no_project(self, no_project: Option<bool>) -> Self {
-        Self { no_project, ..self }
+        Self {
+            no_project: no_project.or(self.no_project),
+            ..self
+        }
     }
 
     pub fn variables(self, variables: Option<HashMap<String, String>>) -> Self {
-        Self { variables, ..self }
+        Self {
+            variables: variables.or(self.variables),
+            ..self
+        }
     }
 
     pub fn verbose(self, verbose: Option<bool>) -> Self {
-        Self { verbose, ..self }
+        Self {
+            verbose: verbose.or(self.verbose),
+            ..self
+        }
     }
 
     pub fn timeout(self, timeout: Option<Duration>) -> Self {
-        Self { timeout, ..self }
+        Self {
+            timeout: timeout.or(self.timeout),
+            ..self
+        }
     }
 
     pub fn cache_dir(self, cache_dir: Option<PathBuf>) -> Self {
-        Self { cache_dir, ..self }
+        Self {
+            cache_dir: cache_dir.or(self.cache_dir),
+            ..self
+        }
     }
 
     pub fn data_dir(self, data_dir: Option<PathBuf>) -> Self {
-        Self { data_dir, ..self }
+        Self {
+            data_dir: data_dir.or(self.data_dir),
+            ..self
+        }
     }
 
     pub fn entrypoint_layout(self, rock_layout: RockLayoutConfig) -> Self {

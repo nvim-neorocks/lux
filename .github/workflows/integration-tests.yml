@@ -29,7 +29,7 @@ jobs:
         uses: rhysd/action-setup-vim@v1 # Used by the 'run' integration test
         with:
           neovim: true
-          version: v0.11.0
+          version: v0.11.2
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@main

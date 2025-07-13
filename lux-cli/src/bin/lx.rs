@@ -3,11 +3,11 @@ use std::time::Duration;
 use clap::Parser;
 use eyre::Result;
 use lux_cli::{
-    add, build, check, config,
+    add, build, check, completion, config,
     debug::Debug,
     doc, download, exec, fetch, format, generate_rockspec, info, install, install_lua,
     install_rockspec, list, outdated, pack, path, pin, project, purge, remove, run, run_lua,
-    search, test, uninstall, unpack, update,
+    search, shell, test, uninstall, unpack, update,
     upload::{self},
     which, Cli, Commands,
 };
@@ -48,6 +48,7 @@ async fn main() -> Result<()> {
     let config = config_builder.build()?;
 
     match cli.command {
+        Commands::Completion(completion_args) => completion::completion(completion_args).await?,
         Commands::Search(search_data) => search::search(search_data, config).await?,
         Commands::Download(download_data) => download::download(download_data, config).await?,
         Commands::Debug(debug) => match debug {
@@ -57,7 +58,9 @@ async fn main() -> Result<()> {
             Debug::Project(debug_project) => project::debug_project(debug_project)?,
         },
         Commands::New(project_data) => project::write_project_rockspec(project_data).await?,
-        Commands::Build(build_data) => build::build(build_data, config).await?,
+        Commands::Build(build_data) => {
+            build::build(build_data, config).await?;
+        }
         Commands::List(list_data) => list::list_installed(list_data, config)?,
         Commands::Lua(run_lua) => run_lua::run_lua(run_lua, config).await?,
         Commands::Install(install_data) => install::install(install_data, config).await?,
@@ -66,7 +69,7 @@ async fn main() -> Result<()> {
         }
         Commands::Outdated(outdated) => outdated::outdated(outdated, config).await?,
         Commands::InstallLua => install_lua::install_lua(config).await?,
-        Commands::Fmt => format::format()?,
+        Commands::Fmt(fmt_args) => format::format(fmt_args)?,
         Commands::Purge => purge::purge(config).await?,
         Commands::Remove(remove_args) => remove::remove(remove_args, config).await?,
         Commands::Exec(run_args) => exec::exec(run_args, config).await?,
@@ -89,6 +92,7 @@ async fn main() -> Result<()> {
         Commands::Which(which_args) => which::which(which_args, config)?,
         Commands::Run(run_args) => run::run(run_args, config).await?,
         Commands::GenerateRockspec(data) => generate_rockspec::generate_rockspec(data)?,
+        Commands::Shell(data) => shell::shell(data, config).await?,
     }
     Ok(())
 }

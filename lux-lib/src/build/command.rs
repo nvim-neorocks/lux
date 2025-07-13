@@ -9,11 +9,11 @@ use thiserror::Error;
 use tokio::process::Command;
 
 use crate::{
+    build::backend::{BuildBackend, BuildInfo, RunBuildArgs},
     config::Config,
     lua_installation::LuaInstallation,
-    lua_rockspec::{Build, BuildInfo, CommandBuildSpec},
-    progress::{Progress, ProgressBar},
-    tree::{RockLayout, Tree},
+    lua_rockspec::CommandBuildSpec,
+    tree::RockLayout,
     variables::VariableSubstitutionError,
 };
 
@@ -42,34 +42,23 @@ pub enum CommandError {
     VariableSubstitutionError(#[from] VariableSubstitutionError),
 }
 
-impl Build for CommandBuildSpec {
+impl BuildBackend for CommandBuildSpec {
     type Err = CommandError;
 
-    async fn run(
-        self,
-        output_paths: &RockLayout,
-        no_install: bool,
-        lua: &LuaInstallation,
-        external_dependencies: &HashMap<String, ExternalDependencyInfo>,
-        config: &Config,
-        _tree: &Tree,
-        build_dir: &Path,
-        progress: &Progress<ProgressBar>,
-    ) -> Result<BuildInfo, Self::Err> {
+    async fn run(self, args: RunBuildArgs<'_>) -> Result<BuildInfo, Self::Err> {
+        let output_paths = args.output_paths;
+        let no_install = args.no_install;
+        let lua = args.lua;
+        let external_dependencies = args.external_dependencies;
+        let config = args.config;
+        let build_dir = args.build_dir;
+        let progress = args.progress;
+
         progress.map(|bar| bar.set_message("Running build_command..."));
-        run_command(
-            &self.build_command,
-            output_paths,
-            lua,
-            external_dependencies,
-            config,
-            build_dir,
-        )
-        .await?;
-        if !no_install {
-            progress.map(|bar| bar.set_message("Running install_command..."));
+        if let Some(build_command) = &self.build_command {
+            progress.map(|bar| bar.set_message("Running build_command..."));
             run_command(
-                &self.install_command,
+                build_command,
                 output_paths,
                 lua,
                 external_dependencies,
@@ -77,6 +66,20 @@ impl Build for CommandBuildSpec {
                 build_dir,
             )
             .await?;
+        }
+        if !no_install {
+            if let Some(install_command) = &self.install_command {
+                progress.map(|bar| bar.set_message("Running install_command..."));
+                run_command(
+                    install_command,
+                    output_paths,
+                    lua,
+                    external_dependencies,
+                    config,
+                    build_dir,
+                )
+                .await?;
+            }
         }
         Ok(BuildInfo::default())
     }

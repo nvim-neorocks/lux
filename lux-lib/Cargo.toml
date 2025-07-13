@@ -1,7 +1,7 @@
 [package]
 
 name = "lux-lib"
-version = "0.10.0"
+version = "0.12.1"
 description = "Library for the lux package manager for Lua"
 authors = ["vhyrro <vhyrro@gmail.com>", "mrcjkb <marc@jakobi.dev>"]
 repository = "https://github.com/nvim-neorocks/lux"
@@ -39,11 +39,11 @@ serde-enum-str = "0.4.0"
 ssri = "9.2.0"
 strum = { version = "0.27" }
 strum_macros = "0.27"
-tokio = { version = "1.45.0", features = ["full"] }
+tokio = { version = "1.46.0", features = ["full"] }
 tempdir = "0.3.7"
 vfs = "0.12.1"
 walkdir = "2.5.0"
-zip = "4.2.0"
+zip = "4.3.0"
 tar = "0.4.44"
 flate2 = "1.1.1"
 which = "8.0.0"
@@ -69,9 +69,9 @@ url = "2.5.4"
 bon = { version = "3.6.3", features = ["implied-bounds"] }
 clean-path = "0.2.1"
 diffy = "0.4.2"
-toml = "0.8.22"
-md5 = "0.7.0"
-toml_edit = "0.22.26"
+toml = "0.9.0"
+md5 = "0.8.0"
+toml_edit = "0.23.0"
 nix-nar = "0.3.0"
 tree-sitter-loader = "0.25.4"
 tree-sitter-generate = "0.25.4"

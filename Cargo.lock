@@ -346,21 +346,11 @@ checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 
 [[package]]
 name = "bzip2"
-version = "0.5.2"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49ecfb22d906f800d4fe833b6282cf4dc1c298f5057ca0b5445e5c209735ca47"
+checksum = "bea8dcd42434048e4f7a304411d9273a411f647446c1234a65ce0554923f4cff"
 dependencies = [
- "bzip2-sys",
-]
-
-[[package]]
-name = "bzip2-sys"
-version = "0.1.13+1.0.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "225bff33b2141874fe80d71e07d6eec4f85c5c216453dd96388240f96e1acc14"
-dependencies = [
- "cc",
- "pkg-config",
+ "libbz2-rs-sys",
 ]
 
 [[package]]
@@ -493,9 +483,9 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "4.5.46"
+version = "4.5.54"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5c5508ea23c5366f77e53f5a0070e5a84e51687ec3ef9e0464c86dc8d13ce98"
+checksum = "aad5b1b4de04fead402672b48897030eec1f3bfe1550776322f59f6d6e6a5677"
 dependencies = [
  "clap 4.5.38",
 ]
@@ -564,15 +554,15 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 
 [[package]]
 name = "console"
-version = "0.15.8"
+version = "0.15.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e1f83fc076bd6dd27517eacdf25fef6c4dfe5f1d7448bafaaf3a26f13b5e4eb"
+checksum = "054ccb5b10f9f2cbf51eb355ca1d05c2d279ce1804688d0db74b4733a5aeafd8"
 dependencies = [
  "encode_unicode",
- "lazy_static",
  "libc",
- "unicode-width 0.1.14",
- "windows-sys 0.52.0",
+ "once_cell",
+ "unicode-width 0.2.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -937,9 +927,9 @@ checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
 
 [[package]]
 name = "encode_unicode"
-version = "0.3.6"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
+checksum = "34aa73646ffb006b8f5147f3dc182bd4bcb190227ce861fc4a4844bf8e3cb2c0"
 
 [[package]]
 name = "encoding_rs"
@@ -1286,11 +1276,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26145e563e54f2cadc477553f1ec5ee650b00862f0a58bcd12cbdc5f0ea2d2f4"
 dependencies = [
  "cfg-if",
- "js-sys",
  "libc",
  "r-efi",
  "wasi 0.14.2+wasi-0.2.4",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -1923,6 +1911,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "io-uring"
+version = "0.7.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b86e202f00093dcba4275d4636b93ef9dd75d025ae560d2521b45ea28ab49013"
+dependencies = [
+ "bitflags 2.9.0",
+ "cfg-if",
+ "libc",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2041,6 +2040,12 @@ name = "lets_find_up"
 version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8052b3d5cfa8bae8af3b44aae11a43e9fa48ce0ae477c4a39733a8deff34059"
+
+[[package]]
+name = "libbz2-rs-sys"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "775bf80d5878ab7c2b1080b5351a48b2f737d9f6f8b383574eebcc22be0dfccb"
 
 [[package]]
 name = "libc"
@@ -2219,10 +2224,11 @@ dependencies = [
 
 [[package]]
 name = "lux-cli"
-version = "0.7.3"
+version = "0.8.3"
 dependencies = [
  "assert_fs",
  "clap 4.5.38",
+ "clap_complete",
  "edit",
  "eyre",
  "git-url-parse",
@@ -2251,7 +2257,7 @@ dependencies = [
  "termtree 0.5.1",
  "text_trees",
  "tokio",
- "toml",
+ "toml 0.9.0",
  "url",
  "walkdir",
  "which 8.0.0",
@@ -2260,7 +2266,7 @@ dependencies = [
 
 [[package]]
 name = "lux-lib"
-version = "0.10.0"
+version = "0.12.1"
 dependencies = [
  "assert_fs",
  "async-recursion",
@@ -2322,8 +2328,8 @@ dependencies = [
  "tempdir",
  "thiserror 2.0.12",
  "tokio",
- "toml",
- "toml_edit",
+ "toml 0.9.0",
+ "toml_edit 0.23.0",
  "tree-sitter",
  "tree-sitter-config",
  "tree-sitter-generate",
@@ -2337,7 +2343,7 @@ dependencies = [
 
 [[package]]
 name = "lux-lua"
-version = "0.7.3"
+version = "0.8.3"
 dependencies = [
  "assert_fs",
  "lux-lib",
@@ -2383,7 +2389,7 @@ dependencies = [
  "time",
  "tokio",
  "tokio-util",
- "toml_edit",
+ "toml_edit 0.23.0",
  "tracing",
 ]
 
@@ -2395,9 +2401,9 @@ checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 
 [[package]]
 name = "md5"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
+checksum = "ae960838283323069879657ca3de837e9f7bbb4c7bf6ea7f1b290d5e9476d2e0"
 
 [[package]]
 name = "memchr"
@@ -2997,6 +3003,12 @@ name = "powerfmt"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
+
+[[package]]
+name = "ppmd-rust"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c834641d8ad1b348c9ee86dec3b9840d805acd5f24daa5f90c788951a52ff59b"
 
 [[package]]
 name = "ppv-lite86"
@@ -3690,6 +3702,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_spanned"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40734c41988f7306bb04f0ecf60ec0f3f1caa34290e4e8ea471dcd3346483b83"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde_urlencoded"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4081,7 +4102,7 @@ dependencies = [
  "strum 0.25.0",
  "thiserror 1.0.69",
  "threadpool",
- "toml",
+ "toml 0.8.22",
  "wasm-bindgen",
 ]
 
@@ -4169,7 +4190,7 @@ dependencies = [
  "cfg-expr",
  "heck 0.5.0",
  "pkg-config",
- "toml",
+ "toml 0.8.22",
  "version-compare",
 ]
 
@@ -4355,17 +4376,19 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "1.45.0"
+version = "1.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2513ca694ef9ede0fb23fe71a4ee4107cb102b9dc1930f6d0fd77aae068ae165"
+checksum = "1140bb80481756a8cbe10541f37433b459c5aa1e727b4c020fbfebdc25bf3ec4"
 dependencies = [
  "backtrace",
  "bytes",
+ "io-uring",
  "libc",
  "mio 1.0.2",
  "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
+ "slab",
  "socket2",
  "tokio-macros",
  "windows-sys 0.52.0",
@@ -4423,9 +4446,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05ae329d1f08c4d17a59bed7ff5b5a769d062e64a62d34a3261b219e62cd5aae"
 dependencies = [
  "serde",
- "serde_spanned",
- "toml_datetime",
- "toml_edit",
+ "serde_spanned 0.6.8",
+ "toml_datetime 0.6.9",
+ "toml_edit 0.22.26",
+]
+
+[[package]]
+name = "toml"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f271e09bde39ab52250160a67e88577e0559ad77e9085de6e9051a2c4353f8f8"
+dependencies = [
+ "indexmap 2.9.0",
+ "serde",
+ "serde_spanned 1.0.0",
+ "toml_datetime 0.7.0",
+ "toml_parser",
+ "toml_writer",
+ "winnow",
 ]
 
 [[package]]
@@ -4438,6 +4476,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "toml_datetime"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bade1c3e902f58d73d3f294cd7f20391c1cb2fbcb643b73566bc773971df91e3"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "toml_edit"
 version = "0.22.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4445,9 +4492,33 @@ checksum = "310068873db2c5b3e7659d2cc35d21855dbafa50d1ce336397c666e3cb08137e"
 dependencies = [
  "indexmap 2.9.0",
  "serde",
- "serde_spanned",
- "toml_datetime",
+ "serde_spanned 0.6.8",
+ "toml_datetime 0.6.9",
  "toml_write",
+ "winnow",
+]
+
+[[package]]
+name = "toml_edit"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54449f7f7569ce6f57cda7812361961c0f6a77f720802537b5618585b4a7ff4c"
+dependencies = [
+ "indexmap 2.9.0",
+ "serde",
+ "serde_spanned 1.0.0",
+ "toml_datetime 0.7.0",
+ "toml_parser",
+ "toml_writer",
+ "winnow",
+]
+
+[[package]]
+name = "toml_parser"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5c1c469eda89749d2230d8156a5969a69ffe0d6d01200581cdc6110674d293e"
+dependencies = [
  "winnow",
 ]
 
@@ -4456,6 +4527,12 @@ name = "toml_write"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfb942dfe1d8e29a7ee7fcbde5bd2b9a25fb89aa70caea2eba3bee836ff41076"
+
+[[package]]
+name = "toml_writer"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b679217f2848de74cabd3e8fc5e6d66f40b7da40f8e1954d92054d9010690fd5"
 
 [[package]]
 name = "tower"
@@ -5331,7 +5408,7 @@ dependencies = [
  "clap_mangen",
  "lux-cli",
  "lux-workspace-hack",
- "toml",
+ "toml 0.9.0",
 ]
 
 [[package]]
@@ -5339,7 +5416,7 @@ name = "xtask-lua"
 version = "0.1.0"
 dependencies = [
  "lux-workspace-hack",
- "toml",
+ "toml 0.9.0",
 ]
 
 [[package]]
@@ -5458,9 +5535,9 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "4.2.0"
+version = "4.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95ab361742de920c5535880f89bbd611ee62002bf11341d16a5f057bb8ba6899"
+checksum = "9aed4ac33e8eb078c89e6cbb1d5c4c7703ec6d299fc3e7c3695af8f8b423468b"
 dependencies = [
  "aes",
  "arbitrary",
@@ -5475,6 +5552,7 @@ dependencies = [
  "liblzma",
  "memchr",
  "pbkdf2",
+ "ppmd-rust",
  "sha1",
  "time",
  "zeroize",

@@ -31,6 +31,8 @@ pub struct Exec<'a> {
 
     #[builder(field)]
     args: Vec<String>,
+
+    disable_loader: Option<bool>,
 }
 
 impl<State: exec_builder::State> ExecBuilder<'_, State> {
@@ -43,7 +45,12 @@ impl<State: exec_builder::State> ExecBuilder<'_, State> {
         self.args.extend(args.into_iter().map_into());
         self
     }
+}
 
+impl<State> ExecBuilder<'_, State>
+where
+    State: exec_builder::State + exec_builder::IsComplete,
+{
     pub async fn exec(self) -> Result<(), ExecError>
     where
         State: exec_builder::IsComplete,
@@ -89,9 +96,24 @@ async fn exec(run: Exec<'_>) -> Result<(), ExecError> {
         paths.prepend(&Paths::new(&project.tree(run.config)?)?);
     }
 
+    let lua_init = if run.disable_loader.unwrap_or(false) {
+        None
+    } else if user_tree.version().lux_lib_dir().is_none() {
+        eprintln!(
+            "⚠️ WARNING: lux-lua library not found.
+    Cannot use the `lux.loader`.
+    To suppress this warning, set the `--no-loader` option.
+                    "
+        );
+        None
+    } else {
+        Some(paths.init())
+    };
+
     match Command::new(run.command)
         .args(run.args)
         .env("PATH", paths.path_prepended().joined())
+        .env("LUA_INIT", lua_init.unwrap_or_default())
         .env("LUA_PATH", paths.package_path().joined())
         .env("LUA_CPATH", paths.package_cpath().joined())
         .output()

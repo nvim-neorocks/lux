@@ -1,7 +1,7 @@
 use std::{collections::HashMap, io, sync::Arc};
 
 use crate::{
-    build::{Build, BuildBehaviour, BuildError},
+    build::{Build, BuildBehaviour, BuildError, RemotePackageSourceSpec, SrcRockSource},
     config::{Config, LuaVersionUnset},
     lockfile::{
         LocalPackage, LocalPackageId, LockConstraint, Lockfile, OptState, PinnedState, ReadOnly,
@@ -214,6 +214,7 @@ async fn install_impl(
                 RemoteRockDownload::RockspecOnly { rockspec_download } => {
                     install_rockspec(
                         rockspec_download,
+                        None,
                         install_spec.spec.constraint(),
                         install_spec.build_behaviour,
                         install_spec.pin,
@@ -243,9 +244,29 @@ async fn install_impl(
                     )
                     .await?
                 }
-                RemoteRockDownload::SrcRock { .. } => todo!(
-                    "lux does not yet support installing .src.rock packages without a rockspec"
-                ),
+                RemoteRockDownload::SrcRock {
+                    rockspec_download,
+                    src_rock,
+                    source_url,
+                } => {
+                    let src_rock_source = SrcRockSource {
+                        bytes: src_rock,
+                        source_url,
+                    };
+                    install_rockspec(
+                        rockspec_download,
+                        Some(src_rock_source),
+                        install_spec.spec.constraint(),
+                        install_spec.build_behaviour,
+                        install_spec.pin,
+                        install_spec.opt,
+                        install_spec.entry_type,
+                        &tree,
+                        &config,
+                        progress_arc,
+                    )
+                    .await?
+                }
             };
 
             Ok::<_, InstallError>((pkg.id(), (pkg, install_spec.entry_type)))
@@ -300,6 +321,7 @@ async fn install_impl(
 #[allow(clippy::too_many_arguments)]
 async fn install_rockspec(
     rockspec_download: DownloadedRockspec,
+    src_rock_source: Option<SrcRockSource>,
     constraint: LockConstraint,
     behaviour: BuildBehaviour,
     pin: PinnedState,
@@ -326,13 +348,18 @@ async fn install_rockspec(
             .await?;
     }
 
+    let source_spec = match src_rock_source {
+        Some(src_rock_source) => RemotePackageSourceSpec::SrcRock(src_rock_source),
+        None => RemotePackageSourceSpec::RockSpec(rockspec_download.source_url),
+    };
+
     let pkg = Build::new(&rockspec, tree, entry_type, config, &bar)
         .pin(pin)
         .opt(opt)
         .constraint(constraint)
         .behaviour(behaviour)
         .source(source)
-        .maybe_source_url(rockspec_download.source_url)
+        .source_spec(source_spec)
         .build()
         .await
         .map_err(|err| InstallError::BuildError(package, err))?;

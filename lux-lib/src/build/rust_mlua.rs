@@ -1,15 +1,8 @@
-use super::external_dependency::ExternalDependencyInfo;
 use super::utils::c_dylib_extension;
+use crate::build::backend::{BuildBackend, BuildInfo, RunBuildArgs};
 use crate::config::LuaVersionUnset;
-use crate::lua_rockspec::BuildInfo;
 use crate::progress::{Progress, ProgressBar};
-use crate::tree::Tree;
-use crate::{
-    config::{Config, LuaVersion},
-    lua_installation::LuaInstallation,
-    lua_rockspec::{Build, RustMluaBuildSpec},
-    tree::RockLayout,
-};
+use crate::{config::LuaVersion, lua_rockspec::RustMluaBuildSpec, tree::RockLayout};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -32,20 +25,14 @@ pub enum RustError {
     LuaVersionUnset(#[from] LuaVersionUnset),
 }
 
-impl Build for RustMluaBuildSpec {
+impl BuildBackend for RustMluaBuildSpec {
     type Err = RustError;
 
-    async fn run(
-        self,
-        output_paths: &RockLayout,
-        _no_install: bool,
-        _lua: &LuaInstallation,
-        _external_dependencies: &HashMap<String, ExternalDependencyInfo>,
-        config: &Config,
-        _tree: &Tree,
-        build_dir: &Path,
-        progress: &Progress<ProgressBar>,
-    ) -> Result<BuildInfo, Self::Err> {
+    async fn run(self, args: RunBuildArgs<'_>) -> Result<BuildInfo, Self::Err> {
+        let output_paths = args.output_paths;
+        let config = args.config;
+        let build_dir = args.build_dir;
+        let progress = args.progress;
         let lua_version = LuaVersion::from(config)?;
         let lua_feature = match lua_version {
             LuaVersion::Lua51 => "lua51",

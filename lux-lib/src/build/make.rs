@@ -1,25 +1,21 @@
 use itertools::Itertools;
 use path_slash::PathBufExt;
 use std::{
-    collections::HashMap,
     io,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{ExitStatus, Stdio},
 };
 use thiserror::Error;
 use tokio::process::Command;
 
 use crate::{
-    build::utils,
-    config::Config,
-    lua_installation::LuaInstallation,
-    lua_rockspec::{Build, BuildInfo, MakeBuildSpec},
-    progress::{Progress, ProgressBar},
-    tree::{RockLayout, Tree},
+    build::{
+        backend::{BuildBackend, BuildInfo, RunBuildArgs},
+        utils,
+    },
+    lua_rockspec::MakeBuildSpec,
     variables::VariableSubstitutionError,
 };
-
-use super::external_dependency::ExternalDependencyInfo;
 
 #[derive(Error, Debug)]
 pub enum MakeError {
@@ -40,20 +36,17 @@ pub enum MakeError {
     MakefileNotFound(PathBuf),
 }
 
-impl Build for MakeBuildSpec {
+impl BuildBackend for MakeBuildSpec {
     type Err = MakeError;
 
-    async fn run(
-        self,
-        output_paths: &RockLayout,
-        no_install: bool,
-        lua: &LuaInstallation,
-        external_dependencies: &HashMap<String, ExternalDependencyInfo>,
-        config: &Config,
-        _tree: &Tree,
-        build_dir: &Path,
-        _progress: &Progress<ProgressBar>,
-    ) -> Result<BuildInfo, Self::Err> {
+    async fn run(self, args: RunBuildArgs<'_>) -> Result<BuildInfo, Self::Err> {
+        let output_paths = args.output_paths;
+        let no_install = args.no_install;
+        let lua = args.lua;
+        let external_dependencies = args.external_dependencies;
+        let config = args.config;
+        let build_dir = args.build_dir;
+
         // Build step
         if self.build_pass {
             let build_args = self

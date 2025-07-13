@@ -16,8 +16,16 @@ use crate::build::Build;
 pub struct Exec {
     /// The command to run.
     command: String,
+
     /// Arguments to pass to the program.
     args: Option<Vec<String>>,
+
+    /// Do not add `require('lux').loader()` to `LUA_INIT`.
+    /// If a rock has conflicting transitive dependencies,
+    /// disabling the Lux loader may result in the wrong modules being loaded.
+    #[clap(default_value_t = false)]
+    #[arg(long)]
+    no_loader: bool,
 }
 
 pub async fn exec(run: Exec, config: Config) -> Result<()> {
@@ -37,12 +45,15 @@ pub async fn exec(run: Exec, config: Config) -> Result<()> {
     }
     if which(&run.command).is_err() {
         match project {
-            Some(_) => super::build::build(Build::default(), config.clone()).await?,
+            Some(_) => {
+                super::build::build(Build::default(), config.clone()).await?;
+            }
             None => install_command(&run.command, &config).await?,
         }
     };
     operations::Exec::new(&run.command, project.as_ref(), &config)
         .args(run.args.unwrap_or_default())
+        .disable_loader(run.no_loader)
         .exec()
         .await?;
     Ok(())

@@ -24,7 +24,10 @@ defaults:
 jobs:
   upload-assets:
     name: ${{ matrix.target }}
-    if: github.repository_owner == 'nvim-neorocks' && startsWith(github.event.release.name, 'v')
+    if: github.repository_owner == 'nvim-neorocks' && (
+      ( github.event_name == 'release' && startsWith(github.event.release.name, 'v')) ||
+        github.event_name == 'workflow_dispatch'
+      )
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -37,8 +40,8 @@ jobs:
             os: macos-13
           # - target: aarch64-pc-windows-msvc
           #   os: windows-2022
-          # - target: x86_64-pc-windows-msvc
-          #   os: windows-2022
+          - target: x86_64-pc-windows-msvc
+            os: windows-2022
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-22.04
           - target: x86_64-unknown-linux-musl
@@ -51,27 +54,60 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: cachix/cachix-action@v16
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        if: "!endsWith(matrix.target, 'windows-msvc')"
+
+      - name: Setup cachix
+        uses: cachix/cachix-action@v16
+        if: "!endsWith(matrix.target, 'windows-msvc')"
         with:
           name: neorocks
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-      - uses: nicknovitski/nix-develop@v1.2.1
+
+      - name: Nix devShell
+        uses: nicknovitski/nix-develop@v1.2.1
+        if: "!endsWith(matrix.target, 'windows-msvc')"
+
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: ${{ matrix.target }}
         if: startsWith(matrix.os, 'ubuntu') && !contains(matrix.target, '-musl')
-      - uses: taiki-e/install-action@v2
+
+      - name: Install Rust Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install C/C++ Compiler
+        uses: rlalik/setup-cpp-compiler@master
         with:
-          tool: cross
-        if: contains(matrix.target, '-musl')
-      - run: echo "RUSTFLAGS=${RUSTFLAGS} -C target-feature=+crt-static" >> "${GITHUB_ENV}"
+          compiler: clang-latest
         if: endsWith(matrix.target, 'windows-msvc')
+
+      - name: Install MSVC Compiler Toolchain
+        uses: ilammy/msvc-dev-cmd@v1
+        if: endsWith(matrix.target, 'windows-msvc')
+
+      - name: "Setup environment for MSVC"
+        run: |
+          echo "RUSTFLAGS=${RUSTFLAGS} -C target-feature=+crt-static" >> "${GITHUB_ENV}"
+          echo "OPENSSL_DIR=C:\Program Files\OpenSSL" >> "${GITHUB_ENV}"
+          echo "OPENSSL_LIB_DIR=C:\Program Files\OpenSSL\lib\VC\x64\MD" >> "${GITHUB_ENV}"
+        if: endsWith(matrix.target, 'windows-msvc')
+
+      - name: Install Build Dependencies
+        run: |
+          $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\ProgramData\chocolatey\bin"
+          [Environment]::SetEnvironmentVariable("Path", $env:PATH, "Machine")
+          choco install -y --no-progress openssl libgit2
+        if: endsWith(matrix.target, 'windows-msvc')
+
       - uses: taiki-e/upload-rust-binary-action@v1
         # TODO: also build `lux-lua`
         with:
           bin: lx
           target: ${{ matrix.target }}
+          features: vendored-lua
           tar: all
           zip: windows
           token: ${{ secrets.GITHUB_TOKEN }}

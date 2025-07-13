@@ -85,6 +85,23 @@ impl Paths {
         &self.lib
     }
 
+    /// Get the `package.path`, prepended to `LUA_PATH`
+    pub fn package_path_prepended(&self) -> PackagePath {
+        let mut lua_path = PackagePath::from_str(env::var("LUA_PATH").unwrap_or_default().as_str())
+            .unwrap_or_default();
+        lua_path.prepend(self.package_path());
+        lua_path
+    }
+
+    /// Get the `package.cpath`, prepended to `LUA_CPATH`
+    pub fn package_cpath_prepended(&self) -> PackagePath {
+        let mut lua_cpath =
+            PackagePath::from_str(env::var("LUA_CPATH").unwrap_or_default().as_str())
+                .unwrap_or_default();
+        lua_cpath.prepend(self.package_cpath());
+        lua_cpath
+    }
+
     /// Get the `$PATH`
     pub fn path(&self) -> &BinPath {
         &self.bin
@@ -109,11 +126,11 @@ impl Paths {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Default, Serialize)]
+#[derive(PartialEq, Eq, Debug, Default, Serialize, Clone)]
 pub struct PackagePath(Vec<PathBuf>);
 
 impl PackagePath {
-    pub fn prepend(&mut self, other: &Self) {
+    fn prepend(&mut self, other: &Self) {
         let mut new_vec = other.0.to_owned();
         new_vec.append(&mut self.0);
         self.0 = new_vec;

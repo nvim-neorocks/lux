@@ -6,6 +6,99 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.8.3](https://github.com/nvim-neorocks/lux/compare/v0.8.2...v0.8.3) - 2025-07-12
+
+### Other
+- *(deps)* bump toml from 0.8.22 to 0.9.0 ([#846](https://github.com/nvim-neorocks/lux/pull/846))
+
+## `lux-lib` - [0.12.1](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.12.0...lux-lib-v0.12.1) - 2025-07-12
+
+### Fixed
+- *(build)* relax `source.dir` inferring logic ([#859](https://github.com/nvim-neorocks/lux/pull/859))
+- *(config)* TOML configs overridden by defaults ([#858](https://github.com/nvim-neorocks/lux/pull/858))
+
+### Other
+- *(deps)* bump zip from 4.2.0 to 4.3.0 ([#850](https://github.com/nvim-neorocks/lux/pull/850))
+- *(deps)* bump toml_edit from 0.22.26 to 0.23.0 ([#847](https://github.com/nvim-neorocks/lux/pull/847))
+- *(deps)* bump toml from 0.8.22 to 0.9.0 ([#846](https://github.com/nvim-neorocks/lux/pull/846))
+
+## `lux-cli` - [0.8.2](https://github.com/nvim-neorocks/lux/compare/v0.8.1...v0.8.2) - 2025-07-08
+
+### Added
+- expose shell completions in main binary ([#837](https://github.com/nvim-neorocks/lux/pull/837))
+
+### Other
+- *(cli/completion)* auto-detect shell ([#845](https://github.com/nvim-neorocks/lux/pull/845))
+
+## `lux-cli` - [0.8.1](https://github.com/nvim-neorocks/lux/compare/v0.8.0...v0.8.1) - 2025-07-08
+
+### Added
+- *(cli)* allow passing path to `fmt` ([#835](https://github.com/nvim-neorocks/lux/pull/835))
+
+## `lux-lib` - [0.12.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.11.0...lux-lib-v0.12.0) - 2025-07-08
+
+### Fixed
+- *(build)* [**breaking**] `copy_directorys` drops subdirectories ([#842](https://github.com/nvim-neorocks/lux/pull/842))
+- *(build)* install conf files to etc/conf ([#841](https://github.com/nvim-neorocks/lux/pull/841))
+
+## `lux-cli` - [0.8.0](https://github.com/nvim-neorocks/lux/compare/v0.7.4...v0.8.0) - 2025-07-07
+
+### Added
+- *(cli)* lx shell ([#817](https://github.com/nvim-neorocks/lux/pull/817))
+- add help for `lx lua` flags
+
+### Fixed
+- fix!(cli): `lx pack` broken in projects ([#821](https://github.com/nvim-neorocks/lux/pull/821))
+
+### Other
+- [**breaking**] `_prepended` for `PackagePath`
+- `lx shell` cleanup
+- *(deps)* bump tokio from 1.45.0 to 1.46.0 ([#827](https://github.com/nvim-neorocks/lux/pull/827))
+
+## `lux-lib` - [0.11.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.10.1...lux-lib-v0.11.0) - 2025-07-07
+
+### Added
+- *(lux-lua)* state functions and search functionality ([#781](https://github.com/nvim-neorocks/lux/pull/781))
+- use `--verbose` flag to enable compiler warnings ([#833](https://github.com/nvim-neorocks/lux/pull/833))
+- *(install)* support rocks with only .src.rock sources ([#823](https://github.com/nvim-neorocks/lux/pull/823))
+
+### Fixed
+- fix!(cli): `lx pack` broken in projects ([#821](https://github.com/nvim-neorocks/lux/pull/821))
+- *(build/command)* make `_command` fields optional ([#832](https://github.com/nvim-neorocks/lux/pull/832))
+
+### Other
+- *(build)* [**breaking**] don't expose `BuildBackend` trait ([#826](https://github.com/nvim-neorocks/lux/pull/826))
+- *(build)* [**breaking**] use Builder pattern for `BuildBackend` trait ([#825](https://github.com/nvim-neorocks/lux/pull/825))
+- [**breaking**] `_prepended` for `PackagePath`
+- *(build)* [**breaking**] `lua_rockspec::Build` -> `build::backend::BuildBackend` ([#824](https://github.com/nvim-neorocks/lux/pull/824))
+- *(deps)* bump tokio from 1.45.0 to 1.46.0 ([#827](https://github.com/nvim-neorocks/lux/pull/827))
+
+## `lux-cli` - [0.7.4](https://github.com/nvim-neorocks/lux/compare/v0.7.3...v0.7.4) - 2025-06-27
+
+### Added
+- *(cli)* set `LUA_INIT` for `lx exec`
+- feat!(cli): add `--no-loader` flag to repl and run commands
+
+### Fixed
+- only run repl initialisation in repl
+
+### Other
+- *(deps)* bump lua-src from 547.0.0 to 548.1.1 ([#782](https://github.com/nvim-neorocks/lux/pull/782))
+
+## `lux-lib` - [0.10.1](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.10.0...lux-lib-v0.10.1) - 2025-06-27
+
+### Added
+- *(cli)* set `LUA_INIT` for `lx exec`
+- feat!(cli): add `--no-loader` flag to repl and run commands
+
+### Fixed
+- only run repl initialisation in repl
+
+### Other
+- *(deps)* bump md5 from 0.7.0 to 0.8.0 ([#816](https://github.com/nvim-neorocks/lux/pull/816))
+- *(deps)* bump zip from 4.1.0 to 4.2.0 ([#814](https://github.com/nvim-neorocks/lux/pull/814))
+- *(deps)* bump lua-src from 547.0.0 to 548.1.1 ([#782](https://github.com/nvim-neorocks/lux/pull/782))
+
 ## `lux-cli` - [0.7.3](https://github.com/nvim-neorocks/lux/compare/v0.7.2...v0.7.3) - 2025-06-17
 
 ### Added

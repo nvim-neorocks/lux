@@ -1,4 +1,4 @@
-use crate::project::NewProject;
+use crate::{completion::Completion, format::Fmt, project::NewProject};
 use std::error::Error;
 use std::path::PathBuf;
 
@@ -25,6 +25,7 @@ use remove::Remove;
 use run::Run;
 use run_lua::RunLua;
 use search::Search;
+use shell::Shell;
 use test::Test;
 use uninstall::Uninstall;
 use update::Update;
@@ -35,6 +36,7 @@ use which::Which;
 pub mod add;
 pub mod build;
 pub mod check;
+pub mod completion;
 pub mod config;
 pub mod debug;
 pub mod doc;
@@ -58,6 +60,7 @@ pub mod remove;
 pub mod run;
 pub mod run_lua;
 pub mod search;
+pub mod shell;
 pub mod test;
 pub mod uninstall;
 pub mod unpack;
@@ -145,6 +148,9 @@ pub enum Commands {
     /// Interact with the lux configuration.
     #[command(subcommand, arg_required_else_help = true)]
     Config(ConfigCmd),
+    /// Generate autocompletion scripts for the shell.{n}
+    /// Example: `lx completion zsh > ~/.zsh/completions/_lx`
+    Completion(Completion),
     /// Internal commands for debugging Lux itself.
     #[command(subcommand, arg_required_else_help = true)]
     Debug(Debug),
@@ -154,7 +160,7 @@ pub enum Commands {
     #[command(arg_required_else_help = true)]
     Download(Download),
     /// Formats the codebase with stylua.
-    Fmt,
+    Fmt(Fmt),
     /// Generate a rockspec file from a project.
     GenerateRockspec(GenerateRockspec),
     /// Show metadata for any rock.
@@ -286,6 +292,8 @@ pub enum Commands {
     Upload(Upload),
     /// Tell which file corresponds to a given module name.
     Which(Which),
+    /// Spawns an interactive shell with PATH, LUA_PATH, LUA_CPATH and LUA_INIT set.
+    Shell(Shell),
 }
 
 /// Parse a key=value pair.

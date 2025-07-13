@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 lux-workspace-hack = { version = "0.1", path = "../lux-workspace-hack" }
-toml = "0.8.22"
+toml = "0.9.0"
 
 [features] # For lux-lua distribution
 default = []

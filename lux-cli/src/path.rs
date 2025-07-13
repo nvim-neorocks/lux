@@ -1,5 +1,3 @@
-use std::{env, str::FromStr as _};
-
 use clap::Subcommand;
 use eyre::Result;
 use lux_lib::{
@@ -56,10 +54,12 @@ struct FullArgs {
     #[arg(long)]
     no_bin: bool,
 
-    /// Do not export `LUA_INIT` (`require('lux').loader()`).
+    /// Do not add `require('lux').loader()` to `LUA_INIT`.
+    /// If a rock has conflicting transitive dependencies,
+    /// disabling the Lux loader may result in the wrong modules being loaded.
     #[clap(default_value_t = false)]
     #[arg(long)]
-    no_init: bool,
+    no_loader: bool,
 
     /// The shell to format for.
     #[clap(default_value_t = Shell::default())]
@@ -89,12 +89,12 @@ pub async fn path(path_data: Path, config: Config) -> Result<()> {
     match cmd {
         PathCmd::Full(args) => {
             let mut result = String::new();
-            let no_init = args.no_init || {
+            let no_loader = args.no_loader || {
                 if tree.version().lux_lib_dir().is_none() {
                     eprintln!(
                         "⚠️ WARNING: lux-lua library not found.
 Cannot use the `lux.loader`.
-To suppress this warning, run `lx path full --no-init`.
+To suppress this warning, set the `--no-loader` option.
                 "
                     );
                     true
@@ -103,12 +103,12 @@ To suppress this warning, run `lx path full --no-init`.
                 }
             };
             let shell = args.shell;
-            let package_path = mk_package_path(&paths, prepend)?;
+            let package_path = mk_package_path(&paths, prepend);
             if !package_path.is_empty() {
                 result.push_str(format_export(&shell, "LUA_PATH", &package_path).as_str());
                 result.push('\n')
             }
-            let package_cpath = mk_package_cpath(&paths, prepend)?;
+            let package_cpath = mk_package_cpath(&paths, prepend);
             if !package_cpath.is_empty() {
                 result.push_str(format_export(&shell, "LUA_CPATH", &package_cpath).as_str());
                 result.push('\n')
@@ -120,39 +120,34 @@ To suppress this warning, run `lx path full --no-init`.
                     result.push('\n')
                 }
             }
-            if !no_init {
+            if !no_loader {
                 result.push_str(format_export(&shell, "LUA_INIT", &paths.init()).as_str());
                 result.push('\n')
             }
             println!("{}", &result);
         }
-        PathCmd::Lua => println!("{}", &mk_package_path(&paths, prepend)?),
-        PathCmd::C => println!("{}", &mk_package_cpath(&paths, prepend)?),
+        PathCmd::Lua => println!("{}", &mk_package_path(&paths, prepend)),
+        PathCmd::C => println!("{}", &mk_package_cpath(&paths, prepend)),
         PathCmd::Bin => println!("{}", &mk_bin_path(&paths, prepend)?),
         PathCmd::Init => println!("{}", paths.init()),
     }
     Ok(())
 }
 
-fn mk_package_path(paths: &Paths, prepend: bool) -> Result<PackagePath> {
-    let mut result = if prepend {
-        PackagePath::from_str(env::var("LUA_PATH").unwrap_or_default().as_str()).unwrap_or_default()
+fn mk_package_path(paths: &Paths, prepend: bool) -> PackagePath {
+    if prepend {
+        paths.package_path_prepended()
     } else {
-        PackagePath::default()
-    };
-    result.prepend(paths.package_path());
-    Ok(result)
+        paths.package_path().clone()
+    }
 }
 
-fn mk_package_cpath(paths: &Paths, prepend: bool) -> Result<PackagePath> {
-    let mut result = if prepend {
-        PackagePath::from_str(env::var("LUA_CPATH").unwrap_or_default().as_str())
-            .unwrap_or_default()
+fn mk_package_cpath(paths: &Paths, prepend: bool) -> PackagePath {
+    if prepend {
+        paths.package_cpath_prepended()
     } else {
-        PackagePath::default()
-    };
-    result.prepend(paths.package_cpath());
-    Ok(result)
+        paths.package_cpath().clone()
+    }
 }
 
 fn mk_bin_path(paths: &Paths, prepend: bool) -> Result<BinPath> {

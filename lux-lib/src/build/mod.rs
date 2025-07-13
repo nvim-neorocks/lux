@@ -1,9 +1,13 @@
+use crate::build::backend::{BuildBackend, BuildInfo, RunBuildArgs};
 use crate::lockfile::{LockfileError, OptState, RemotePackageSourceUrl};
 use crate::lua_installation::LuaInstallationError;
 use crate::lua_rockspec::LuaVersionError;
+use crate::operations::{RemotePackageSourceMetadata, UnpackError};
 use crate::rockspec::{LuaVersionCompatibility, Rockspec};
 use crate::tree::{self, EntryType, TreeError};
+use bytes::Bytes;
 use std::collections::HashMap;
+use std::io::Cursor;
 use std::{io, path::Path};
 
 use crate::{
@@ -11,7 +15,7 @@ use crate::{
     hash::HasIntegrity,
     lockfile::{LocalPackage, LocalPackageHashes, LockConstraint, PinnedState},
     lua_installation::LuaInstallation,
-    lua_rockspec::{Build as _, BuildBackendSpec, BuildInfo},
+    lua_rockspec::BuildBackendSpec,
     operations::{self, FetchSrcError},
     package::PackageSpec,
     progress::{Progress, ProgressBar},
@@ -46,6 +50,8 @@ mod patch;
 mod rust_mlua;
 mod source;
 mod treesitter_parser;
+
+pub(crate) mod backend;
 pub(crate) mod utils;
 
 pub mod external_dependency;
@@ -76,10 +82,22 @@ pub struct Build<'a, R: Rockspec + HasIntegrity> {
     #[builder(default)]
     behaviour: BuildBehaviour,
 
-    source_url: Option<RemotePackageSourceUrl>,
+    #[builder(setters(vis = "pub(crate)"))]
+    source_spec: Option<RemotePackageSourceSpec>,
 
     // TODO(vhyrro): Remove this and enforce that this is provided at a type level.
     source: Option<RemotePackageSource>,
+}
+
+pub(crate) enum RemotePackageSourceSpec {
+    RockSpec(Option<RemotePackageSourceUrl>),
+    SrcRock(SrcRockSource),
+}
+
+/// A packed .src.rock archive.
+pub(crate) struct SrcRockSource {
+    pub bytes: Bytes,
+    pub source_url: RemotePackageSourceUrl,
 }
 
 // Overwrite the `build()` function to use our own instead.
@@ -131,6 +149,8 @@ pub enum BuildError {
         expected: Integrity,
         actual: Integrity,
     },
+    #[error("failed to unpack src.rock: {0}")]
+    UnpackSrcRock(UnpackError),
     #[error("failed to fetch rock source: {0}")]
     FetchSrcError(#[from] FetchSrcError),
     #[error("failed to install binary {0}: {1}")]
@@ -169,129 +189,25 @@ impl From<bool> for BuildBehaviour {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn run_build<R: Rockspec + HasIntegrity>(
     rockspec: &R,
-    output_paths: &RockLayout,
-    lua: &LuaInstallation,
-    external_dependencies: &HashMap<String, ExternalDependencyInfo>,
-    config: &Config,
-    build_dir: &Path,
-    tree: &Tree,
-    progress: &Progress<ProgressBar>,
+    args: RunBuildArgs<'_>,
 ) -> Result<BuildInfo, BuildError> {
+    let progress = args.progress;
     progress.map(|p| p.set_message("🛠️ Building..."));
 
     Ok(
         match rockspec.build().current_platform().build_backend.to_owned() {
-            Some(BuildBackendSpec::Builtin(build_spec)) => {
-                build_spec
-                    .run(
-                        output_paths,
-                        false,
-                        lua,
-                        external_dependencies,
-                        config,
-                        tree,
-                        build_dir,
-                        progress,
-                    )
-                    .await?
-            }
-            Some(BuildBackendSpec::Make(make_spec)) => {
-                make_spec
-                    .run(
-                        output_paths,
-                        false,
-                        lua,
-                        external_dependencies,
-                        config,
-                        tree,
-                        build_dir,
-                        progress,
-                    )
-                    .await?
-            }
-            Some(BuildBackendSpec::CMake(cmake_spec)) => {
-                cmake_spec
-                    .run(
-                        output_paths,
-                        false,
-                        lua,
-                        external_dependencies,
-                        config,
-                        tree,
-                        build_dir,
-                        progress,
-                    )
-                    .await?
-            }
-            Some(BuildBackendSpec::Command(command_spec)) => {
-                command_spec
-                    .run(
-                        output_paths,
-                        false,
-                        lua,
-                        external_dependencies,
-                        config,
-                        tree,
-                        build_dir,
-                        progress,
-                    )
-                    .await?
-            }
-            Some(BuildBackendSpec::RustMlua(rust_mlua_spec)) => {
-                rust_mlua_spec
-                    .run(
-                        output_paths,
-                        false,
-                        lua,
-                        external_dependencies,
-                        config,
-                        tree,
-                        build_dir,
-                        progress,
-                    )
-                    .await?
-            }
+            Some(BuildBackendSpec::Builtin(build_spec)) => build_spec.run(args).await?,
+            Some(BuildBackendSpec::Make(make_spec)) => make_spec.run(args).await?,
+            Some(BuildBackendSpec::CMake(cmake_spec)) => cmake_spec.run(args).await?,
+            Some(BuildBackendSpec::Command(command_spec)) => command_spec.run(args).await?,
+            Some(BuildBackendSpec::RustMlua(rust_mlua_spec)) => rust_mlua_spec.run(args).await?,
             Some(BuildBackendSpec::TreesitterParser(treesitter_parser_spec)) => {
-                treesitter_parser_spec
-                    .run(
-                        output_paths,
-                        false,
-                        lua,
-                        external_dependencies,
-                        config,
-                        tree,
-                        build_dir,
-                        progress,
-                    )
-                    .await?
+                treesitter_parser_spec.run(args).await?
             }
-            Some(BuildBackendSpec::LuaRock(_)) => {
-                luarocks::build(
-                    rockspec,
-                    output_paths,
-                    lua,
-                    config,
-                    build_dir,
-                    tree,
-                    progress,
-                )
-                .await?
-            }
-            Some(BuildBackendSpec::Source) => {
-                source::build(
-                    output_paths,
-                    lua,
-                    external_dependencies,
-                    config,
-                    tree,
-                    build_dir,
-                    progress,
-                )
-                .await?
-            }
+            Some(BuildBackendSpec::LuaRock(_)) => luarocks::build(rockspec, args).await?,
+            Some(BuildBackendSpec::Source) => source::build(args).await?,
             None => BuildInfo::default(),
         },
     )
@@ -321,7 +237,8 @@ async fn install<R: Rockspec + HasIntegrity>(
     let lua_len = install_spec.lua.len();
     let lib_len = install_spec.lib.len();
     let bin_len = install_spec.bin.len();
-    let total_len = lua_len + lib_len + bin_len;
+    let conf_len = install_spec.conf.len();
+    let total_len = lua_len + lib_len + bin_len + conf_len;
     progress.map(|p| p.set_position(total_len as u64));
 
     if lua_len > 0 {
@@ -342,7 +259,9 @@ async fn install<R: Rockspec + HasIntegrity>(
             &output_paths.lib,
             lua,
             external_dependencies,
-        )?;
+            config,
+        )
+        .await?;
         progress.map(|p| p.set_position(p.position() + 1));
     }
     if entry_type.is_entrypoint() {
@@ -361,6 +280,18 @@ async fn install<R: Rockspec + HasIntegrity>(
             )
             .await
             .map_err(|err| BuildError::InstallBinary(target.clone(), err))?;
+            progress.map(|p| p.set_position(p.position() + 1));
+        }
+    }
+    if conf_len > 0 {
+        progress.map(|p| p.set_message("Copying configuration files..."));
+        for (target, source) in &install_spec.conf {
+            let absolute_source = build_dir.join(source);
+            let target = output_paths.conf.join(target);
+            if let Some(parent_dir) = target.parent() {
+                tokio::fs::create_dir_all(parent_dir).await?;
+            }
+            tokio::fs::copy(absolute_source, target).await?;
             progress.map(|p| p.set_position(p.position() + 1));
         }
     }
@@ -387,15 +318,31 @@ where
 
     let temp_dir = tempdir::TempDir::new(&rockspec.package().to_string())?;
 
-    let source_metadata =
-        operations::FetchSrc::new(temp_dir.path(), rockspec, build.config, build.progress)
-            .source_url(build.source_url)
-            .fetch_internal()
-            .await?;
+    let source_metadata = match build.source_spec {
+        Some(RemotePackageSourceSpec::SrcRock(SrcRockSource { bytes, source_url })) => {
+            let hash = bytes.hash()?;
+            let cursor = Cursor::new(&bytes);
+            operations::unpack_src_rock(cursor, temp_dir.path().to_path_buf(), build.progress)
+                .await
+                .map_err(BuildError::UnpackSrcRock)?;
+            RemotePackageSourceMetadata { hash, source_url }
+        }
+        Some(RemotePackageSourceSpec::RockSpec(source_url)) => {
+            operations::FetchSrc::new(temp_dir.path(), rockspec, build.config, build.progress)
+                .maybe_source_url(source_url)
+                .fetch_internal()
+                .await?
+        }
+        None => {
+            operations::FetchSrc::new(temp_dir.path(), rockspec, build.config, build.progress)
+                .fetch_internal()
+                .await?
+        }
+    };
 
     let hashes = LocalPackageHashes {
         rockspec: rockspec.hash()?,
-        source: source_metadata.hash,
+        source: source_metadata.hash.clone(),
     };
 
     let mut package = LocalPackage::from(
@@ -411,7 +358,7 @@ where
                     .map(RemotePackageSource::RockspecContent)
             })
             .unwrap_or(RemotePackageSource::Local),
-        Some(source_metadata.source_url),
+        Some(source_metadata.source_url.clone()),
         hashes,
     );
     package.spec.pinned = build.pin;
@@ -431,21 +378,29 @@ where
             let build_dir = match &rock_source.unpack_dir {
                 Some(unpack_dir) => temp_dir.path().join(unpack_dir),
                 None => {
-                    // Some older rockspecs don't specify a source.dir.
-                    // If there exists a single directory and a rockspec
-                    // after unpacking, we assume it's the source directory.
+                    // Some older/off-spec rockspecs don't specify a source.dir.
+                    // If there exists a single directory with the archive name
+                    // after unpacking an archive, we assume it's the source directory.
                     let dir_entries = std::fs::read_dir(temp_dir.path())?
                         .filter_map(Result::ok)
                         .filter(|f| f.path().is_dir())
                         .collect_vec();
-                    let rockspec_entries = std::fs::read_dir(temp_dir.path())?
-                        .filter_map(Result::ok)
-                        .filter(|f| {
-                            let path = f.path();
-                            path.is_file() && path.extension().is_some_and(|ext| ext == "rockspec")
+                    let archive_name = rock_source
+                        .archive_name
+                        .clone()
+                        .or(source_metadata.archive_name());
+                    if dir_entries.len() == 1
+                        && archive_name.is_some_and(|archive_name| {
+                            archive_name.to_string_lossy().starts_with(
+                                &dir_entries
+                                    .first()
+                                    .unwrap()
+                                    .file_name()
+                                    .to_string_lossy()
+                                    .to_string(),
+                            )
                         })
-                        .collect_vec();
-                    if dir_entries.len() == 1 && rockspec_entries.len() == 1 {
+                    {
                         temp_dir.path().join(dir_entries.first().unwrap().path())
                     } else {
                         temp_dir.path().into()
@@ -472,13 +427,16 @@ where
 
             let output = run_build(
                 rockspec,
-                &output_paths,
-                &lua,
-                &external_dependencies,
-                build.config,
-                &build_dir,
-                tree,
-                build.progress,
+                RunBuildArgs::new()
+                    .output_paths(&output_paths)
+                    .no_install(false)
+                    .lua(&lua)
+                    .external_dependencies(&external_dependencies)
+                    .config(build.config)
+                    .tree(tree)
+                    .build_dir(&build_dir)
+                    .progress(build.progress)
+                    .build(),
             )
             .await?;
 
@@ -507,7 +465,11 @@ where
                         .is_some_and(|name| name != "doc" && name != "docs")
                 })
             {
-                recursive_copy_dir(&build_dir.join(directory), &output_paths.etc).await?;
+                recursive_copy_dir(
+                    &build_dir.join(directory),
+                    &output_paths.etc.join(directory),
+                )
+                .await?;
             }
 
             recursive_copy_doc_dir(&output_paths, &build_dir).await?;
@@ -584,13 +546,16 @@ mod tests {
         let progress = Progress::Progress(MultiProgress::new());
         run_build(
             &rockspec,
-            &rock_layout,
-            &lua,
-            &HashMap::default(),
-            &config,
-            &build_dir,
-            &tree,
-            &progress.map(|p| p.new_bar()),
+            RunBuildArgs::new()
+                .output_paths(&rock_layout)
+                .no_install(false)
+                .lua(&lua)
+                .external_dependencies(&HashMap::default())
+                .config(&config)
+                .tree(&tree)
+                .build_dir(&build_dir)
+                .progress(&progress.map(|p| p.new_bar()))
+                .build(),
         )
         .await
         .unwrap();

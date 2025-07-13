@@ -18,12 +18,6 @@ use crate::build::{self, Build};
 #[derive(Args, Default)]
 #[clap(disable_help_flag = true)]
 pub struct RunLua {
-    #[arg(long)]
-    test: bool,
-
-    #[arg(long)]
-    build: bool,
-
     /// Arguments to pass to Lua. See `lua -h`.
     args: Option<Vec<String>>,
 
@@ -31,12 +25,27 @@ pub struct RunLua {
     #[arg(long)]
     lua: Option<String>,
 
-    /// Print help
+    /// Add test dependencies to the environment.
     #[arg(long)]
-    help: bool,
+    test: bool,
+
+    /// Add build dependencies to the environment.
+    #[arg(long)]
+    build: bool,
+
+    /// Disable the Lux loader.
+    /// If a rock has conflicting transitive dependencies,
+    /// disabling the Lux loader may result in the wrong modules being loaded.
+    #[clap(default_value_t = false)]
+    #[arg(long)]
+    no_loader: bool,
 
     #[clap(flatten)]
     build_args: Build,
+
+    /// Print help
+    #[arg(long)]
+    help: bool,
 }
 
 pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
@@ -64,7 +73,9 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
 
     welcome_message = format!(
         r#"{}
-Run `lx lua --help` for options."#,
+Run `lx lua --help` for options.
+To exit type 'exit()' or <C-d>.
+"#,
         welcome_message
     );
 
@@ -91,6 +102,8 @@ Run `lx lua --help` for options."#,
         .args(args)
         .prepend_test_paths(run_lua.test)
         .prepend_build_paths(run_lua.build)
+        .disable_loader(run_lua.no_loader)
+        .lua_init("exit = os.exit".to_string())
         .welcome_message(welcome_message)
         .run_lua()
         .await?;

@@ -14,6 +14,11 @@ labels = ["luarocks", "package-manager"]
 
 [build]
 type = "builtin"
+copy_directories = [ "plugin" ]
 
 [build.modules]
 "foo.main" = "lua/foo.lua"
+
+[build.install]
+conf = { "foo/bar.toml" = "bar.toml" }
+

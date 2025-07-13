@@ -19,24 +19,11 @@ use itertools::Itertools;
 
 use mlua::{FromLua, IntoLua, Lua, LuaSerdeExt, UserData, Value};
 use std::{
-    collections::HashMap,
-    env::consts::DLL_EXTENSION,
-    fmt::Display,
-    future::Future,
-    path::{Path, PathBuf},
-    str::FromStr,
+    collections::HashMap, env::consts::DLL_EXTENSION, fmt::Display, path::PathBuf, str::FromStr,
 };
 use thiserror::Error;
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
-
-use crate::{
-    build::external_dependency::ExternalDependencyInfo,
-    config::Config,
-    lua_installation::LuaInstallation,
-    progress::{Progress, ProgressBar},
-    tree::{RockLayout, Tree},
-};
 
 use super::{
     mlua_json_value_to_map, mlua_json_value_to_vec, DisplayAsLuaKV, DisplayAsLuaValue,
@@ -91,10 +78,6 @@ impl UserData for BuildSpec {
 pub enum BuildSpecInternalError {
     #[error("'builtin' modules should not have list elements")]
     ModulesHaveListElements,
-    #[error("no 'build_command' specified for the 'command' build backend")]
-    NoBuildCommand,
-    #[error("no 'install_command' specified for the 'command' build backend")]
-    NoInstallCommand,
     #[error("no 'modules' specified for the 'rust-mlua' build backend")]
     NoModulesSpecified,
     #[error("no 'lang' specified for 'treesitter-parser' build backend")]
@@ -155,18 +138,10 @@ impl BuildSpec {
                     variables: internal.variables.unwrap_or_default(),
                 }))
             }
-            BuildType::Command => {
-                let build_command = internal
-                    .build_command
-                    .ok_or(BuildSpecInternalError::NoBuildCommand)?;
-                let install_command = internal
-                    .install_command
-                    .ok_or(BuildSpecInternalError::NoInstallCommand)?;
-                Some(BuildBackendSpec::Command(CommandBuildSpec {
-                    build_command,
-                    install_command,
-                }))
-            }
+            BuildType::Command => Some(BuildBackendSpec::Command(CommandBuildSpec {
+                build_command: internal.build_command,
+                install_command: internal.install_command,
+            })),
             BuildType::None => None,
             BuildType::LuaRock(s) => Some(BuildBackendSpec::LuaRock(s)),
             BuildType::RustMlua => Some(BuildBackendSpec::RustMlua(RustMluaBuildSpec {
@@ -300,8 +275,8 @@ impl IntoLua for BuildBackendSpec {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct CommandBuildSpec {
-    pub build_command: String,
-    pub install_command: String,
+    pub build_command: Option<String>,
+    pub install_command: Option<String>,
 }
 
 impl UserData for CommandBuildSpec {
@@ -972,29 +947,6 @@ impl Default for BuildType {
     fn default() -> Self {
         Self::Builtin
     }
-}
-
-#[derive(Default)]
-pub struct BuildInfo {
-    pub binaries: Vec<PathBuf>,
-}
-
-// TODO(vhyrro): Move this to the dedicated build.rs module
-pub trait Build {
-    type Err: std::error::Error;
-
-    #[allow(clippy::too_many_arguments)]
-    fn run(
-        self,
-        output_paths: &RockLayout,
-        no_install: bool,
-        lua: &LuaInstallation,
-        external_dependencies: &HashMap<String, ExternalDependencyInfo>,
-        config: &Config,
-        tree: &Tree,
-        build_dir: &Path,
-        progress: &Progress<ProgressBar>,
-    ) -> impl Future<Output = Result<BuildInfo, Self::Err>> + Send;
 }
 
 #[cfg(test)]

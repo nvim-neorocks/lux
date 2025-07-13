@@ -1,24 +1,20 @@
 use itertools::Itertools;
 use std::{
-    collections::HashMap,
     env, io,
-    path::Path,
     process::{ExitStatus, Stdio},
 };
 use thiserror::Error;
 use tokio::process::Command;
 
 use crate::{
-    build::utils,
+    build::{
+        backend::{BuildBackend, BuildInfo, RunBuildArgs},
+        utils,
+    },
     config::Config,
-    lua_installation::LuaInstallation,
-    lua_rockspec::{Build, BuildInfo, CMakeBuildSpec},
-    progress::{Progress, ProgressBar},
-    tree::{RockLayout, Tree},
+    lua_rockspec::CMakeBuildSpec,
     variables::{self, HasVariables, VariableSubstitutionError},
 };
-
-use super::external_dependency::ExternalDependencyInfo;
 
 const CMAKE_BUILD_FILE: &str = "build.lux";
 
@@ -54,20 +50,17 @@ impl HasVariables for CMakeVariables {
     }
 }
 
-impl Build for CMakeBuildSpec {
+impl BuildBackend for CMakeBuildSpec {
     type Err = CMakeError;
 
-    async fn run(
-        self,
-        output_paths: &RockLayout,
-        no_install: bool,
-        lua: &LuaInstallation,
-        external_dependencies: &HashMap<String, ExternalDependencyInfo>,
-        config: &Config,
-        _tree: &Tree,
-        build_dir: &Path,
-        _progress: &Progress<ProgressBar>,
-    ) -> Result<BuildInfo, Self::Err> {
+    async fn run(self, args: RunBuildArgs<'_>) -> Result<BuildInfo, Self::Err> {
+        let output_paths = args.output_paths;
+        let no_install = args.no_install;
+        let lua = args.lua;
+        let external_dependencies = args.external_dependencies;
+        let config = args.config;
+        let build_dir = args.build_dir;
+
         let mut args = Vec::new();
         if let Some(content) = self.cmake_lists_content {
             let cmakelists = build_dir.join("CMakeLists.txt");
