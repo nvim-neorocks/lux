@@ -1,2 +1,5 @@
 .lux
 .direnv
+
+# For the test project only
+lux.lock
