@@ -62,14 +62,14 @@ pub fn update_luarc(config: &Config) -> Result<(), ()> {
         &LocalPackageLockType::Test,
     );
 
-    let library_dirs: Vec<PathBuf> = dependency_dirs
+    let all_dependecy_dirs: Vec<PathBuf> = dependency_dirs
         .into_iter()
         .chain(test_dependency_dirs.into_iter())
         // make sure the paths actually exist
         .filter(|path| fs::exists(path).is_ok_and(|exists| exists))
         .collect();
 
-    let file = generate_luarc(luarc_content.as_str(), library_dirs);
+    let file = generate_luarc(luarc_content.as_str(), all_dependecy_dirs);
 
     fs::write(&luarc_path, file)
         .expect(format!("failed to write {} file", luarc_path.display()).as_str());
