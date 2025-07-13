@@ -24,26 +24,26 @@ struct Workspace {
     library: Vec<String>,
 }
 
-pub fn update_luarc(config: &Config) -> Result<(), ()> {
+pub fn update_luarc(config: &Config) {
     if !config.generate_luarc() {
-        return Ok(());
+        return; // do nothing
     }
     let project = Project::current_or_err().expect("failed to get current project");
     let lockfile = project.lockfile().expect("should have a lockfile");
     let luarc_path = project.luarc_path();
-    let dependency_tree = project.tree(&config).expect("failed to get project tree");
+    let dependency_tree = project.tree(config).expect("failed to get project tree");
     let dependency_tree_root_relative_path = dependency_tree
         .root()
-        .strip_prefix(&project.root())
+        .strip_prefix(project.root())
         .expect("tree root should be a subpath of project root")
         .to_path_buf();
 
     let test_dependency_tree = project
-        .test_tree(&config)
+        .test_tree(config)
         .expect("failed to get project test tree");
     let test_dependency_tree_root_relative_path = test_dependency_tree
         .root()
-        .strip_prefix(&project.root())
+        .strip_prefix(project.root())
         .expect("test tree root should be a subpath of project root")
         .to_path_buf();
 
@@ -64,7 +64,7 @@ pub fn update_luarc(config: &Config) -> Result<(), ()> {
 
     let all_dependecy_dirs: Vec<PathBuf> = dependency_dirs
         .into_iter()
-        .chain(test_dependency_dirs.into_iter())
+        .chain(test_dependency_dirs)
         // make sure the paths actually exist
         .filter(|path| fs::exists(path).is_ok_and(|exists| exists))
         .collect();
@@ -72,9 +72,7 @@ pub fn update_luarc(config: &Config) -> Result<(), ()> {
     let file = generate_luarc(luarc_content.as_str(), all_dependecy_dirs);
 
     fs::write(&luarc_path, file)
-        .expect(format!("failed to write {} file", luarc_path.display()).as_str());
-
-    Ok(())
+        .unwrap_or_else(|_| panic!("failed to write {} file", luarc_path.display()));
 }
 
 fn find_dependency_dirs(
@@ -84,10 +82,10 @@ fn find_dependency_dirs(
 ) -> Vec<PathBuf> {
     let rocks = lockfile.local_pkg_lock(local_package_lock_type).rocks();
 
-    return rocks
+    rocks
         .iter()
         .map(|t| lux_tree_base_dir.join(format!("{}-{}@{}/src", t.0, t.1.name(), t.1.version())))
-        .collect();
+        .collect()
 }
 
 fn generate_luarc(prev_contents: &str, extra_paths: Vec<PathBuf>) -> String {
