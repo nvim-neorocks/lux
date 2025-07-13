@@ -31,12 +31,23 @@ pub fn update_luarc(config: &Config) -> Result<(), ()> {
     }
     let project = Project::current_or_err().expect("failed to get current project");
     let tree = project.tree(&config).expect("failed to get project tree");
-    let luarc_path = project.luarc_path();
-
-    let luarc_content = fs::read_to_string(&luarc_path).unwrap_or_else(|_| String::from("{}"));
     let lockfile = project.lockfile().expect("should have a lockfile");
+    let luarc_path = project.luarc_path();
+    let relative_tree_root_path = tree
+        .root()
+        .strip_prefix(&project.root())
+        .expect("tree root should be a subpath of project root")
+        .to_path_buf();
 
-    let dependency_dirs = find_dependency_dirs(&lockfile, tree.root());
+    // read the existing .luarc file or create a new one if it doesn't exist
+    let luarc_content = fs::read_to_string(&luarc_path).unwrap_or_else(|_| String::from("{}"));
+
+    let dependency_dirs = find_dependency_dirs(&lockfile, relative_tree_root_path)
+        .into_iter()
+        // make sure the paths actually exist
+        .filter(|path| fs::exists(path).is_ok_and(|exists| exists))
+        .collect();
+
     let file = generate_luarc(luarc_content.as_str(), dependency_dirs);
 
     fs::write(&luarc_path, file)
@@ -55,7 +66,7 @@ fn find_dependency_dirs(
 
     let directories: Vec<PathBuf> = rocks
         .iter()
-        .map(|t| lux_tree_base_dir.join(format!("/{}-{}@{}/src", t.0, t.1.name(), t.1.version())))
+        .map(|t| lux_tree_base_dir.join(format!("{}-{}@{}/src", t.0, t.1.name(), t.1.version())))
         .collect();
 
     let test_rocks = lockfile.local_pkg_lock(&LocalPackageLockType::Test).rocks();
@@ -64,7 +75,7 @@ fn find_dependency_dirs(
         .iter()
         .map(|t| {
             lux_tree_base_dir.join(format!(
-                "/test-dependencies/{}-{}@{}/src",
+                "test-dependencies/{}-{}@{}/src",
                 t.0,
                 t.1.name(),
                 t.1.version()
