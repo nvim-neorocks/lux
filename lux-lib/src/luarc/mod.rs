@@ -81,6 +81,12 @@ fn find_dependency_dirs(
 fn generate_luarc(prev_contents: &str, extra_paths: Vec<PathBuf>) -> String {
     let mut luarc: LuaRC = serde_json::from_str(prev_contents).unwrap();
 
+    // remove any preexisting lux library paths
+    luarc
+        .workspace
+        .library
+        .retain(|path| !path.starts_with(".lux/"));
+
     for p in extra_paths {
         let path = p.clone().into_os_string().into_string();
         if let Ok(path_str) = path {
@@ -104,30 +110,16 @@ mod test {
     fn test_generate_luarc_with_previous_libraries_parametrized() {
         let cases = vec![
             (
-                "Preexisting lib in the middle", // 📝 Description
-                r#"{
-                    "workspace": {
-                        "library": ["2-preexisting-lib"]
-                    }
-                }"#,
-                vec!["1-some-lib-A".into(), "3-some-lib-B".into()],
-                r#"{
-                    "workspace": {
-                        "library": ["1-some-lib-A", "2-preexisting-lib", "3-some-lib-B"]
-                    }
-                }"#,
-            ),
-            (
                 "Empty existing libraries, adding single lib", // 📝 Description
                 r#"{
                     "workspace": {
                         "library": []
                     }
                 }"#,
-                vec!["my-lib".into()],
+                vec![".lux/5.1/my-lib".into()],
                 r#"{
                     "workspace": {
-                        "library": ["my-lib"]
+                        "library": [".lux/5.1/my-lib"]
                     }
                 }"#,
             ),
@@ -139,11 +131,25 @@ mod test {
                         "library": []
                     }
                 }"#,
-                vec!["lib-A".into(), "lib-B".into()],
+                vec![".lux/5.1/lib-A".into(), ".lux/5.1/lib-B".into()],
                 r#"{
                     "any-other-field": true,
                     "workspace": {
-                        "library": ["lib-A", "lib-B"]
+                        "library": [".lux/5.1/lib-A", ".lux/5.1/lib-B"]
+                    }
+                }"#,
+            ),
+            (
+                "Removes not present libs, without removing others", // 📝 Description
+                r#"{
+                    "workspace": {
+                        "library": [".lux/5.1/lib-A", ".lux/5.4/lib-B"]
+                    }
+                }"#,
+                vec![".lux/5.1/lib-C".into()],
+                r#"{
+                    "workspace": {
+                        "library": [".lux/5.1/lib-C"]
                     }
                 }"#,
             ),
