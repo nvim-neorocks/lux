@@ -13,6 +13,8 @@ use crate::{
     },
     config::Config,
     lua_rockspec::CMakeBuildSpec,
+    path::{Paths, PathsError},
+    tree::TreeError,
     variables::{self, HasVariables, VariableSubstitutionError},
 };
 
@@ -20,6 +22,10 @@ const CMAKE_BUILD_FILE: &str = "build.lux";
 
 #[derive(Error, Debug)]
 pub enum CMakeError {
+    #[error(transparent)]
+    Tree(#[from] TreeError),
+    #[error(transparent)]
+    Paths(#[from] PathsError),
     #[error("{name} step failed.\n\n{status}\n\nstdout:\n{stdout}\n\nstderr:\n{stderr}")]
     CommandFailure {
         name: String,
@@ -61,6 +67,12 @@ impl BuildBackend for CMakeBuildSpec {
         let config = args.config;
         let build_dir = args.build_dir;
 
+        let build_tree = args.tree.build_tree(config)?;
+        let build_paths = Paths::new(&build_tree)?;
+        let lua_path = build_paths.package_path_prepended().joined();
+        let lua_cpath = build_paths.package_cpath_prepended().joined();
+        let bin_path = build_paths.path_prepended().joined();
+
         let mut args = Vec::new();
         if let Some(content) = self.cmake_lists_content {
             let cmakelists = build_dir.join("CMakeLists.txt");
@@ -91,7 +103,10 @@ impl BuildBackend for CMakeBuildSpec {
                 .current_dir(build_dir)
                 .arg("-H.")
                 .arg(format!("-B{}", CMAKE_BUILD_FILE))
-                .args(args),
+                .args(args)
+                .env("PATH", &bin_path)
+                .env("LUA_PATH", &lua_path)
+                .env("LUA_CPATH", &lua_cpath),
             config,
         )
         .await?;
@@ -103,7 +118,10 @@ impl BuildBackend for CMakeBuildSpec {
                     .arg("--build")
                     .arg(CMAKE_BUILD_FILE)
                     .arg("--config")
-                    .arg("Release"),
+                    .arg("Release")
+                    .env("PATH", &bin_path)
+                    .env("LUA_PATH", &lua_path)
+                    .env("LUA_CPATH", &lua_cpath),
                 config,
             )
             .await?
@@ -118,7 +136,10 @@ impl BuildBackend for CMakeBuildSpec {
                     .arg("--target")
                     .arg("install")
                     .arg("--config")
-                    .arg("Release"),
+                    .arg("Release")
+                    .env("PATH", &bin_path)
+                    .env("LUA_PATH", &lua_path)
+                    .env("LUA_CPATH", &lua_cpath),
                 config,
             )
             .await?;

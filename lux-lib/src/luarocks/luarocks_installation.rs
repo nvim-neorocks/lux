@@ -1,9 +1,7 @@
-use futures::future::join_all;
 use itertools::Itertools;
 use path_slash::{PathBufExt, PathExt};
 use ssri::Integrity;
 use std::{
-    collections::HashMap,
     io,
     path::{Path, PathBuf},
     process::ExitStatus,
@@ -14,19 +12,25 @@ use thiserror::Error;
 use tokio::process::Command;
 
 use crate::{
-    build::{Build, BuildError},
+    build::BuildError,
     config::{Config, LuaVersion, LuaVersionUnset},
-    lockfile::{LocalPackage, LocalPackageId},
     lua_installation::LuaInstallation,
     lua_rockspec::RockspecFormat,
-    operations::{get_all_dependencies, PackageInstallSpec, SearchAndDownloadError, UnpackError},
+    operations::{
+        build_dependencies::{InstallBuildDependencies, InstallBuildDependenciesError},
+        install::PackageInstallSpec,
+        UnpackError,
+    },
     path::{Paths, PathsError},
     progress::{MultiProgress, Progress, ProgressBar},
-    remote_package_db::{RemotePackageDB, RemotePackageDBError},
+    remote_package_db::RemotePackageDB,
     rockspec::Rockspec,
     tree::{self, Tree, TreeError},
     variables::{self, VariableSubstitutionError},
 };
+
+#[cfg(target_family = "unix")]
+use crate::build::Build;
 
 #[cfg(target_family = "unix")]
 const LUAROCKS_EXE: &str = "luarocks";
@@ -73,20 +77,6 @@ pub enum LuaRocksInstallError {
     UnpackError(#[from] UnpackError),
     #[error("luarocks integrity mismatch.\nExpected: {expected}\nBut got: {got}")]
     IntegrityMismatch { expected: Integrity, got: Integrity },
-}
-
-#[derive(Error, Debug)]
-pub enum InstallBuildDependenciesError {
-    #[error(transparent)]
-    Io(#[from] io::Error),
-    #[error(transparent)]
-    Tree(#[from] TreeError),
-    #[error(transparent)]
-    RemotePackageDBError(#[from] RemotePackageDBError),
-    #[error(transparent)]
-    SearchAndDownloadError(#[from] SearchAndDownloadError),
-    #[error(transparent)]
-    BuildError(#[from] BuildError),
 }
 
 #[derive(Error, Debug)]
@@ -204,7 +194,6 @@ impl LuaRocksInstallation {
         progress_arc: Arc<Progress<MultiProgress>>,
     ) -> Result<(), InstallBuildDependenciesError> {
         let progress = Arc::clone(&progress_arc);
-        let mut lockfile = self.tree.lockfile()?.write_guard();
         let bar = progress.map(|p| p.new_bar());
         let package_db = RemotePackageDB::from_config(&self.config, &bar).await?;
         bar.map(|b| b.finish_and_clear());
@@ -226,74 +215,14 @@ impl LuaRocksInstallation {
         .map(|dep| PackageInstallSpec::new(dep.package_req, tree::EntryType::Entrypoint).build())
         .collect_vec();
 
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-        get_all_dependencies(
-            tx,
-            build_dependencies,
-            Arc::new(package_db),
-            Arc::new(lockfile.clone()),
-            &self.config,
-            progress_arc,
-        )
-        .await?;
-
-        let mut all_packages = HashMap::with_capacity(rx.len());
-        while let Some(dep) = rx.recv().await {
-            all_packages.insert(dep.spec.id(), dep);
-        }
-
-        let installed_packages = join_all(all_packages.clone().into_values().map(|install_spec| {
-            let bar = progress.map(|p| {
-                p.add(ProgressBar::from(format!(
-                    "💻 Installing build dependency: {}",
-                    install_spec.downloaded_rock.rockspec().package(),
-                )))
-            });
-            let config = self.config.clone();
-            let tree = self.tree.clone();
-            tokio::spawn(async move {
-                let rockspec = install_spec.downloaded_rock.rockspec();
-                let pkg = Build::new(rockspec, &tree, tree::EntryType::Entrypoint, &config, &bar)
-                    .constraint(install_spec.spec.constraint())
-                    .behaviour(install_spec.build_behaviour)
-                    .build()
-                    .await?;
-
-                bar.map(|b| b.finish_and_clear());
-
-                Ok::<_, InstallBuildDependenciesError>((pkg.id(), (pkg, install_spec.entry_type)))
-            })
-        }))
-        .await
-        .into_iter()
-        .flatten()
-        .try_collect::<_, HashMap<LocalPackageId, (LocalPackage, tree::EntryType)>, _>()?;
-
-        installed_packages
-            .iter()
-            .for_each(|(id, (pkg, entry_type))| {
-                if *entry_type == tree::EntryType::Entrypoint {
-                    lockfile.add_entrypoint(pkg);
-                }
-
-                all_packages
-                    .get(id)
-                    .map(|pkg| pkg.spec.dependencies())
-                    .unwrap_or_default()
-                    .into_iter()
-                    .for_each(|dependency_id| {
-                        lockfile.add_dependency(
-                            pkg,
-                            &installed_packages
-                                .get(dependency_id)
-                                // NOTE: This can happen if an install thread panics
-                                .expect("required dependency not found [This is a bug!]")
-                                .0,
-                        );
-                    });
-            });
-
-        Ok(())
+        InstallBuildDependencies::new()
+            .config(&self.config)
+            .tree(&self.tree)
+            .package_db(&package_db)
+            .progress(progress_arc)
+            .packages(build_dependencies)
+            .install()
+            .await
     }
 
     pub async fn make(

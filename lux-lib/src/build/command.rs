@@ -13,7 +13,8 @@ use crate::{
     config::Config,
     lua_installation::LuaInstallation,
     lua_rockspec::CommandBuildSpec,
-    tree::RockLayout,
+    path::{Paths, PathsError},
+    tree::{RockLayout, TreeError},
     variables::VariableSubstitutionError,
 };
 
@@ -22,6 +23,10 @@ use super::utils;
 
 #[derive(Error, Debug)]
 pub enum CommandError {
+    #[error(transparent)]
+    Tree(#[from] TreeError),
+    #[error(transparent)]
+    Paths(#[from] PathsError),
     #[error("'build_command' and 'install_command' cannot be empty.")]
     EmptyCommand,
     #[error("error parsing command:\n{command}\n\nerror: {err}")]
@@ -54,6 +59,9 @@ impl BuildBackend for CommandBuildSpec {
         let build_dir = args.build_dir;
         let progress = args.progress;
 
+        let build_tree = args.tree.build_tree(config)?;
+        let build_paths = Paths::new(&build_tree)?;
+
         progress.map(|bar| bar.set_message("Running build_command..."));
         if let Some(build_command) = &self.build_command {
             progress.map(|bar| bar.set_message("Running build_command..."));
@@ -64,6 +72,7 @@ impl BuildBackend for CommandBuildSpec {
                 external_dependencies,
                 config,
                 build_dir,
+                &build_paths,
             )
             .await?;
         }
@@ -77,6 +86,7 @@ impl BuildBackend for CommandBuildSpec {
                     external_dependencies,
                     config,
                     build_dir,
+                    &build_paths,
                 )
                 .await?;
             }
@@ -92,7 +102,11 @@ async fn run_command(
     external_dependencies: &HashMap<String, ExternalDependencyInfo>,
     config: &Config,
     build_dir: &Path,
+    build_paths: &Paths,
 ) -> Result<(), CommandError> {
+    let lua_path = build_paths.package_path_prepended().joined();
+    let lua_cpath = build_paths.package_cpath_prepended().joined();
+    let bin_path = build_paths.path_prepended().joined();
     let substituted_cmd =
         utils::substitute_variables(command, output_paths, lua, external_dependencies, config)?;
     let cmd_parts = split(&substituted_cmd).map_err(|err| CommandError::ParseError {
@@ -105,6 +119,9 @@ async fn run_command(
         .current_dir(build_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
+        .env("PATH", &bin_path)
+        .env("LUA_PATH", &lua_path)
+        .env("LUA_CPATH", &lua_cpath)
         .spawn()
     {
         Err(err) => {

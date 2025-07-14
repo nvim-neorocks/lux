@@ -14,11 +14,17 @@ use crate::{
         utils,
     },
     lua_rockspec::MakeBuildSpec,
+    path::{Paths, PathsError},
+    tree::TreeError,
     variables::VariableSubstitutionError,
 };
 
 #[derive(Error, Debug)]
 pub enum MakeError {
+    #[error(transparent)]
+    Tree(#[from] TreeError),
+    #[error(transparent)]
+    Paths(#[from] PathsError),
     #[error("{name} step failed.\n\n{status}\n\nstdout:\n{stdout}\n\nstderr:\n{stderr}")]
     CommandFailure {
         name: String,
@@ -46,6 +52,12 @@ impl BuildBackend for MakeBuildSpec {
         let external_dependencies = args.external_dependencies;
         let config = args.config;
         let build_dir = args.build_dir;
+
+        let build_tree = args.tree.build_tree(config)?;
+        let build_paths = Paths::new(&build_tree)?;
+        let lua_path = build_paths.package_path_prepended().joined();
+        let lua_cpath = build_paths.package_cpath_prepended().joined();
+        let bin_path = build_paths.path_prepended().joined();
 
         // Build step
         if self.build_pass {
@@ -75,6 +87,9 @@ impl BuildBackend for MakeBuildSpec {
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .args(build_args)
+                .env("PATH", &bin_path)
+                .env("LUA_PATH", &lua_path)
+                .env("LUA_CPATH", &lua_cpath)
                 .spawn()
             {
                 Ok(child) => match child.wait_with_output().await {
@@ -122,6 +137,9 @@ impl BuildBackend for MakeBuildSpec {
                 .arg(&self.install_target)
                 .args(["-f", &self.makefile.to_slash_lossy()])
                 .args(install_args)
+                .env("PATH", &bin_path)
+                .env("LUA_PATH", &lua_path)
+                .env("LUA_CPATH", &lua_cpath)
                 .output()
                 .await
             {
