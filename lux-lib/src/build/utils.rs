@@ -2,6 +2,7 @@ use crate::{
     config::Config,
     lua_installation::LuaInstallation,
     lua_rockspec::{DeploySpec, LuaModule, ModulePaths},
+    path::{Paths, PathsError},
     tree::{RockLayout, Tree},
     variables::{self, Environment, VariableSubstitutionError},
 };
@@ -13,11 +14,13 @@ use std::{
     collections::HashMap,
     io,
     path::{Path, PathBuf},
-    process::{ExitStatus, Output},
+    process::{ExitStatus, Output, Stdio},
     string::FromUtf8Error,
 };
 use target_lexicon::Triple;
 use thiserror::Error;
+use tokio::process::Command;
+use which::which;
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -466,6 +469,8 @@ pub(crate) async fn compile_c_modules(
 pub enum InstallBinaryError {
     #[error(transparent)]
     Io(#[from] io::Error),
+    #[error(transparent)]
+    Paths(#[from] PathsError),
     #[error("error wrapping binary: {0}")]
     Wrap(#[from] WrapBinaryError),
 }
@@ -490,13 +495,15 @@ pub(crate) async fn install_binary(
     config: &Config,
 ) -> Result<PathBuf, InstallBinaryError> {
     tokio::fs::create_dir_all(&tree.bin()).await?;
-    let script = if deploy.wrap_bin_scripts && is_compatible_lua_script(source, lua, config).await {
-        install_wrapped_binary(source, target, tree, lua, config).await?
-    } else {
-        let target = tree.bin().join(target);
-        tokio::fs::copy(source, &target).await?;
-        target
-    };
+    let paths = Paths::new(tree)?;
+    let script =
+        if deploy.wrap_bin_scripts && is_compatible_lua_script(source, lua, &paths, config).await {
+            install_wrapped_binary(source, target, tree, lua, config).await?
+        } else {
+            let target = tree.bin().join(target);
+            tokio::fs::copy(source, &target).await?;
+            target
+        };
 
     #[cfg(unix)]
     set_executable_permissions(&script).await?;
@@ -568,6 +575,45 @@ async fn set_executable_permissions(script: &Path) -> std::io::Result<()> {
 /// wrapping with the `deploy.wrap_bin_scripts` rockspec config.
 async fn is_compatible_lua_script(
     file: &Path,
+    lua: &LuaInstallation,
+    paths: &Paths,
+    config: &Config,
+) -> bool {
+    let lua_path = paths.package_path_prepended().joined();
+    let lua_cpath = paths.package_cpath_prepended().joined();
+    let path = paths.path_prepended().joined();
+    if let Some(lua_bin) = &lua.lua_binary_or_config_override(config) {
+        let lua_bin_path = PathBuf::from(lua_bin);
+        if lua_bin_path.is_file() || which(lua_bin).is_ok() {
+            Command::new(lua_bin)
+                .arg("-e")
+                .arg(format!(
+                    "if loadfile('{}') then os.exit(0) else os.exit(1) end",
+                    // On Windows, Lua escapes path separators, so we ensure forward slashes
+                    file.to_slash_lossy()
+                ))
+                .stderr(Stdio::null())
+                .stdout(Stdio::null())
+                .env("LUA_PATH", lua_path)
+                .env("LUA_CPATH", lua_cpath)
+                .env("PATH", path)
+                .status()
+                .await
+                .is_ok_and(|status| status.success())
+        } else {
+            is_compatible_lua_script_fallback(file, lua, config).await
+        }
+    } else {
+        false
+    }
+}
+
+/// Fallback function for `is_compatible_lua_script`.
+/// Uses the bundled Lua interpreter. This may be less reliable,
+/// as it cannot load scripts for an incompatible Lua version.
+/// But it works for test dependencies like nlua.
+async fn is_compatible_lua_script_fallback(
+    file: &Path,
     lua_installation: &LuaInstallation,
     config: &Config,
 ) -> bool {
@@ -636,10 +682,13 @@ mod tests {
         let lua = LuaInstallation::new(lua_version, &config).await.unwrap();
         let valid_script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("resources/test/sample_lua_bin_script_valid");
-        assert!(is_compatible_lua_script(&valid_script, &lua, &config).await);
+        let temp_dir = assert_fs::TempDir::new().unwrap().to_path_buf();
+        let tree = Tree::new(temp_dir, lua_version.clone(), &config).unwrap();
+        let paths = Paths::new(&tree).unwrap();
+        assert!(is_compatible_lua_script(&valid_script, &lua, &paths, &config).await);
         let invalid_script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("resources/test/sample_lua_bin_script_invalid");
-        assert!(!is_compatible_lua_script(&invalid_script, &lua, &config).await);
+        assert!(!is_compatible_lua_script(&invalid_script, &lua, &paths, &config).await);
     }
 
     #[tokio::test]
