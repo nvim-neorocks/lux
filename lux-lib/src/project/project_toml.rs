@@ -1150,6 +1150,18 @@ mod tests {
 
         [build]
         type = "builtin"
+
+        [build.install.lua]
+        "foo.bar" = "src/bar.lua"
+
+        [build.install.lib]
+        "foo.baz" = "src/baz.c"
+
+        [build.install.bin]
+        "bla" = "src/bla"
+
+        [build.install.conf]
+        "cfg.conf" = "resources/config.conf"
         "#;
 
         let expected_rockspec = r#"
@@ -1209,6 +1221,20 @@ mod tests {
 
             build = {
                 type = "builtin",
+                install = {
+                    lua = {
+                        ["foo.bar"] = "src/bar.lua",
+                    },
+                    lib = {
+                        ["foo.baz"] = "src/baz.c",
+                    },
+                    bin = {
+                        bla = "src/bla",
+                    },
+                    conf = {
+                        ["cfg.conf"] = "resources/config.conf",
+                    },
+                },
             }
         "#;
 

@@ -7,6 +7,7 @@ mod tree_sitter;
 pub use builtin::{BuiltinBuildSpec, LuaModule, ModulePaths, ModuleSpec};
 pub use cmake::*;
 pub use make::*;
+use path_slash::PathBufExt;
 pub use rust_mlua::*;
 pub use tree_sitter::*;
 
@@ -402,25 +403,61 @@ impl DisplayAsLuaKV for InstallSpec {
     fn display_lua(&self) -> DisplayLuaKV {
         let mut result = Vec::new();
 
-        self.lua
-            .iter()
-            .chain(self.lib.iter())
-            .for_each(|(key, value)| {
-                result.push(DisplayLuaKV {
-                    key: key.to_string(),
-                    value: DisplayLuaValue::String(value.to_string_lossy().to_string()),
-                });
+        let mut lua_entries = Vec::new();
+        self.lua.iter().for_each(|(key, value)| {
+            lua_entries.push(DisplayLuaKV {
+                key: key.to_string(),
+                value: DisplayLuaValue::String(value.to_slash_lossy().to_string()),
             });
+        });
+        if !lua_entries.is_empty() {
+            result.push(DisplayLuaKV {
+                key: "lua".to_string(),
+                value: DisplayLuaValue::Table(lua_entries),
+            });
+        }
 
-        self.conf
-            .iter()
-            .chain(self.bin.iter())
-            .for_each(|(key, value)| {
-                result.push(DisplayLuaKV {
-                    key: key.clone(),
-                    value: DisplayLuaValue::String(value.to_string_lossy().to_string()),
-                });
+        let mut lib_entries = Vec::new();
+        self.lib.iter().for_each(|(key, value)| {
+            lib_entries.push(DisplayLuaKV {
+                key: key.to_string(),
+                value: DisplayLuaValue::String(value.to_slash_lossy().to_string()),
             });
+        });
+        if !lib_entries.is_empty() {
+            result.push(DisplayLuaKV {
+                key: "lib".to_string(),
+                value: DisplayLuaValue::Table(lib_entries),
+            });
+        }
+
+        let mut bin_entries = Vec::new();
+        self.bin.iter().for_each(|(key, value)| {
+            bin_entries.push(DisplayLuaKV {
+                key: key.clone(),
+                value: DisplayLuaValue::String(value.to_slash_lossy().to_string()),
+            });
+        });
+        if !bin_entries.is_empty() {
+            result.push(DisplayLuaKV {
+                key: "bin".to_string(),
+                value: DisplayLuaValue::Table(bin_entries),
+            });
+        }
+
+        let mut conf_entries = Vec::new();
+        self.conf.iter().for_each(|(key, value)| {
+            conf_entries.push(DisplayLuaKV {
+                key: key.clone(),
+                value: DisplayLuaValue::String(value.to_slash_lossy().to_string()),
+            });
+        });
+        if !conf_entries.is_empty() {
+            result.push(DisplayLuaKV {
+                key: "conf".to_string(),
+                value: DisplayLuaValue::Table(conf_entries),
+            });
+        }
 
         DisplayLuaKV {
             key: "install".to_string(),
