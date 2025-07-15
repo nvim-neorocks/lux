@@ -131,7 +131,7 @@ async fn run_command(
             })
         }
         Ok(child) => match child.wait_with_output().await {
-            Ok(output) if output.status.success() => {}
+            Ok(output) if output.status.success() => utils::log_command_output(&output, config),
             Ok(output) => {
                 return Err(CommandError::CommandFailure {
                     command: substituted_cmd,

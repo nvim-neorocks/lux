@@ -12,7 +12,7 @@ use thiserror::Error;
 use tokio::process::Command;
 
 use crate::{
-    build::BuildError,
+    build::{self, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
     lua_installation::LuaInstallation,
     lua_rockspec::RockspecFormat,
@@ -298,6 +298,7 @@ variables = {{
             .output()
             .await?;
         if output.status.success() {
+            build::utils::log_command_output(&output, &self.config);
             Ok(())
         } else {
             Err(ExecLuaRocksError::CommandFailure {

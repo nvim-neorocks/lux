@@ -82,7 +82,7 @@ pub enum OutputValidationError {
     },
 }
 
-fn validate_output(output: Output) -> Result<(), OutputValidationError> {
+fn validate_output(output: &Output) -> Result<(), OutputValidationError> {
     if !output.status.success() {
         return Err(OutputValidationError::CommandFailure {
             status: output.status,
@@ -212,7 +212,8 @@ pub(crate) async fn compile_c_files(
         }
     }
 
-    validate_output(output)?;
+    validate_output(&output)?;
+    log_command_output(&output, config);
 
     if output_path.exists() {
         Ok(())
@@ -454,7 +455,8 @@ pub(crate) async fn compile_c_modules(
         }
     }
 
-    validate_output(output)?;
+    validate_output(&output)?;
+    log_command_output(&output, config);
 
     if output_path.exists() {
         Ok(())
@@ -509,6 +511,18 @@ pub(crate) async fn install_binary(
     set_executable_permissions(&script).await?;
 
     Ok(script)
+}
+
+/// Logs the output's stdout and stderr in verbose mode
+pub(crate) fn log_command_output(output: &Output, config: &Config) {
+    if config.verbose() {
+        if !output.stderr.is_empty() {
+            println!("{}", String::from_utf8_lossy(&output.stderr));
+        }
+        if !output.stdout.is_empty() {
+            println!("{}", String::from_utf8_lossy(&output.stdout));
+        }
+    }
 }
 
 async fn install_wrapped_binary(
