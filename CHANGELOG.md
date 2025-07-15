@@ -6,6 +6,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.9.1](https://github.com/nvim-neorocks/lux/compare/v0.9.0...v0.9.1) - 2025-07-15
+
+### Other
+- release ([#867](https://github.com/nvim-neorocks/lux/pull/867))
+
+## `lux-lib` - [0.13.2](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.13.1...lux-lib-v0.13.2) - 2025-07-15
+
+### Fixed
+- *(lux.toml)* bad conversion of deploy spec to lua ([#871](https://github.com/nvim-neorocks/lux/pull/871))
+
 ## `lux-cli` - [0.9.1](https://github.com/nvim-neorocks/lux/compare/v0.9.0...v0.9.1) - 2025-07-14
 
 ### Other
