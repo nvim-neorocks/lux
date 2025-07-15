@@ -26,5 +26,6 @@ lua52 = ["mlua/module", "mlua/lua52", "lux-lib/lua52"]
 lua53 = ["mlua/module", "mlua/lua53", "lux-lib/lua53"]
 lua54 = ["mlua/module", "mlua/lua54", "lux-lib/lua54"]
 luajit = ["mlua/module", "mlua/luajit", "lux-lib/luajit"]
+vendored = ["lux-lib/vendored-openssl"]
 # Run tests without module mode so we can link against Lua and run the tests.
 test = ["mlua/vendored", "lux-lib/lua51"]

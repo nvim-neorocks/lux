@@ -14,7 +14,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
-      
+
       - name: Install C/C++ Compiler
         uses: rlalik/setup-cpp-compiler@master
         with:
@@ -40,7 +40,7 @@ jobs:
         run: |
           $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\ProgramData\chocolatey\bin"
           [Environment]::SetEnvironmentVariable("Path", $env:PATH, "Machine")
-          choco install -y --no-progress openssl libgit2 make cmake
+          choco install -y --no-progress libgit2 make cmake
 
       - name: Install Rust Toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -52,7 +52,7 @@ jobs:
         env:
           OPENSSL_DIR: C:\Program Files\OpenSSL
           OPENSSL_LIB_DIR: C:\Program Files\OpenSSL\lib\VC\x64\MD
-        run: cargo build --features vendored-lua
+        run: cargo build --features vendored
 
       - name: Run tests
         env:
@@ -61,4 +61,4 @@ jobs:
           CC_ENABLE_DEBUG_OUTPUT: true
           CFLAGS: "/NOLOGO /MT /O2"
         run: |
-          cargo nextest run --test "*" --no-fail-fast --features vendored-lua
+          cargo nextest run --test "*" --no-fail-fast --features vendored

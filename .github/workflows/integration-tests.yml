@@ -1,4 +1,4 @@
-on: 
+on:
   pull_request:
     types: [opened, ready_for_review, reopened, synchronize]
   push:
@@ -21,7 +21,7 @@ jobs:
           { version: "luajit-2.1", feature: "luajit" }
         ]
       fail-fast: false
-          
+
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -39,4 +39,9 @@ jobs:
           name: neorocks
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: Run tests (Linux/macOS)
-        run: nix develop .#${{ matrix.lua.feature }} --command cargo nextest run --test "*"
+        run: |
+          nix develop .#${{ matrix.lua.feature }} \
+            --command cargo nextest run \
+            --test "*" \
+            --no-fail-fast \
+            --features vendored

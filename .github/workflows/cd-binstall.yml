@@ -1,4 +1,4 @@
-name: CD
+name: CD (cargo-binstall)
 
 permissions:
   contents: write
@@ -38,11 +38,11 @@ jobs:
           - target: aarch64-unknown-linux-musl
             os: ubuntu-22.04
           - target: aarch64-apple-darwin
-            os: macos-13
+            os: macos-15
           # - target: aarch64-pc-windows-msvc
           #   os: windows-2022
           - target: x86_64-pc-windows-msvc
-            os: windows-2022
+            os: windows-2025
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-22.04
           - target: x86_64-unknown-linux-musl
@@ -93,15 +93,13 @@ jobs:
       - name: "Setup environment for MSVC"
         run: |
           echo "RUSTFLAGS=${RUSTFLAGS} -C target-feature=+crt-static" >> "${GITHUB_ENV}"
-          echo "OPENSSL_DIR=C:\Program Files\OpenSSL" >> "${GITHUB_ENV}"
-          echo "OPENSSL_LIB_DIR=C:\Program Files\OpenSSL\lib\VC\x64\MD" >> "${GITHUB_ENV}"
         if: endsWith(matrix.target, 'windows-msvc')
 
       - name: Install Build Dependencies
         run: |
           $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\ProgramData\chocolatey\bin"
           [Environment]::SetEnvironmentVariable("Path", $env:PATH, "Machine")
-          choco install -y --no-progress openssl libgit2
+          choco install -y --no-progress libgit2
         if: endsWith(matrix.target, 'windows-msvc')
 
       - uses: taiki-e/upload-rust-binary-action@v1
@@ -109,7 +107,7 @@ jobs:
         with:
           bin: lx
           target: ${{ matrix.target }}
-          features: vendored-lua
+          features: vendored
           tar: all
           zip: windows
           token: ${{ secrets.GITHUB_TOKEN }}
