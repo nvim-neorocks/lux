@@ -5,10 +5,13 @@ use std::{
     process::{Command, Stdio},
 };
 
+use cargo_packager::config::Binary;
 use clap::{CommandFactory, ValueEnum};
 use clap_complete::{generate_to, Shell};
 use clap_mangen::Man;
 use lux_cli::Cli;
+use serde::Deserialize;
+use xtask_lua::LuaFeature;
 
 type DynError = Box<dyn std::error::Error>;
 
@@ -28,6 +31,7 @@ fn try_main() -> Result<(), DynError> {
         Some("dist") => dist(true)?,
         Some("dist-man") => dist_man()?,
         Some("dist-completions") => dist_completions()?,
+        Some("dist-package") => dist_package()?,
         Some("build") => build(false)?,
         Some("build-release") => build(true)?,
         _ => print_help(),
@@ -43,6 +47,7 @@ fn print_help() {
 build               builds and links all libraries and the application
 dist-man            builds man pages
 dist-completions    builds shell completions
+dist-package       builds an AppImage
 dist                builds everything, equivalent to build + dist-man + dist-completions
 
 LUA_LIB_DIR         when set, overrides the path to the directory containing the compiled lux-lua libraries
@@ -62,7 +67,7 @@ fn build(release: bool) -> Result<(), DynError> {
     let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let dest_dir = project_root().join(format!("target/{profile}"));
 
-    let mut args = vec!["build", "--features", "luajit"];
+    let mut args = vec!["build"];
 
     if release {
         args.push("--release");
@@ -92,7 +97,11 @@ fn build(release: bool) -> Result<(), DynError> {
 
     let dest = dest_dir.join("lx");
 
+    if !dest.is_file() {
+        Err(format!("{} not found", dest.display()))?;
+    }
     if release {
+        fs::create_dir_all(dist_dir())?;
         fs::copy(&dest, dist_dir().join("lx"))?;
     }
 
@@ -134,6 +143,84 @@ fn dist_completions() -> Result<(), DynError> {
         generate_to(*shell, cmd, "lx", dist_dir()).unwrap();
     }
 
+    Ok(())
+}
+
+#[derive(Deserialize)]
+struct LuxManifest {
+    workspace: LuxWorkspace,
+}
+
+#[derive(Deserialize)]
+struct LuxWorkspace {
+    package: LuxPackage,
+}
+
+#[derive(Deserialize)]
+struct LuxPackage {
+    version: String,
+}
+
+fn dist_package() -> Result<(), DynError> {
+    let _ = fs::remove_dir_all(dist_dir());
+    // TODO: create pkgconfig file for each lux-lua version
+    xtask_lua::dist(
+        true,
+        Some(xtask_lua::DistOpts {
+            lua_feature: Some(LuaFeature::Lua51),
+            clean_dist_dir: false,
+        }),
+    )?;
+    xtask_lua::dist(
+        true,
+        Some(xtask_lua::DistOpts {
+            lua_feature: Some(LuaFeature::Lua52),
+            clean_dist_dir: false,
+        }),
+    )?;
+    xtask_lua::dist(
+        true,
+        Some(xtask_lua::DistOpts {
+            lua_feature: Some(LuaFeature::Lua53),
+            clean_dist_dir: false,
+        }),
+    )?;
+    xtask_lua::dist(
+        true,
+        Some(xtask_lua::DistOpts {
+            lua_feature: Some(LuaFeature::Lua54),
+            clean_dist_dir: false,
+        }),
+    )?;
+    xtask_lua::dist(
+        true,
+        Some(xtask_lua::DistOpts {
+            lua_feature: Some(LuaFeature::Luajit),
+            clean_dist_dir: false,
+        }),
+    )?;
+    build(true)?;
+    let project_root = project_root();
+    let manifest_path = project_root.join("Cargo.toml");
+    let manifest_content = fs::read_to_string(manifest_path)?;
+    let manifest: LuxManifest = toml::from_str(&manifest_content)?;
+    let lx_bin_path = dist_dir().join("lx");
+    if !lx_bin_path.is_file() {
+        Err(format!("{} not found", lx_bin_path.display()))?;
+    }
+    // TODO(mrcjkb): Move this to another xtask crate that can also build lux-lua
+    let config_builder = cargo_packager::Config::builder()
+        .product_name("lux")
+        .version(manifest.workspace.package.version)
+        .out_dir(dist_dir())
+        .binaries(vec![Binary::new(lx_bin_path).main(true)])
+        .description("A luxurious package manager for Lua")
+        .homepage("https://nvim-neorocks.github.io/")
+        .authors(vec!["mrcjkb", "vhyrro"])
+        .publisher("nvim-neorocks")
+        .license_file(project_root.join("LICENSE"))
+        .icons(vec![project_root.join("lux-logo.svg").to_string_lossy()]);
+    cargo_packager::package(config_builder.config())?; // TODO(mrcjkb): use package_and_sign
     Ok(())
 }
 
