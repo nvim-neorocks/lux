@@ -6,6 +6,22 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.10.0](https://github.com/nvim-neorocks/lux/compare/v0.9.1...v0.10.0) - 2025-07-15
+
+### Added
+- *(build)* [**breaking**] more output in verbose mode ([#876](https://github.com/nvim-neorocks/lux/pull/876))
+
+### Fixed
+- *(cli)* typo in help docs ([#872](https://github.com/nvim-neorocks/lux/pull/872))
+
+## `lux-lib` - [0.14.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.13.2...lux-lib-v0.14.0) - 2025-07-15
+
+### Added
+- *(build)* [**breaking**] more output in verbose mode ([#876](https://github.com/nvim-neorocks/lux/pull/876))
+
+### Other
+- *(deps)* bump mlua from 0.10.3 to 0.10.5 ([#875](https://github.com/nvim-neorocks/lux/pull/875))
+
 ## `lux-cli` - [0.9.1](https://github.com/nvim-neorocks/lux/compare/v0.9.0...v0.9.1) - 2025-07-15
 
 ### Other
