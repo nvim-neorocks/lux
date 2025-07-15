@@ -24,7 +24,7 @@ git2 = "0.20.2"
 html-escape = "0.2.13"
 httpdate = "1.0.3"
 itertools = "0.14.0"
-mlua = { version = "0.10.3", features = [
+mlua = { version = "0.10.5", features = [
   "serialize",
   "macros",
   "error-send",
