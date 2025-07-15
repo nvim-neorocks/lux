@@ -95,7 +95,7 @@
 
         installPhase = ''
           runHook preInstall
-          install -D -v target/dist/${luaVersionDir}/* -t $out/${luaVersionDir}
+          install -D -v target/dist/share/lux-lua/${luaVersionDir}/* -t $out/share/lux-lua/${luaVersionDir}
           install -D -v target/dist/lib/pkgconfig/* -t $out/lib/pkgconfig
           runHook postInstall
         '';

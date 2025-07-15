@@ -1,0 +1,70 @@
+on: 
+  pull_request:
+    # types: [opened, ready_for_review, reopened, synchronize]
+  push:
+    branches:
+      - master
+
+name: Build binary distributions
+
+jobs:
+  dist-package:
+    # if: github.event.pull_request.draft == false
+    strategy:
+      matrix:
+        os: ["ubuntu-24.04", "macos-14", "windows-2025"]
+      fail-fast: false
+          
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        if: "!startsWith(matrix.os, 'windows')"
+
+      - name: Setup cachix
+        uses: cachix/cachix-action@v16
+        with:
+          name: neorocks
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        if: "!startsWith(matrix.os, 'windows')"
+
+      - name: Nix devShell
+        uses: nicknovitski/nix-develop@v1.2.1
+        if: "!startsWith(matrix.os, 'windows')"
+
+      - name: Install Rust Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        if: "startsWith(matrix.os, 'windows')"
+
+      - name: Install C/C++ Compiler
+        uses: rlalik/setup-cpp-compiler@master
+        with:
+          compiler: clang-latest
+        if: "startsWith(matrix.os, 'windows')"
+
+      - name: Install MSVC Compiler Toolchain
+        uses: ilammy/msvc-dev-cmd@v1
+        if: "startsWith(matrix.os, 'windows')"
+
+      - name: "Setup environment for MSVC"
+        run: |
+          echo "RUSTFLAGS=${RUSTFLAGS} -C target-feature=+crt-static" >> "${GITHUB_ENV}"
+          echo "OPENSSL_DIR=C:\Program Files\OpenSSL" >> "${GITHUB_ENV}"
+          echo "OPENSSL_LIB_DIR=C:\Program Files\OpenSSL\lib\VC\x64\MD" >> "${GITHUB_ENV}"
+        if: "startsWith(matrix.os, 'windows')"
+
+      - name: Install Build Dependencies
+        run: |
+          $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\ProgramData\chocolatey\bin"
+          [Environment]::SetEnvironmentVariable("Path", $env:PATH, "Machine")
+          choco install -y --no-progress openssl libgit2
+        if: "startsWith(matrix.os, 'windows')"
+
+      - name: Build binary distributions
+        run: |
+          cargo xtask dist-package
+
+      - run: ls -a target/dist
