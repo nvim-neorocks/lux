@@ -134,6 +134,10 @@ pub struct Cli {
     #[arg(long, value_name = "seconds")]
     pub timeout: Option<usize>,
 
+    /// Whether to generate or update a `.luarc.json` file for the project.
+    #[arg(long)]
+    pub generate_luarc: bool,
+
     #[command(subcommand)]
     pub command: Commands,
 }
