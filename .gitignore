@@ -28,4 +28,7 @@
 /.busted
 /*.rock
 
+# Editor Settings Files
+.idea/
+.vscode/
 .pre-commit-config.yaml
