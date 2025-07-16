@@ -1424,6 +1424,18 @@ mod tests {
                 .collect()
             }))
         );
+        let rockspec_content = "
+        rockspec_format = '1.0'\n
+        package = 'foo'\n
+        version = '1.0.0-1'\n
+        deploy = {\n
+            wrap_bin_scripts = false,\n
+        }\n
+        source = { url = 'git+https://hub.com/example-project/foo.zip' }\n
+        ";
+        let rockspec = RemoteLuaRockspec::new(rockspec_content).unwrap();
+        let deploy_spec = &rockspec.deploy().current_platform();
+        assert!(!deploy_spec.wrap_bin_scripts);
     }
 
     #[tokio::test]

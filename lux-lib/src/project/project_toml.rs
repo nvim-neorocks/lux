@@ -905,6 +905,10 @@ version = "{}""#,
             template.push(test.display_lua());
         }
 
+        if let Some(ref deploy) = self.local.internal.deploy {
+            template.push(deploy.display_lua());
+        }
+
         template.push(self.local.internal.build.display_lua());
 
         Ok(std::iter::once(starter)
@@ -1148,8 +1152,23 @@ mod tests {
         command = "my-command"
         args = ["--foo", "--bar"]
 
+        [deploy]
+        wrap_bin_scripts = false
+
         [build]
         type = "builtin"
+
+        [build.install.lua]
+        "foo.bar" = "src/bar.lua"
+
+        [build.install.lib]
+        "foo.baz" = "src/baz.c"
+
+        [build.install.bin]
+        "bla" = "src/bla"
+
+        [build.install.conf]
+        "cfg.conf" = "resources/config.conf"
         "#;
 
         let expected_rockspec = r#"
@@ -1207,8 +1226,26 @@ mod tests {
                 flags = {"foo", "bar"},
             }
 
+            deploy = {
+                wrap_bin_scripts = false,
+            }
+
             build = {
                 type = "builtin",
+                install = {
+                    lua = {
+                        ["foo.bar"] = "src/bar.lua",
+                    },
+                    lib = {
+                        ["foo.baz"] = "src/baz.c",
+                    },
+                    bin = {
+                        bla = "src/bla",
+                    },
+                    conf = {
+                        ["cfg.conf"] = "resources/config.conf",
+                    },
+                },
             }
         "#;
 

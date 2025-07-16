@@ -88,12 +88,14 @@ Cannot uninstall dependencies:
         .cloned()
         .partition(|pkg_id| lockfile.is_dependency(pkg_id));
 
-    operations::Remove::new(&config)
-        .packages(entrypoints)
-        .remove()
-        .await?;
+    let progress = MultiProgress::new_arc();
 
-    if !dependencies.is_empty() {
+    if dependencies.is_empty() {
+        operations::Remove::new(&config)
+            .packages(entrypoints)
+            .remove()
+            .await?;
+    } else {
         let package_names = dependencies
             .iter()
             .map(|pkg_id| unsafe { lockfile.get_unchecked(pkg_id) }.name().to_string())
@@ -123,6 +125,12 @@ Reinstall?
             .prompt()
             .expect("Error prompting for reinstall")
         {
+            operations::Remove::new(&config)
+                .packages(entrypoints)
+                .progress(progress.clone())
+                .remove()
+                .await?;
+
             let reinstall_specs = dependencies
                 .iter()
                 .map(|pkg_id| {
@@ -138,7 +146,6 @@ Reinstall?
                     .build()
                 })
                 .collect_vec();
-            let progress = MultiProgress::new_arc();
             operations::Remove::new(&config)
                 .packages(dependencies)
                 .progress(progress.clone())
@@ -147,13 +154,40 @@ Reinstall?
             operations::Install::new(&config)
                 .packages(reinstall_specs)
                 .tree(tree)
-                .progress(progress)
+                .progress(progress.clone())
                 .install()
                 .await?;
         } else {
             return Err(eyre!("Operation cancelled."));
         }
     };
+
+    let mut has_dangling_rocks = true;
+    while has_dangling_rocks {
+        let tree = config.user_tree(LuaVersion::from(&config)?.clone())?;
+        let lockfile = tree.lockfile()?;
+        let dangling_rocks = lockfile
+            .rocks()
+            .iter()
+            .filter_map(|(pkg_id, _)| {
+                if lockfile.is_entrypoint(pkg_id) || lockfile.is_dependency(pkg_id) {
+                    None
+                } else {
+                    Some(pkg_id)
+                }
+            })
+            .cloned()
+            .collect_vec();
+        if dangling_rocks.is_empty() {
+            has_dangling_rocks = false
+        } else {
+            operations::Remove::new(&config)
+                .packages(dangling_rocks)
+                .progress(progress.clone())
+                .remove()
+                .await?;
+        }
+    }
 
     Ok(())
 }
