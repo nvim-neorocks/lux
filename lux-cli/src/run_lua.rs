@@ -72,11 +72,10 @@ pub async fn run_lua(run_lua: RunLua, config: Config) -> Result<()> {
     };
 
     welcome_message = format!(
-        r#"{}
+        r#"{welcome_message}
 Run `lx lua --help` for options.
 To exit type 'exit()' or <C-d>.
 "#,
-        welcome_message
     );
 
     let lua_cmd = run_lua
@@ -125,7 +124,7 @@ async fn print_lua_help(lua_cmd: &LuaBinary) -> Result<()> {
     let lua_help = String::from_utf8_lossy(&output.stderr)
         .lines()
         .skip(2)
-        .map(|line| format!("  {}", line))
+        .map(|line| format!("  {line}"))
         .collect_vec()
         .join("\n");
     print!(
@@ -134,7 +133,7 @@ Usage: lx lua -- [LUA_OPTIONS] [SCRIPT [ARGS]]...
 
 Arguments:
   [LUA_OPTIONS]...
-{}
+{lua_help}
 
 Options:
   --lua       Path to the Lua interpreter to use
@@ -146,7 +145,6 @@ Build options (if running a repl for a project):
   --no-lock   Ignore the project's lockfile and don't create one
   --only-deps Build only the dependencies
 ",
-        lua_help,
     );
     Ok(())
 }

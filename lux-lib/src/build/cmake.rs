@@ -96,13 +96,13 @@ impl BuildBackend for CMakeBuildSpec {
                     variables::substitute(&[&CMakeVariables], &substituted_value)?;
                 Ok::<_, Self::Err>(format!("{key}={substituted_value}"))
             })
-            .fold_ok((), |(), variable| args.push(format!("-D{}", variable)))?;
+            .fold_ok((), |(), variable| args.push(format!("-D{variable}")))?;
 
         spawn_cmake_cmd(
             Command::new(config.cmake_cmd())
                 .current_dir(build_dir)
                 .arg("-H.")
-                .arg(format!("-B{}", CMAKE_BUILD_FILE))
+                .arg(format!("-B{CMAKE_BUILD_FILE}"))
                 .args(args)
                 .env("PATH", &bin_path)
                 .env("LUA_PATH", &lua_path)

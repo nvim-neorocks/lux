@@ -64,7 +64,7 @@ pub(crate) async fn unpack<R>(
 where
     R: Read + Seek + Send,
 {
-    progress.map(|p| p.set_message(format!("📦 Unpacking {}", file_name)));
+    progress.map(|p| p.set_message(format!("📦 Unpacking {file_name}")));
 
     match mime_type {
         Some("application/zip") => {

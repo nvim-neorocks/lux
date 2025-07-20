@@ -234,7 +234,7 @@ async fn download_remote_rock(
     progress: &Progress<ProgressBar>,
 ) -> Result<RemoteRockDownload, SearchAndDownloadError> {
     let remote_package = package_db.find(package_req, None, progress)?;
-    progress.map(|p| p.set_message(format!("📥 Downloading rockspec for {}", package_req)));
+    progress.map(|p| p.set_message(format!("📥 Downloading rockspec for {package_req}")));
     match &remote_package.source {
         RemotePackageSource::LuarocksRockspec(url) => {
             let package = &remote_package.package;
@@ -397,7 +397,7 @@ async fn download_src_rock_to_file(
     package_db: &RemotePackageDB,
     progress: &Progress<ProgressBar>,
 ) -> Result<DownloadedPackedRock, SearchAndDownloadError> {
-    progress.map(|p| p.set_message(format!("📥 Downloading {}", package_req)));
+    progress.map(|p| p.set_message(format!("📥 Downloading {package_req}")));
 
     let rock = search_and_download_src_rock(package_req, package_db, progress).await?;
     let full_rock_name = mk_packed_rock_name(&rock.name, &rock.version, "src.rock");
@@ -483,7 +483,7 @@ where
 }
 
 fn mk_packed_rock_name(name: &PackageName, version: &PackageVersion, ext: &str) -> String {
-    format!("{}-{}.{}", name, version, ext)
+    format!("{name}-{version}.{ext}")
 }
 
 pub(crate) async fn unpack_rockspec(

@@ -60,16 +60,16 @@ impl Display for RemotePackageSource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
             RemotePackageSource::LuarocksRockspec(url) => {
-                format!("luarocks_rockspec{}{}", PLUS, url).fmt(f)
+                format!("luarocks_rockspec{PLUS}{url}").fmt(f)
             }
             RemotePackageSource::LuarocksSrcRock(url) => {
-                format!("luarocks_src_rock{}{}", PLUS, url).fmt(f)
+                format!("luarocks_src_rock{PLUS}{url}").fmt(f)
             }
             RemotePackageSource::LuarocksBinaryRock(url) => {
-                format!("luarocks_rock{}{}", PLUS, url).fmt(f)
+                format!("luarocks_rock{PLUS}{url}").fmt(f)
             }
             RemotePackageSource::RockspecContent(content) => {
-                format!("rockspec{}{}", PLUS, content).fmt(f)
+                format!("rockspec{PLUS}{content}").fmt(f)
             }
             RemotePackageSource::Local => "local".fmt(f),
             #[cfg(test)]
@@ -83,7 +83,7 @@ impl Serialize for RemotePackageSource {
     where
         S: serde::Serializer,
     {
-        format!("{}", self).serialize(serializer)
+        format!("{self}").serialize(serializer)
     }
 }
 
@@ -154,20 +154,20 @@ source = {
     fn luarocks_source_roundtrip() {
         let url = Url::parse("https://luarocks.org/").unwrap();
         let source = RemotePackageSource::LuarocksRockspec(url.clone());
-        let roundtripped = RemotePackageSource::try_from(format!("{}", source)).unwrap();
+        let roundtripped = RemotePackageSource::try_from(format!("{source}")).unwrap();
         assert_eq!(source, roundtripped);
         let source = RemotePackageSource::LuarocksSrcRock(url.clone());
-        let roundtripped = RemotePackageSource::try_from(format!("{}", source)).unwrap();
+        let roundtripped = RemotePackageSource::try_from(format!("{source}")).unwrap();
         assert_eq!(source, roundtripped);
         let source = RemotePackageSource::LuarocksBinaryRock(url);
-        let roundtripped = RemotePackageSource::try_from(format!("{}", source)).unwrap();
+        let roundtripped = RemotePackageSource::try_from(format!("{source}")).unwrap();
         assert_eq!(source, roundtripped)
     }
 
     #[test]
     fn rockspec_source_roundtrip() {
         let source = RemotePackageSource::RockspecContent(LUAROCKS_ROCKSPEC.into());
-        let roundtripped = RemotePackageSource::try_from(format!("{}", source)).unwrap();
+        let roundtripped = RemotePackageSource::try_from(format!("{source}")).unwrap();
         assert_eq!(source, roundtripped)
     }
 }

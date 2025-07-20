@@ -167,7 +167,7 @@ async fn do_fetch_src<R: Rockspec>(
     let metadata = match &source_spec {
         RockSourceSpec::Git(git) => {
             let url = git.url.to_string();
-            progress.map(|p| p.set_message(format!("🦠 Cloning {}", url)));
+            progress.map(|p| p.set_message(format!("🦠 Cloning {url}")));
 
             let mut fetch_options = FetchOptions::new();
             fetch_options.update_fetchhead(false);

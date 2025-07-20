@@ -85,10 +85,10 @@ fn url_from_git_host(
     repo: String,
 ) -> Result<GitUrlShorthand, GitUrlParseError> {
     let url_str = match host {
-        GitHost::Github => format!("https://github.com/{}/{}.git", owner, repo),
-        GitHost::Gitlab => format!("https://gitlab.com/{}/{}.git", owner, repo),
-        GitHost::Sourcehut => format!("https://git.sr.ht/~{}/{}", owner, repo),
-        GitHost::Codeberg => format!("https://codeberg.org/~{}/{}.git", owner, repo),
+        GitHost::Github => format!("https://github.com/{owner}/{repo}.git"),
+        GitHost::Gitlab => format!("https://gitlab.com/{owner}/{repo}.git"),
+        GitHost::Sourcehut => format!("https://git.sr.ht/~{owner}/{repo}"),
+        GitHost::Codeberg => format!("https://codeberg.org/~{owner}/{repo}.git"),
     };
     let url = url_str.parse()?;
     Ok(GitUrlShorthand(url))
@@ -129,7 +129,7 @@ fn prefix_parser<'a>(
         .then(owner_repo)
         .try_map(|(host, (owner, repo)), span| {
             let url = url_from_git_host(host, owner, repo).map_err(|err| {
-                Rich::custom(span, format!("error parsing git url shorthand: {}", err))
+                Rich::custom(span, format!("error parsing git url shorthand: {err}"))
             })?;
             Ok(url)
         })
@@ -159,7 +159,7 @@ fn parser<'a>() -> impl Parser<'a, &'a str, GitUrlShorthand, chumsky::extra::Err
         .then(owner_repo)
         .try_map(|(host, (owner, repo)), span| {
             let url = url_from_git_host(host, owner, repo).map_err(|err| {
-                Rich::custom(span, format!("error parsing git url shorthand: {}", err))
+                Rich::custom(span, format!("error parsing git url shorthand: {err}"))
             })?;
             Ok(url)
         })

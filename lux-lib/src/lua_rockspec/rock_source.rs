@@ -180,7 +180,7 @@ impl DisplayAsLuaKV for RockSourceSpec {
                 let mut source_tbl = Vec::new();
                 source_tbl.push(DisplayLuaKV {
                     key: "url".to_string(),
-                    value: DisplayLuaValue::String(format!("{}", url)),
+                    value: DisplayLuaValue::String(format!("{url}")),
                 });
                 DisplayLuaKV {
                     key: "source".to_string(),

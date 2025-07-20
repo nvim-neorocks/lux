@@ -61,7 +61,7 @@ impl ExternalDependencyInfo {
                 let lib_name = lib_name.to_string_lossy().to_string();
                 let lib_name_without_ext = lib_name.split('.').next().unwrap_or(&lib_name);
                 pkg_config_probe(lib_name_without_ext)
-                    .or(pkg_config_probe(&format!("lib{}", lib_name_without_ext)))
+                    .or(pkg_config_probe(&format!("lib{lib_name_without_ext}")))
             }));
         if let Some(info) = lib_info {
             let include_dir = if let Some(header) = &dependency.header {
@@ -212,9 +212,9 @@ impl ExternalDependencyInfo {
                 .iter()
                 .map(|(k, v)| match v {
                     Some(val) => {
-                        format!("-D{}={}", k, val)
+                        format!("-D{k}={val}")
                     }
-                    None => format!("-D{}", k),
+                    None => format!("-D{k}"),
                 })
                 .collect_vec()
         } else {
@@ -253,7 +253,7 @@ impl ExternalDependencyInfo {
                                     lib_dir.join(lib_name).to_slash_lossy().to_string()
                                 })
                             } else {
-                                Some(format!("-l{}", lib_name))
+                                Some(format!("-l{lib_name}"))
                             }
                         })
                         .iter()
@@ -317,14 +317,13 @@ fn not_found_error_msg(name: &String) -> String {
     let env_lib = format!("{}_LIBDIR", &name.to_uppercase());
 
     format!(
-        r#"External dependency not found: {}.
+        r#"External dependency not found: {name}.
 Consider one of the following:
 1. Set environment variables:
-   - {} for the installation prefix, or
-   - {} and {} for specific directories
+   - {env_dir} for the installation prefix, or
+   - {env_inc} and {env_lib} for specific directories
 2. Add the installation prefix to the configuration:
-   {} = "/path/to/installation""#,
-        name, env_dir, env_inc, env_lib, env_dir,
+   {env_dir} = "/path/to/installation""#
     )
 }
 
@@ -338,17 +337,17 @@ fn lib_dir_compile_arg(dir: &Path, compiler: &cc::Tool) -> String {
 
 fn format_lib_link_arg(lib: &str, compiler: &cc::Tool) -> String {
     if compiler.is_like_msvc() {
-        format!("{}.lib", lib)
+        format!("{lib}.lib")
     } else {
-        format!("-l{}", lib)
+        format!("-l{lib}")
     }
 }
 
 fn format_linker_arg(arg: &str, compiler: &cc::Tool) -> String {
     if compiler.is_like_msvc() {
-        format!("-Wl,{}", arg)
+        format!("-Wl,{arg}")
     } else {
-        format!("/link {}", arg)
+        format!("/link {arg}")
     }
 }
 

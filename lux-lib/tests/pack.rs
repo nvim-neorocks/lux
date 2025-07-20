@@ -30,7 +30,7 @@ async fn pack_project_with_etc_directories() {
     let project_toml_file = project_root.join("lux.toml");
     let project_toml_content = tokio::fs::read_to_string(&project_toml_file).await.unwrap();
     let project_toml_content = format!(
-        r#"{}
+        r#"{project_toml_content}
 copy_directories = [ "plugin" ]
 
 [source]
@@ -38,8 +38,7 @@ url = "https://github.com/nvim-neorocks/luarocks-stub"
 
 [build.install.conf]
 "cfg.toml" = "cfg.toml"
-"#,
-        project_toml_content
+"#
     );
     tokio::fs::write(&project_toml_file, project_toml_content)
         .await

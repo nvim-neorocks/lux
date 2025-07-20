@@ -75,7 +75,7 @@ async fn get_manifest(
             .map_err(|err| ManifestFromServerError::ZipExtract(url.clone(), err))?;
 
         let mut extracted_manifest =
-            File::open(temp.path().join(format!("manifest-{}", manifest_version))).await?;
+            File::open(temp.path().join(format!("manifest-{manifest_version}"))).await?;
         let mut target = OpenOptions::new()
             .read(true)
             .write(true)
@@ -164,10 +164,10 @@ fn mk_manifest_url(
     manifest_version: &str,
     config: &Config,
 ) -> Result<Url, ManifestFromServerError> {
-    let manifest_filename = format!("manifest-{}.zip", manifest_version);
+    let manifest_filename = format!("manifest-{manifest_version}.zip");
     let url = match config.namespace() {
-        Some(ns) => server_url
-            .join(&format!("manifests/{}/", ns))?
+        Some(namespace) => server_url
+            .join(&format!("manifests/{namespace}/"))?
             .join(&manifest_filename)?,
         None => server_url.join(&manifest_filename)?,
     };
@@ -408,7 +408,7 @@ mod tests {
 
     fn start_test_server(manifest_name: String) -> Server {
         let server = Server::run();
-        let manifest_path = format!("/{}", manifest_name);
+        let manifest_path = format!("/{manifest_name}");
         server.expect(
             Expectation::matching(request::path(manifest_path + ".zip"))
                 .times(1..)

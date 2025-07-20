@@ -165,8 +165,8 @@ where
     D: std::fmt::Display,
 {
     match shell {
-        Shell::Posix => format!("export {}='{}';", var_name, var),
-        Shell::Fish => format!("set -x {} \"{}\";", var_name, var),
-        Shell::Nu => format!("$env.{} = \"{}\";", var_name, var),
+        Shell::Posix => format!("export {var_name}='{var}';"),
+        Shell::Fish => format!("set -x {var_name} \"{var}\";"),
+        Shell::Nu => format!("$env.{var_name} = \"{var}\";"),
     }
 }

@@ -1085,7 +1085,7 @@ impl Lockfile<ReadOnly> {
                 };
                 let json_str =
                     serde_json::to_string(&empty_lockfile).map_err(LockfileError::WriteJson)?;
-                write!(file, "{}", json_str).map_err(LockfileError::Create)?;
+                write!(file, "{json_str}").map_err(LockfileError::Create)?;
             }
             Err(err) if err.kind() == ErrorKind::AlreadyExists => {}
             Err(err) => return Err(LockfileError::Create(err)),
@@ -1181,7 +1181,7 @@ impl ProjectLockfile<ReadOnly> {
                 };
                 let json_str =
                     serde_json::to_string(&empty_lockfile).map_err(LockfileError::WriteJson)?;
-                write!(file, "{}", json_str).map_err(LockfileError::Create)?;
+                write!(file, "{json_str}").map_err(LockfileError::Create)?;
             }
             Err(err) if err.kind() == ErrorKind::AlreadyExists => {}
             Err(err) => return Err(LockfileError::Create(err)),

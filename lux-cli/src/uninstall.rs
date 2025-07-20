@@ -112,12 +112,11 @@ Reinstall?
             format!(
                 "
             The following packages can be removed from the entrypoints, but are also dependencies:
-{:#?}
+{package_names:#?}
 
 They will have to be reinstalled.
 Reinstall?
             ",
-                package_names
             )
         };
         if Confirm::new(&prompt)

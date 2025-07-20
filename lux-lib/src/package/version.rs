@@ -242,7 +242,7 @@ impl Display for SemVer {
             // luarocks allows and arbitrary number of '.' separators
             // We treat anything after the third '.' as a semver prerelease/build version,
             // so we have to convert it back for luarocks.
-            luarocks_version_str.push_str(&format!(".{}", remainder));
+            luarocks_version_str.push_str(&format!(".{remainder}"));
         }
         let str = format!("{}-{}", luarocks_version_str, self.specrev);
         str.fmt(f)
@@ -663,7 +663,7 @@ fn correct_prerelease_version_string(version: &str) -> String {
 /// Recursively append .0 until the version string has a minor or patch version
 fn append_minor_patch_if_missing(version: &str) -> String {
     if version.matches('.').count() < 2 {
-        append_minor_patch_if_missing(&format!("{}.0", version))
+        append_minor_patch_if_missing(&format!("{version}.0"))
     } else {
         version.to_string()
     }

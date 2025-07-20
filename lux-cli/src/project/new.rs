@@ -93,7 +93,7 @@ fn clap_parse_license(s: &str) -> std::result::Result<LicenseId, String> {
 }
 
 fn clap_parse_version(input: &str) -> std::result::Result<PackageReq, String> {
-    PackageReq::from_str(format!("lua {}", input).as_str()).map_err(|err| err.to_string())
+    PackageReq::from_str(format!("lua {input}").as_str()).map_err(|err| err.to_string())
 }
 
 fn clap_parse_list(input: &str) -> std::result::Result<Vec<String>, String> {
@@ -101,7 +101,10 @@ fn clap_parse_list(input: &str) -> std::result::Result<Vec<String>, String> {
         .chars()
         .find_position(|&c| c != '-' && c != '_' && c != ',' && c.is_ascii_punctuation())
     {
-        Err(format!("Unexpected punctuation '{}' found at column {}. Lists are comma separated but names should not contain punctuation!", char, pos))
+        Err(format!(
+            r#"Unexpected punctuation '{char}' found at column {pos}.
+    Lists are comma separated but names should not contain punctuation!"#
+        ))
     } else {
         Ok(input.split(',').map(|str| str.trim().to_string()).collect())
     }
@@ -123,8 +126,7 @@ fn validate_license(input: &str) -> std::result::Result<Validation, Box<dyn Erro
 
     Ok(
         match spdx::imprecise_license_id(input).ok_or(format!(
-            "Unable to identify license '{}', please try again!",
-            input
+            "Unable to identify license '{input}', please try again!",
         )) {
             Ok(_) => Validation::Valid,
             Err(err) => Validation::Invalid(err.into()),
@@ -141,10 +143,7 @@ pub async fn write_project_rockspec(cli_flags: NewProject) -> Result<()> {
     if project.is_some()
         && !Confirm::new("Target directory already has a project, write anyway?")
             .with_default(false)
-            .with_help_message(&format!(
-                "This may overwrite your existing {}",
-                PROJECT_TOML
-            ))
+            .with_help_message(&format!("This may overwrite your existing {PROJECT_TOML}",))
             .with_render_config(render_config)
             .prompt()?
     {

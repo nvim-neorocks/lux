@@ -672,7 +672,7 @@ mod tests {
                 || unsupported.is_extension_of(&supported) {
                 return Ok(());
             }
-            let identifier_str = format!("!{}", unsupported);
+            let identifier_str = format!("!{unsupported}");
             let platforms = vec![identifier_str];
             let platform_support = PlatformSupport::parse(&platforms).unwrap();
             prop_assert!(!platform_support.is_supported(&unsupported));
@@ -686,7 +686,7 @@ mod tests {
                 return Ok(());
             }
             let supported_str = unspecified.to_string();
-            let unsupported_str = format!("!{}", unsupported);
+            let unsupported_str = format!("!{unsupported}");
             let platforms = vec![supported_str, unsupported_str];
             let platform_support = PlatformSupport::parse(&platforms).unwrap();
             prop_assert!(platform_support.is_supported(&unspecified));
@@ -703,7 +703,7 @@ mod tests {
         #[test]
         fn conflicting_platforms(identifier in platform_identifier_strategy()) {
             let identifier_str = identifier.to_string();
-            let identifier_str_negated = format!("!{}", identifier);
+            let identifier_str_negated = format!("!{identifier}");
             let platforms = vec![identifier_str, identifier_str_negated];
             let _ = PlatformSupport::parse(&platforms).unwrap_err();
         }
@@ -720,7 +720,7 @@ mod tests {
 
         #[test]
         fn sub_platforms_unsupported_if_unsupported(identifier in platform_identifier_strategy()) {
-            let identifier_str = format!("!{}", identifier);
+            let identifier_str = format!("!{identifier}");
             let platforms = vec![identifier_str];
             let platform_support = PlatformSupport::parse(&platforms).unwrap();
             for identifier in identifier.get_subsets() {
@@ -735,7 +735,7 @@ mod tests {
                 return Ok(());
             }
             let supported_str = identifier.to_string();
-            let mut platforms: Vec<String> = extended_platforms.into_iter().map(|ident| format!("!{}", ident)).collect();
+            let mut platforms: Vec<String> = extended_platforms.into_iter().map(|ident| format!("!{ident}")).collect();
             platforms.push(supported_str);
             let _ = PlatformSupport::parse(&platforms).unwrap_err();
         }

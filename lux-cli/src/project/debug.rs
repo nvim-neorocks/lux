@@ -31,7 +31,7 @@ pub fn debug_project(args: DebugProject) -> Result<()> {
                 println!("\nNo included project files detected.");
             } else {
                 let project_tree = term_tree_from_paths(&project_files);
-                println!("\nIncluded project files:\n\n{}.", project_tree);
+                println!("\nIncluded project files:\n\n{project_tree}.");
             }
         }
     } else {

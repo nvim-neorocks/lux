@@ -402,8 +402,7 @@ where
         // NOTE(mrcjkb): There also shouldn't be a directory named the same as the rockspec,
         // but I'm not sure how to (or if it makes sense to) enforce this here.
         Some(d) => Err(format!(
-            "directory '{}' in copy_directories clashes with the .rock format", // TODO(vhyrro): More informative error message.
-            d
+            "directory '{d}' in copy_directories clashes with the .rock format", // TODO(vhyrro): More informative error message.
         )),
         _ => Ok(copy_directories.map(|vec| vec.into_iter().map(PathBuf::from).collect())),
     }
@@ -983,7 +982,7 @@ impl Display for BuildType {
             BuildType::CMake => write!(f, "cmake"),
             BuildType::Command => write!(f, "command"),
             BuildType::None => write!(f, "none"),
-            BuildType::LuaRock(s) => write!(f, "{}", s),
+            BuildType::LuaRock(s) => write!(f, "{s}"),
             BuildType::RustMlua => write!(f, "rust-mlua"),
             BuildType::TreesitterParser => write!(f, "treesitter-parser"),
             BuildType::Source => write!(f, "source"),

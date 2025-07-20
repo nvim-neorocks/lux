@@ -22,8 +22,7 @@ impl<'de> Deserialize<'de> for LuaTableKey {
             Ok(LuaTableKey::StringKey(value.as_str().unwrap().into()))
         } else {
             Err(de::Error::custom(format!(
-                "Could not parse Lua table key. Expected an integer or string, but got {}",
-                value
+                "Could not parse Lua table key. Expected an integer or string, but got {value}"
             )))
         }
     }
@@ -127,14 +126,14 @@ impl Display for DisplayLuaValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             //DisplayLuaValue::Nil => write!(f, "nil"),
-            //DisplayLuaValue::Number(n) => write!(f, "{}", n),
-            DisplayLuaValue::Boolean(b) => write!(f, "{}", b),
-            DisplayLuaValue::String(s) => write!(f, "\"{}\"", s),
+            //DisplayLuaValue::Number(n) => write!(f, "{n}"),
+            DisplayLuaValue::Boolean(b) => write!(f, "{b}"),
+            DisplayLuaValue::String(s) => write!(f, "\"{s}\""),
             DisplayLuaValue::List(l) => {
                 writeln!(f, "{{")?;
 
                 for item in l {
-                    writeln!(f, "{},", item)?;
+                    writeln!(f, "{item},")?;
                 }
 
                 write!(f, "}}")?;
@@ -145,7 +144,7 @@ impl Display for DisplayLuaValue {
                 writeln!(f, "{{")?;
 
                 for item in t {
-                    writeln!(f, "{},", item)?;
+                    writeln!(f, "{item},")?;
                 }
 
                 write!(f, "}}")?;
@@ -186,16 +185,16 @@ mod tests {
     #[test]
     fn display_lua_value() {
         let value = DisplayLuaValue::String("hello".to_string());
-        assert_eq!(format!("{}", value), "\"hello\"");
+        assert_eq!(format!("{value}"), "\"hello\"");
 
         let value = DisplayLuaValue::Boolean(true);
-        assert_eq!(format!("{}", value), "true");
+        assert_eq!(format!("{value}"), "true");
 
         let value = DisplayLuaValue::List(vec![
             DisplayLuaValue::String("hello".to_string()),
             DisplayLuaValue::Boolean(true),
         ]);
-        assert_eq!(format!("{}", value), "{\n\"hello\",\ntrue,\n}");
+        assert_eq!(format!("{value}"), "{\n\"hello\",\ntrue,\n}");
 
         let value = DisplayLuaValue::Table(vec![
             DisplayLuaKV {
@@ -212,7 +211,7 @@ mod tests {
             },
         ]);
         assert_eq!(
-            format!("{}", value),
+            format!("{value}"),
             "{\nkey = \"value\",\nkey2 = true,\n['key3.key4'] = true,\n}"
         );
     }

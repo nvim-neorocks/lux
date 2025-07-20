@@ -203,7 +203,7 @@ fn add_rock_entry(
 
     zip.start_file(zip_dir.join(&relative_path).to_string_lossy(), options)?;
     zip.write_all(&buffer)?;
-    Ok((relative_path, format!("{:x}", digest)))
+    Ok((relative_path, format!("{digest:x}")))
 }
 
 fn add_dir_or_file_entry(

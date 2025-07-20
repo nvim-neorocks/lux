@@ -290,7 +290,7 @@ fn test_build_multiple_treesitter_parsers() {
     for i in 0..4 {
         let config = ConfigBuilder::new()
             .unwrap()
-            .user_tree(Some(dir.join(format!("{}", i))))
+            .user_tree(Some(dir.join(format!("{i}"))))
             .lua_version(lua_version.clone())
             .build()
             .unwrap();

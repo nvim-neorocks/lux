@@ -109,7 +109,7 @@ impl LuaVersion {
 
     /// Searches for the path to the lux-lua library for this version
     pub fn lux_lib_dir(&self) -> Option<PathBuf> {
-        let lib_name = format!("lux-lua{}", self);
+        let lib_name = format!("lux-lua{self}");
         option_env!("LUX_LIB_DIR")
             .map(PathBuf::from)
             .or_else(|| {

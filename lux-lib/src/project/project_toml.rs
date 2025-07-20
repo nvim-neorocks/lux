@@ -309,9 +309,9 @@ impl PartialProjectToml {
                     .into_iter()
                     .map(|(platform, supported)| {
                         if supported {
-                            format!("{}", platform)
+                            format!("{platform}")
                         } else {
-                            format!("!{}", platform)
+                            format!("!{platform}")
                         }
                     })
                     .collect_vec(),

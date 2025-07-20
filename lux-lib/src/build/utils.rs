@@ -239,9 +239,8 @@ fn mk_def_file(
         .unwrap_or_else(|| exported_name.clone());
     let content = format!(
         r#"EXPORTS
-luaopen_{}
+luaopen_{exported_name}
 "#,
-        exported_name
     );
     std::fs::write(&def_file, content)?;
     Ok(def_file)
@@ -677,7 +676,7 @@ pub(crate) fn format_path(path: &Path) -> String {
     } else {
         try_quote(&path_str)
             .map(|str| str.to_string())
-            .unwrap_or(format!("'{}'", path_str))
+            .unwrap_or(format!("'{path_str}'"))
     }
 }
 

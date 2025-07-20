@@ -34,7 +34,7 @@ fn parser<'a>(
                     .find_map(|v| v.get_variable(&s))
                     .ok_or(Rich::custom(
                         span,
-                        format!("could not expand variable $({})", s),
+                        format!("could not expand variable $({s})"),
                     ))
             })
             .or(none_of("$)").repeated().at_least(1).collect::<String>())

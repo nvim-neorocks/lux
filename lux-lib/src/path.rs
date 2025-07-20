@@ -223,7 +223,7 @@ mod test {
             ])
         );
         assert_eq!(
-            format!("{}", path),
+            format!("{path}"),
             "/path/to/some/lib/lua/5.1/?.so;/path/to/another/lib/lua/5.1/?.so"
         );
     }

@@ -63,8 +63,8 @@ impl LuaModule {
             .unwrap_or("".into());
         let module = path
             .to_string_lossy()
-            .trim_end_matches(format!("init.{}", extension).as_str())
-            .trim_end_matches(format!(".{}", extension).as_str())
+            .trim_end_matches(format!("init.{extension}").as_str())
+            .trim_end_matches(format!(".{extension}").as_str())
             .trim_end_matches(std::path::MAIN_SEPARATOR_STR)
             .replace(std::path::MAIN_SEPARATOR_STR, ".");
         LuaModule(module)
@@ -357,7 +357,7 @@ impl DisplayAsLuaValue for ModulePathsInternal {
                         .iter()
                         .map(|(k, v)| {
                             if let Some(v) = v {
-                                DisplayLuaValue::String(format!("{}={}", k, v))
+                                DisplayLuaValue::String(format!("{k}={v}"))
                             } else {
                                 DisplayLuaValue::String(k.clone())
                             }

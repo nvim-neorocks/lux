@@ -36,7 +36,7 @@ pub fn apply_build_behaviour(
                     .all(|pkg_id| !lockfile.is_entrypoint(pkg_id));
             let build_behaviour: Option<BuildBehaviour> = if force || existing_packages.is_empty() {
                 Some(BuildBehaviour::from(force))
-            } else if Confirm::new(&format!("Package {} already exists. Overwrite?", req))
+            } else if Confirm::new(&format!("Package {req} already exists. Overwrite?"))
                 .with_default(false)
                 .prompt()
                 .expect("Error prompting for reinstall")
