@@ -34,6 +34,10 @@ pub struct Tree {
     root_parent: PathBuf,
     /// The rock layout config for this tree
     entrypoint_layout: RockLayoutConfig,
+    /// The root of this tree's test dependency tree.
+    test_tree_dir: PathBuf,
+    /// The root of this tree's build dependency tree.
+    build_tree_dir: PathBuf,
 }
 
 #[derive(Debug, Error)]
@@ -117,6 +121,19 @@ impl Tree {
         version: LuaVersion,
         config: &Config,
     ) -> Result<Self, TreeError> {
+        let version_dir = root.join(version.to_string());
+        let test_tree_dir = version_dir.join("test_dependencies");
+        let build_tree_dir = version_dir.join("build_dependencies");
+        Self::new_with_paths(root, test_tree_dir, build_tree_dir, version, config)
+    }
+
+    fn new_with_paths(
+        root: PathBuf,
+        test_tree_dir: PathBuf,
+        build_tree_dir: PathBuf,
+        version: LuaVersion,
+        config: &Config,
+    ) -> Result<Self, TreeError> {
         let path_with_version = root.join(version.to_string());
 
         // Ensure that the root and the version directory exist.
@@ -138,6 +155,8 @@ impl Tree {
             root_parent: root,
             version,
             entrypoint_layout: rock_layout_config,
+            test_tree_dir,
+            build_tree_dir,
         })
     }
 
@@ -287,15 +306,29 @@ impl Tree {
     }
 
     /// The tree in which to install test dependencies
-    pub fn test_tree(&self, config: &Config) -> Result<Tree, TreeError> {
-        let test_tree_root = self.root().join("test_dependencies");
-        Tree::new(test_tree_root, self.version.clone(), config)
+    pub fn test_tree(&self, config: &Config) -> Result<Self, TreeError> {
+        let test_tree_dir = self.test_tree_dir.clone();
+        let build_tree_dir = self.build_tree_dir.clone();
+        Self::new_with_paths(
+            test_tree_dir.clone(),
+            test_tree_dir,
+            build_tree_dir,
+            self.version.clone(),
+            config,
+        )
     }
 
     /// The tree in which to install build dependencies
-    pub fn build_tree(&self, config: &Config) -> Result<Tree, TreeError> {
-        let build_tree_root = self.root().join("build_dependencies");
-        Tree::new(build_tree_root, self.version.clone(), config)
+    pub fn build_tree(&self, config: &Config) -> Result<Self, TreeError> {
+        let test_tree_dir = self.test_tree_dir.clone();
+        let build_tree_dir = self.build_tree_dir.clone();
+        Self::new_with_paths(
+            build_tree_dir.clone(),
+            test_tree_dir,
+            build_tree_dir,
+            self.version.clone(),
+            config,
+        )
     }
 }
 
