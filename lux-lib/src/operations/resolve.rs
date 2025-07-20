@@ -30,11 +30,14 @@ pub(crate) struct PackageInstallData {
 }
 
 #[async_recursion]
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn get_all_dependencies<P>(
-    tx: UnboundedSender<PackageInstallData>,
+    dependencies_tx: UnboundedSender<PackageInstallData>,
+    build_dependencies_tx: UnboundedSender<PackageInstallData>,
     packages: Vec<PackageInstallSpec>,
     package_db: Arc<RemotePackageDB>,
     lockfile: Arc<Lockfile<P>>,
+    build_lockfile: Arc<Lockfile<P>>,
     config: &Config,
     progress: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackageId>, SearchAndDownloadError>
@@ -67,10 +70,13 @@ where
                      source,
                  }| {
                     let config = config.clone();
-                    let tx = tx.clone();
+                    let dependencies_tx = dependencies_tx.clone();
+                    let build_dependencies_tx = build_dependencies_tx.clone();
                     let package_db = Arc::clone(&package_db);
                     let progress = Arc::clone(&progress);
+                    let build_dep_progress = Arc::clone(&progress);
                     let lockfile = Arc::clone(&lockfile);
+                    let build_lockfile = Arc::clone(&build_lockfile);
 
                     tokio::spawn(async move {
                         let bar = progress.map(|p| p.new_bar());
@@ -89,8 +95,39 @@ where
 
                         let constraint = constraint.unwrap_or(package.version_req().clone().into());
 
-                        let dependencies = downloaded_rock
-                            .rockspec()
+                        let rockspec = downloaded_rock.rockspec();
+                        let build_dependencies = rockspec
+                            .build_dependencies()
+                            .current_platform()
+                            .iter()
+                            .map(|dep| {
+                                // We always install build dependencies as entrypoints
+                                // with regard to the build tree
+                                let entry_type = tree::EntryType::Entrypoint;
+                                PackageInstallSpec::new(dep.package_req().clone(), entry_type)
+                                    .build_behaviour(build_behaviour)
+                                    .pin(pin)
+                                    .opt(opt)
+                                    .maybe_source(dep.source().clone())
+                                    .build()
+                            })
+                            .collect_vec();
+
+                        // NOTE: We treat transitive regular dependencies of build dependencies
+                        // as build dependencies
+                        get_all_dependencies(
+                            build_dependencies_tx.clone(),
+                            build_dependencies_tx.clone(),
+                            build_dependencies,
+                            package_db.clone(),
+                            build_lockfile.clone(),
+                            build_lockfile.clone(),
+                            &config,
+                            build_dep_progress,
+                        )
+                        .await?;
+
+                        let dependencies = rockspec
                             .dependencies()
                             .current_platform()
                             .iter()
@@ -118,10 +155,12 @@ where
                             .collect_vec();
 
                         let dependencies = get_all_dependencies(
-                            tx.clone(),
+                            dependencies_tx.clone(),
+                            build_dependencies_tx,
                             dependencies,
                             package_db,
                             lockfile,
+                            build_lockfile,
                             &config,
                             progress,
                         )
@@ -147,7 +186,7 @@ where
                             entry_type,
                         };
 
-                        tx.send(install_spec).unwrap();
+                        dependencies_tx.send(install_spec).unwrap();
 
                         Ok::<_, SearchAndDownloadError>(local_spec.id())
                     })

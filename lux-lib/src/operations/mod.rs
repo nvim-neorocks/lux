@@ -30,5 +30,3 @@ pub use sync::*;
 pub use test::*;
 pub use unpack::*;
 pub use update::*;
-
-pub(crate) use resolve::*;

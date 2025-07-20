@@ -259,6 +259,17 @@ pub enum BuildBackendSpec {
     Source,
 }
 
+impl BuildBackendSpec {
+    pub(crate) fn can_use_build_dependencies(&self) -> bool {
+        match self {
+            Self::Make(_) | Self::CMake(_) | Self::Command(_) | Self::LuaRock(_) => true,
+            Self::Builtin(_) | Self::RustMlua(_) | Self::TreesitterParser(_) | Self::Source => {
+                false
+            }
+        }
+    }
+}
+
 impl IntoLua for BuildBackendSpec {
     fn into_lua(self, lua: &Lua) -> mlua::Result<Value> {
         match self {

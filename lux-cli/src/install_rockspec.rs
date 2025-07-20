@@ -42,11 +42,37 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
     let lua_version = rockspec.lua_version_matches(&config)?;
     let tree = config.user_tree(lua_version)?;
 
-    // Ensure all dependencies are installed first
-    let dependencies = rockspec.dependencies().current_platform();
-
     let progress_arc = MultiProgress::new_arc();
     let progress = Arc::clone(&progress_arc);
+
+    // Ensure all dependencies and build dependencies are installed first
+
+    let build_dependencies = rockspec.build_dependencies().current_platform();
+
+    let build_dependencies_to_install = build_dependencies
+        .iter()
+        .filter(|dep| {
+            tree.match_rocks(dep.package_req())
+                .is_ok_and(|rock_match| rock_match.is_found())
+        })
+        .map(|dep| {
+            PackageInstallSpec::new(dep.package_req().clone(), tree::EntryType::Entrypoint)
+                .build_behaviour(BuildBehaviour::NoForce)
+                .pin(pin)
+                .opt(OptState::Required)
+                .maybe_source(dep.source().clone())
+                .build()
+        })
+        .collect();
+
+    Install::new(&config)
+        .packages(build_dependencies_to_install)
+        .tree(tree.build_tree(&config)?)
+        .progress(progress_arc.clone())
+        .install()
+        .await?;
+
+    let dependencies = rockspec.dependencies().current_platform();
 
     let dependencies_to_install = dependencies
         .iter()
@@ -71,16 +97,11 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
         .install()
         .await?;
 
-    if let Some(BuildBackendSpec::LuaRock(build_backend)) =
-        &rockspec.build().current_platform().build_backend
-    {
+    if let Some(BuildBackendSpec::LuaRock(_)) = &rockspec.build().current_platform().build_backend {
         let build_tree = tree.build_tree(&config)?;
         let luarocks = LuaRocksInstallation::new(&config, build_tree)?;
         let bar = progress.map(|p| p.new_bar());
         luarocks.ensure_installed(&bar).await?;
-        luarocks
-            .install_build_dependencies(build_backend, &rockspec, progress_arc.clone())
-            .await?;
     }
 
     build::Build::new(

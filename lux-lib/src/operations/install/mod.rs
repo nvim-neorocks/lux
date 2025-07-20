@@ -4,15 +4,13 @@ use crate::{
     build::{Build, BuildBehaviour, BuildError, RemotePackageSourceSpec, SrcRockSource},
     config::{Config, LuaVersionUnset},
     lockfile::{
-        LocalPackage, LocalPackageId, LockConstraint, Lockfile, OptState, PinnedState, ReadOnly,
-        ReadWrite,
+        LocalPackage, LocalPackageId, LockConstraint, Lockfile, OptState, PinnedState, ReadWrite,
     },
     lua_rockspec::BuildBackendSpec,
     luarocks::{
         install_binary_rock::{BinaryRockInstall, InstallBinaryRockError},
         luarocks_installation::{LuaRocksError, LuaRocksInstallError, LuaRocksInstallation},
     },
-    operations::build_dependencies::InstallBuildDependencies,
     package::{PackageName, PackageNameList},
     progress::{MultiProgress, Progress, ProgressBar},
     project::{Project, ProjectTreeError},
@@ -21,7 +19,6 @@ use crate::{
     tree::{self, Tree, TreeError},
 };
 
-pub use crate::operations::install::build_dependencies::InstallBuildDependenciesError;
 pub use crate::operations::install::spec::PackageInstallSpec;
 
 use bon::Builder;
@@ -35,8 +32,6 @@ use super::{
 };
 
 pub mod spec;
-
-pub(crate) mod build_dependencies;
 
 /// A rocks package installer, providing fine-grained control
 /// over how packages should be installed.
@@ -131,7 +126,6 @@ where
             Arc::new(package_db),
             install_built.config,
             &install_built.tree,
-            install_built.tree.lockfile()?,
             progress,
         )
         .await
@@ -152,10 +146,10 @@ pub enum InstallError {
     LuaRocksError(#[from] LuaRocksError),
     #[error("error installing LuaRocks compatibility layer: {0}")]
     LuaRocksInstallError(#[from] LuaRocksInstallError),
-    #[error("error installing LuaRocks build dependencies: {0}")]
-    InstallBuildDependenciesError(#[from] InstallBuildDependenciesError),
     #[error("failed to build {0}: {1}")]
     BuildError(PackageName, BuildError),
+    #[error("failed to install build depencency {0}: {1}")]
+    BuildDependencyError(PackageName, BuildError),
     #[error("error initialising remote package DB: {0}")]
     RemotePackageDB(#[from] RemotePackageDBError),
     #[error("failed to install pre-built rock {0}: {1}")]
@@ -175,24 +169,58 @@ async fn install_impl(
     package_db: Arc<RemotePackageDB>,
     config: &Config,
     tree: &Tree,
-    lockfile: Lockfile<ReadOnly>,
     progress_arc: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, InstallError> {
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let (dep_tx, mut dep_rx) = tokio::sync::mpsc::unbounded_channel();
+    let (build_dep_tx, mut build_dep_rx) = tokio::sync::mpsc::unbounded_channel();
+
+    let lockfile = tree.lockfile()?;
+    let build_lockfile = tree.build_tree(config)?.lockfile()?;
 
     get_all_dependencies(
-        tx,
+        dep_tx,
+        build_dep_tx,
         packages,
         package_db.clone(),
         Arc::new(lockfile.clone()),
+        Arc::new(build_lockfile.clone()),
         config,
         progress_arc.clone(),
     )
     .await?;
 
-    let mut all_packages = HashMap::with_capacity(rx.len());
+    // We have to install transitive build dependencies sequentially
+    while let Some(build_dep_spec) = build_dep_rx.recv().await {
+        let rockspec = build_dep_spec.downloaded_rock.rockspec();
+        let bar = progress_arc.map(|p| {
+            p.add(ProgressBar::from(format!(
+                "💻 Installing build dependency: {}",
+                build_dep_spec.downloaded_rock.rockspec().package(),
+            )))
+        });
+        let package = rockspec.package().clone();
+        let build_tree = tree.build_tree(config)?;
+        // We have to write to the build tree's lockfile after each build,
+        // so that each transitive build dependency is available for the
+        // next build dependencies that may depend on it.
+        let mut build_lockfile = build_tree.lockfile()?.write_guard();
+        let pkg = Build::new(
+            rockspec,
+            &build_tree,
+            tree::EntryType::Entrypoint,
+            config,
+            &bar,
+        )
+        .constraint(build_dep_spec.spec.constraint())
+        .behaviour(build_dep_spec.build_behaviour)
+        .build()
+        .await
+        .map_err(|err| InstallError::BuildDependencyError(package, err))?;
+        build_lockfile.add_entrypoint(&pkg);
+    }
 
-    while let Some(dep) = rx.recv().await {
+    let mut all_packages = HashMap::with_capacity(dep_rx.len());
+    while let Some(dep) = dep_rx.recv().await {
         all_packages.insert(dep.spec.id(), dep);
     }
 
@@ -203,40 +231,7 @@ async fn install_impl(
         let tree = tree.clone();
 
         tokio::spawn({
-            let package_db = package_db.clone();
             async move {
-                let rockspec = downloaded_rock.rockspec();
-                if let Some(BuildBackendSpec::LuaRock(build_backend)) =
-                    &rockspec.build().current_platform().build_backend
-                {
-                    let luarocks_tree = tree.build_tree(&config)?;
-                    let luarocks = LuaRocksInstallation::new(&config, luarocks_tree)?;
-                    luarocks
-                        .install_build_dependencies(build_backend, rockspec, progress_arc.clone())
-                        .await?;
-                } else {
-                    let build_dependencies = rockspec
-                        .build_dependencies()
-                        .current_platform()
-                        .to_vec()
-                        .into_iter()
-                        .map(|dep| {
-                            PackageInstallSpec::new(dep.package_req, tree::EntryType::Entrypoint)
-                                .build()
-                        })
-                        .collect_vec();
-                    if !build_dependencies.is_empty() {
-                        InstallBuildDependencies::new()
-                            .config(&config)
-                            .tree(&tree.build_tree(&config)?)
-                            .package_db(&package_db)
-                            .progress(progress_arc.clone())
-                            .packages(build_dependencies)
-                            .install()
-                            .await?;
-                    }
-                }
-
                 let pkg = match downloaded_rock {
                     RemoteRockDownload::RockspecOnly { rockspec_download } => {
                         install_rockspec(
@@ -365,15 +360,10 @@ async fn install_rockspec(
     let package = rockspec.package().clone();
     let bar = progress.map(|p| p.add(ProgressBar::from(format!("💻 Installing {}", &package,))));
 
-    if let Some(BuildBackendSpec::LuaRock(build_backend)) =
-        &rockspec.build().current_platform().build_backend
-    {
+    if let Some(BuildBackendSpec::LuaRock(_)) = &rockspec.build().current_platform().build_backend {
         let luarocks_tree = tree.build_tree(config)?;
         let luarocks = LuaRocksInstallation::new(config, luarocks_tree)?;
         luarocks.ensure_installed(&bar).await?;
-        luarocks
-            .install_build_dependencies(build_backend, &rockspec, progress_arc)
-            .await?;
     }
 
     let source_spec = match src_rock_source {

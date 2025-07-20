@@ -421,7 +421,21 @@ impl Rockspec for RemoteLuaRockspec {
     }
 
     fn build_dependencies(&self) -> &PerPlatform<Vec<LuaDependencySpec>> {
-        self.local.build_dependencies()
+        match self.format() {
+            // Rockspec formats < 3.0 don't support `build_dependencies`,
+            // so we have to return regular dependencies if the build backend might need to use them.
+            Some(RockspecFormat::_1_0 | RockspecFormat::_2_0)
+                if self
+                    .build()
+                    .current_platform()
+                    .build_backend
+                    .as_ref()
+                    .is_some_and(|build_backend| build_backend.can_use_build_dependencies()) =>
+            {
+                self.local.dependencies()
+            }
+            _ => self.local.build_dependencies(),
+        }
     }
 
     fn external_dependencies(&self) -> &PerPlatform<HashMap<String, ExternalDependencySpec>> {

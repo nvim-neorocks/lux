@@ -1,11 +1,9 @@
-use itertools::Itertools;
 use path_slash::{PathBufExt, PathExt};
 use ssri::Integrity;
 use std::{
     io,
     path::{Path, PathBuf},
     process::ExitStatus,
-    sync::Arc,
 };
 use tempdir::TempDir;
 use thiserror::Error;
@@ -15,19 +13,16 @@ use crate::{
     build::{self, BuildError},
     config::{Config, LuaVersion, LuaVersionUnset},
     lua_installation::LuaInstallation,
-    lua_rockspec::RockspecFormat,
-    operations::{
-        build_dependencies::{InstallBuildDependencies, InstallBuildDependenciesError},
-        install::PackageInstallSpec,
-        UnpackError,
-    },
+    operations::UnpackError,
     path::{Paths, PathsError},
-    progress::{MultiProgress, Progress, ProgressBar},
-    remote_package_db::RemotePackageDB,
-    rockspec::Rockspec,
-    tree::{self, Tree, TreeError},
+    progress::{Progress, ProgressBar},
     variables::{self, VariableSubstitutionError},
 };
+
+#[cfg(target_family = "unix")]
+use crate::tree::{self, Tree, TreeError};
+#[cfg(target_family = "windows")]
+use crate::tree::{Tree, TreeError};
 
 #[cfg(target_family = "unix")]
 use crate::build::Build;
@@ -185,44 +180,6 @@ impl LuaRocksInstallation {
         tokio::fs::copy(luarocks_exe, &self.tree.bin().join(LUAROCKS_EXE)).await?;
 
         Ok(())
-    }
-
-    pub async fn install_build_dependencies<R: Rockspec>(
-        &self,
-        build_backend: &str,
-        rocks: &R,
-        progress_arc: Arc<Progress<MultiProgress>>,
-    ) -> Result<(), InstallBuildDependenciesError> {
-        let progress = Arc::clone(&progress_arc);
-        let bar = progress.map(|p| p.new_bar());
-        let package_db = RemotePackageDB::from_config(&self.config, &bar).await?;
-        bar.map(|b| b.finish_and_clear());
-        let build_dependencies = match rocks.format() {
-            Some(RockspecFormat::_1_0 | RockspecFormat::_2_0) => {
-                // XXX: rockspec formats < 3.0 don't support `build_dependencies`,
-                // so we have to fetch the build backend from the dependencies.
-                rocks
-                    .dependencies()
-                    .current_platform()
-                    .iter()
-                    .filter(|dep| dep.name().to_string().contains(build_backend))
-                    .cloned()
-                    .collect_vec()
-            }
-            _ => rocks.build_dependencies().current_platform().to_vec(),
-        }
-        .into_iter()
-        .map(|dep| PackageInstallSpec::new(dep.package_req, tree::EntryType::Entrypoint).build())
-        .collect_vec();
-
-        InstallBuildDependencies::new()
-            .config(&self.config)
-            .tree(&self.tree)
-            .package_db(&package_db)
-            .progress(progress_arc)
-            .packages(build_dependencies)
-            .install()
-            .await
     }
 
     pub async fn make(
