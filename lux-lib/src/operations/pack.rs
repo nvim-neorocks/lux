@@ -5,6 +5,7 @@ use crate::luarocks;
 use crate::luarocks::rock_manifest::DirOrFileEntry;
 use crate::luarocks::rock_manifest::RockManifest;
 use crate::luarocks::rock_manifest::RockManifestBin;
+use crate::luarocks::rock_manifest::RockManifestConf;
 use crate::luarocks::rock_manifest::RockManifestDoc;
 use crate::luarocks::rock_manifest::RockManifestLib;
 use crate::luarocks::rock_manifest::RockManifestLua;
@@ -79,13 +80,18 @@ async fn do_pack(args: Pack) -> Result<PathBuf, PackError> {
     let lua_entries = add_rock_entries(&mut zip, &layout.src, "lua".into())?;
     let lib_entries = add_rock_entries(&mut zip, &layout.lib, "lib".into())?;
     let doc_entries = add_rock_entries(&mut zip, &layout.doc, "doc".into())?;
+    let conf_entries = add_rock_entries(&mut zip, &layout.conf, "conf".into())?;
     // We copy entries from `etc` to the root directory, as luarocks doesn't have an etc directory.
     let temp_dir = TempDir::new("lux-pack-temp-root").unwrap().into_path();
     utils::recursive_copy_dir(&layout.etc, &temp_dir).await?;
-    // prevent duplicate doc entries
+    // prevent duplicate doc and conf entries
     let doc = temp_dir.join("doc");
     if doc.is_dir() {
-        std::fs::remove_dir_all(&doc)?;
+        tokio::fs::remove_dir_all(&doc).await?;
+    }
+    let conf = temp_dir.join("conf");
+    if conf.is_dir() {
+        tokio::fs::remove_dir_all(&conf).await?;
     }
     // luarocks expects a <package>-<version>.rockspec,
     // so we copy it the package.rockspec to our temporary root directory and rename it
@@ -94,8 +100,8 @@ async fn do_pack(args: Pack) -> Result<PathBuf, PackError> {
     }
     let packed_rockspec_name = format!("{}-{}.rockspec", &package.name(), &package.version());
     let renamed_rockspec_entry = temp_dir.join(packed_rockspec_name);
-    std::fs::copy(layout.rockspec_path(), &renamed_rockspec_entry)?;
-    let root_entries = add_root_rock_entries(&mut zip, &temp_dir, "".into())?;
+    tokio::fs::copy(layout.rockspec_path(), &renamed_rockspec_entry).await?;
+    let root_entries = add_rock_entries(&mut zip, &temp_dir, "".into())?;
     let mut bin_entries = HashMap::new();
     for relative_binary_path in package.spec.binaries() {
         let binary_path = tree.bin().join(
@@ -119,6 +125,9 @@ async fn do_pack(args: Pack) -> Result<PathBuf, PackError> {
         },
         doc: RockManifestDoc {
             entries: doc_entries,
+        },
+        conf: RockManifestConf {
+            entries: conf_entries,
         },
         root: RockManifestRoot {
             entries: root_entries,
@@ -147,29 +156,6 @@ fn is_binary_rock(layout: &RockLayout) -> bool {
                     .is_some_and(|ext| ext.to_string_lossy() == c_dylib_extension())
         })
     })
-}
-
-fn add_root_rock_entries(
-    zip: &mut ZipWriter<File>,
-    source_dir: &PathBuf,
-    zip_dir: PathBuf,
-) -> Result<HashMap<PathBuf, String>, PackError> {
-    let mut result = HashMap::new();
-    if source_dir.is_dir() {
-        for file in WalkDir::new(source_dir).into_iter().filter_map_ok(|entry| {
-            let file = entry.into_path();
-            if file.is_file() {
-                Some(file)
-            } else {
-                None
-            }
-        }) {
-            let file = file?;
-            let (relative_path, digest) = add_rock_entry(zip, file, source_dir, &zip_dir)?;
-            result.insert(relative_path, digest);
-        }
-    }
-    Ok(result)
 }
 
 fn add_rock_entries(

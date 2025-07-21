@@ -14,6 +14,7 @@ pub(crate) struct RockManifest {
     pub lua: RockManifestLua,
     pub bin: RockManifestBin,
     pub doc: RockManifestDoc,
+    pub conf: RockManifestConf,
     pub root: RockManifestRoot,
 }
 
@@ -53,10 +54,23 @@ impl FromLua for RockManifest {
                 let doc = RockManifestDoc {
                     entries: rock_manifest_dir_or_file_entry_from_lua(rock_manifest, lua, "doc")?,
                 };
+                let conf = RockManifestConf {
+                    entries: rock_manifest_dir_or_file_entry_from_lua(rock_manifest, lua, "conf")?,
+                };
                 let mut root_entry = HashMap::new();
                 rock_manifest.for_each(|key: String, value: Value| {
+                    if matches!(key.as_str(), "lib" | "lua" | "bin" | "doc" | "conf") {
+                        return Ok(());
+                    }
                     if let val @ Value::String(_) = value {
-                        root_entry.insert(PathBuf::from(key), String::from_lua(val, lua)?);
+                        root_entry.insert(
+                            key.into(),
+                            DirOrFileEntry::FileEntry(String::from_lua(val, lua)?),
+                        );
+                    } else if let Value::Table(_) = value {
+                        let entry =
+                            rock_manifest_dir_or_file_entry_from_lua(rock_manifest, lua, &key)?;
+                        root_entry.insert(key.into(), DirOrFileEntry::DirEntry(entry));
                     }
                     Ok(())
                 })?;
@@ -68,6 +82,7 @@ impl FromLua for RockManifest {
                     lua: lua_entry,
                     bin,
                     doc,
+                    conf,
                     root,
                 })
             }
@@ -89,10 +104,14 @@ impl DisplayAsLuaKV for RockManifest {
                     self.lua.display_lua(),
                     self.lib.display_lua(),
                     self.doc.display_lua(),
+                    self.conf.display_lua(),
                     self.bin.display_lua(),
                 ]
                 .into_iter()
-                .chain(self.root.entries.iter().map(|entry| entry.display_lua()))
+                .chain(self.root.entries.iter().map(|(key, entry)| DisplayLuaKV {
+                    key: key.to_slash_lossy().to_string(),
+                    value: entry.display_lua_value(),
+                }))
                 .collect_vec(),
             ),
         }
@@ -209,17 +228,31 @@ impl DisplayAsLuaKV for RockManifestDoc {
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
+pub(crate) struct RockManifestConf {
+    pub entries: HashMap<PathBuf, DirOrFileEntry>,
+}
+
+impl DisplayAsLuaKV for RockManifestConf {
+    fn display_lua(&self) -> crate::lua_rockspec::DisplayLuaKV {
+        DisplayLuaKV {
+            key: "conf".to_string(),
+            value: self.entries.display_lua_value(),
+        }
+    }
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct RockManifestRoot {
-    pub entries: HashMap<PathBuf, String>,
+    pub entries: HashMap<PathBuf, DirOrFileEntry>,
 }
 
 fn rock_manifest_dir_or_file_entry_from_lua(
-    rock_manifest: &Table,
+    tbl: &Table,
     lua: &Lua,
     key: &str,
 ) -> mlua::Result<HashMap<PathBuf, DirOrFileEntry>> {
-    if rock_manifest.contains_key(key)? {
-        lua.from_value(rock_manifest.get(key)?)
+    if tbl.contains_key(key)? {
+        lua.from_value(tbl.get(key)?)
     } else {
         Ok(HashMap::default())
     }
@@ -250,8 +283,14 @@ rock_manifest = {
       LICENSE = '6bcb3636a93bdb8304439a4ff57e979c',
       ['README.md'] = '842bd0b364e36d982f02e22abee7742d'
    },
+   conf = {
+      ['config.toml'] = '8cbb3637a94bdb8304440a5ff58e980d',
+   },
    lib = {
-      ['toml_edit.so'] = '504d63aea7bb341a688ef28f1232fa9b'
+      ['toml_edit.so'] = '504d63aea7bb341a688ef28f1232fa9b',
+   },
+   plugin = {
+      ['foo.lua'] = '506d61aea8bb340a688ef29f1235fa8c',
    },
    ['toml-edit-0.6.1-1.rockspec'] = 'fcdd3b0066632dec36cd5510e00bc55e'
 }
@@ -281,11 +320,26 @@ rock_manifest = {
                         ),
                     ])
                 },
-                root: RockManifestRoot {
+                conf: RockManifestConf {
                     entries: HashMap::from_iter(vec![(
-                        "toml-edit-0.6.1-1.rockspec".into(),
-                        "fcdd3b0066632dec36cd5510e00bc55e".into()
+                        "config.toml".into(),
+                        "8cbb3637a94bdb8304440a5ff58e980d".into()
                     ),])
+                },
+                root: RockManifestRoot {
+                    entries: HashMap::from_iter(vec![
+                        (
+                            "toml-edit-0.6.1-1.rockspec".into(),
+                            "fcdd3b0066632dec36cd5510e00bc55e".into()
+                        ),
+                        (
+                            "plugin".into(),
+                            DirOrFileEntry::DirEntry(HashMap::from_iter(vec![(
+                                "foo.lua".into(),
+                                "506d61aea8bb340a688ef29f1235fa8c".into()
+                            )])),
+                        ),
+                    ])
                 },
             }
         );
