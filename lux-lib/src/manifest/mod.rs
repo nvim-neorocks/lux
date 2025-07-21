@@ -2,6 +2,7 @@ use itertools::Itertools;
 use mlua::{Lua, LuaSerdeExt};
 use reqwest::{header::ToStrError, Client};
 use std::path::{Path, PathBuf};
+use std::string::FromUtf8Error;
 use std::time::SystemTime;
 use std::{cmp::Ordering, collections::HashMap};
 use thiserror::Error;
@@ -26,6 +27,8 @@ pub enum ManifestFromServerError {
     Io(#[from] io::Error),
     #[error("failed to pull manifest: {0}")]
     Request(#[from] reqwest::Error),
+    #[error("failed to parse manifest: {0}")]
+    FromUtf8(#[from] FromUtf8Error),
     #[error("invalidate date received from server: {0}")]
     InvalidDate(#[from] httpdate::Error),
     #[error("non-ASCII characters returned in response header: {0}")]
@@ -46,40 +49,50 @@ async fn get_manifest(
     target: &Path,
     client: &Client,
 ) -> Result<String, ManifestFromServerError> {
-    let manifest_bytes = client
-        .get(url.clone())
-        .send()
-        .await?
-        .error_for_status()?
-        .bytes()
-        .await?;
-    let mut archive = ZipArchive::new(std::io::Cursor::new(manifest_bytes))
-        .map_err(|err| ManifestFromServerError::ZipRead(url.clone(), err))?;
+    let response = client.get(url.clone()).send().await?;
+    if response.status().is_client_error() {
+        // Fall back to plain text manifest
+        let url: Url = url.to_string().trim_end_matches(".zip").parse()?;
+        let manifest_bytes = client
+            .get(url.clone())
+            .send()
+            .await?
+            .error_for_status()?
+            .bytes()
+            .await?;
+        let manifest = String::from_utf8(manifest_bytes.to_vec())?;
+        tokio::fs::write(&target, &manifest).await?;
+        Ok(manifest)
+    } else {
+        let manifest_bytes = response.error_for_status()?.bytes().await?;
+        let mut archive = ZipArchive::new(std::io::Cursor::new(manifest_bytes))
+            .map_err(|err| ManifestFromServerError::ZipRead(url.clone(), err))?;
 
-    let temp = tempdir::TempDir::new("lux-manifest")?;
+        let temp = tempdir::TempDir::new("lux-manifest")?;
 
-    archive
-        .extract_unwrapped_root_dir(&temp, zip::read::root_dir_common_filter)
-        .map_err(|err| ManifestFromServerError::ZipExtract(url.clone(), err))?;
+        archive
+            .extract_unwrapped_root_dir(&temp, zip::read::root_dir_common_filter)
+            .map_err(|err| ManifestFromServerError::ZipExtract(url.clone(), err))?;
 
-    let mut extracted_manifest =
-        File::open(temp.path().join(format!("manifest-{}", manifest_version))).await?;
-    let mut target = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(target)
-        .await?;
+        let mut extracted_manifest =
+            File::open(temp.path().join(format!("manifest-{}", manifest_version))).await?;
+        let mut target = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(target)
+            .await?;
 
-    io::copy(&mut extracted_manifest, &mut target).await?;
+        io::copy(&mut extracted_manifest, &mut target).await?;
 
-    let mut manifest = String::new();
+        let mut manifest = String::new();
 
-    target.seek(io::SeekFrom::Start(0)).await?;
-    target.read_to_string(&mut manifest).await?;
+        target.seek(io::SeekFrom::Start(0)).await?;
+        target.read_to_string(&mut manifest).await?;
 
-    Ok(manifest)
+        Ok(manifest)
+    }
 }
 
 /// Look up the manifest from a cache, or get the manifest from the server
