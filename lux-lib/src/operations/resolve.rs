@@ -96,36 +96,40 @@ where
                         let constraint = constraint.unwrap_or(package.version_req().clone().into());
 
                         let rockspec = downloaded_rock.rockspec();
-                        let build_dependencies = rockspec
-                            .build_dependencies()
-                            .current_platform()
-                            .iter()
-                            .map(|dep| {
-                                // We always install build dependencies as entrypoints
-                                // with regard to the build tree
-                                let entry_type = tree::EntryType::Entrypoint;
-                                PackageInstallSpec::new(dep.package_req().clone(), entry_type)
-                                    .build_behaviour(build_behaviour)
-                                    .pin(pin)
-                                    .opt(opt)
-                                    .maybe_source(dep.source().clone())
-                                    .build()
-                            })
-                            .collect_vec();
 
-                        // NOTE: We treat transitive regular dependencies of build dependencies
-                        // as build dependencies
-                        get_all_dependencies(
-                            build_dependencies_tx.clone(),
-                            build_dependencies_tx.clone(),
-                            build_dependencies,
-                            package_db.clone(),
-                            build_lockfile.clone(),
-                            build_lockfile.clone(),
-                            &config,
-                            build_dep_progress,
-                        )
-                        .await?;
+                        // NOTE: We don't need to install build dependencies to install binary rocks.
+                        if !matches!(downloaded_rock, RemoteRockDownload::BinaryRock { .. }) {
+                            let build_dependencies = rockspec
+                                .build_dependencies()
+                                .current_platform()
+                                .iter()
+                                .map(|dep| {
+                                    // We always install build dependencies as entrypoints
+                                    // with regard to the build tree
+                                    let entry_type = tree::EntryType::Entrypoint;
+                                    PackageInstallSpec::new(dep.package_req().clone(), entry_type)
+                                        .build_behaviour(build_behaviour)
+                                        .pin(pin)
+                                        .opt(opt)
+                                        .maybe_source(dep.source().clone())
+                                        .build()
+                                })
+                                .collect_vec();
+
+                            // NOTE: We treat transitive regular dependencies of build dependencies
+                            // as build dependencies
+                            get_all_dependencies(
+                                build_dependencies_tx.clone(),
+                                build_dependencies_tx.clone(),
+                                build_dependencies,
+                                package_db.clone(),
+                                build_lockfile.clone(),
+                                build_lockfile.clone(),
+                                &config,
+                                build_dep_progress,
+                            )
+                            .await?;
+                        }
 
                         let dependencies = rockspec
                             .dependencies()
