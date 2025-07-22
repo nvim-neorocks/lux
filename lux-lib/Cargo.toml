@@ -79,7 +79,7 @@ tree-sitter = "0.25.4"
 tree-sitter-config = "0.25.4"
 lux-workspace-hack = { version = "0.1", path = "../lux-workspace-hack" }
 ignore = "0.4.23"
-nonempty = { version = "0.11.0", features = ["serialize"] }
+nonempty = { version = "0.12.0", features = ["serialize"] }
 is_executable = "1.0.4"
 path-slash = "0.2.1"
 chumsky = "0.10.1"
