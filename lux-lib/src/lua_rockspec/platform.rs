@@ -69,7 +69,7 @@ impl FromLua for PlatformIdentifier {
 /// Retrieves the platform identifier for the target platform
 ///
 /// NOTE: This is the platform lux was built with.
-/// As we don't support cross-compilation, we currently expect
+/// As we don't support cross-compiling luarocks packages, we currently expect
 /// users to use a version of lux that was built with the same platform
 /// as the one they are targeting
 fn target_identifier() -> PlatformIdentifier {
