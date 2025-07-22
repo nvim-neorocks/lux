@@ -6,6 +6,22 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.10.1](https://github.com/nvim-neorocks/lux/compare/v0.10.0...v0.10.1) - 2025-07-22
+
+### Other
+- update flake.lock ([#882](https://github.com/nvim-neorocks/lux/pull/882))
+
+## `lux-lib` - [0.14.1](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.14.0...lux-lib-v0.14.1) - 2025-07-22
+
+### Fixed
+- incorrect install path when installing packed rock ([#896](https://github.com/nvim-neorocks/lux/pull/896))
+- fall back to unzipped manifest on HEAD request ([#895](https://github.com/nvim-neorocks/lux/pull/895))
+
+### Other
+- *(deps)* bump nonempty from 0.11.0 to 0.12.0 ([#894](https://github.com/nvim-neorocks/lux/pull/894))
+- update flake.lock ([#882](https://github.com/nvim-neorocks/lux/pull/882))
+- clarify cross-compilation comment
+
 ## `lux-cli` - [0.10.0](https://github.com/nvim-neorocks/lux/compare/v0.9.1...v0.10.0) - 2025-07-21
 
 ### Added
