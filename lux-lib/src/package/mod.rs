@@ -16,6 +16,7 @@ pub use version::{
 use crate::{
     lockfile::RemotePackageSourceUrl,
     lua_rockspec::{DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue},
+    package::version::HasModRev,
     remote_package_source::RemotePackageSource,
     rockspec::lua_dependency::LuaDependencySpec,
     variables::HasVariables,
@@ -104,7 +105,7 @@ impl HasVariables for PackageSpec {
     fn get_variable(&self, input: &str) -> Option<String> {
         match input {
             "PACKAGE" => Some(self.name.to_string()),
-            "VERSION" => Some(self.version.to_string()),
+            "VERSION" => Some(self.version.to_modrev_string()),
             _ => None,
         }
     }

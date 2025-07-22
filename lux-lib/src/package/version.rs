@@ -32,6 +32,16 @@ pub enum PackageVersion {
     StringVer(StringVer),
 }
 
+impl HasModRev for PackageVersion {
+    fn to_modrev_string(&self) -> String {
+        match self {
+            Self::SemVer(ver) => ver.to_modrev_string(),
+            Self::DevVer(ver) => ver.to_modrev_string(),
+            Self::StringVer(ver) => ver.to_modrev_string(),
+        }
+    }
+}
+
 impl PackageVersion {
     pub fn parse(text: &str) -> Result<Self, PackageVersionParseError> {
         PackageVersion::from_str(text)
@@ -234,6 +244,12 @@ pub struct SemVer {
     specrev: u16,
 }
 
+impl HasModRev for SemVer {
+    fn to_modrev_string(&self) -> String {
+        self.version.to_string()
+    }
+}
+
 impl Display for SemVer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (version_str, remainder) = split_semver_version(&self.version.to_string());
@@ -315,6 +331,12 @@ pub struct DevVer {
     specrev: u16,
 }
 
+impl HasModRev for DevVer {
+    fn to_modrev_string(&self) -> String {
+        self.modrev.to_string().to_lowercase()
+    }
+}
+
 impl Default for DevVer {
     fn default() -> Self {
         Self {
@@ -363,6 +385,12 @@ pub struct StringVer {
     specrev: u16,
 }
 
+impl HasModRev for StringVer {
+    fn to_modrev_string(&self) -> String {
+        self.modrev.to_string()
+    }
+}
+
 impl Display for StringVer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let str = format!("{}-{}", self.modrev, self.specrev);
@@ -394,6 +422,12 @@ impl PartialOrd for StringVer {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
+}
+
+pub(crate) trait HasModRev {
+    /// If a version has a modrev (and possibly a specrev),
+    /// this is equivalent to `to_string()`, but includes only the modrev.
+    fn to_modrev_string(&self) -> String;
 }
 
 #[derive(Error, Debug)]
