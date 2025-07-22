@@ -152,11 +152,16 @@ impl<'a> BinaryRockInstall<'a> {
                 let cursor = Cursor::new(self.rock_bytes);
                 let mut zip = zip::ZipArchive::new(cursor)?;
                 zip.extract(&unpack_dir)?;
+                // let lua_dir = unpack_dir.join("lua");
+                // if lua_dir.is_dir() {
+                //     let src_dir = unpack_dir.join("lua");
+                //     tokio::fs::rename(lua_dir, src_dir).await?;
+                // }
                 let rock_manifest_file = unpack_dir.join("rock_manifest");
                 if !rock_manifest_file.is_file() {
                     return Err(InstallBinaryRockError::RockManifestNotFound);
                 }
-                let rock_manifest_content = std::fs::read_to_string(rock_manifest_file)?;
+                let rock_manifest_content = tokio::fs::read_to_string(rock_manifest_file).await?;
                 let output_paths = match self.entry_type {
                     tree::EntryType::Entrypoint => self.tree.entrypoint(&package)?,
                     tree::EntryType::DependencyOnly => self.tree.dependency(&package)?,
@@ -217,12 +222,12 @@ async fn install_manifest_entries<T>(
         let target = dest.join(relative_src_path);
         let src_path = src.join(relative_src_path);
         if src_path.is_dir() {
-            recursive_copy_dir(&src.to_path_buf(), &target).await?;
+            recursive_copy_dir(&src_path, &target).await?;
         } else if src_path.is_file() {
             tokio::fs::create_dir_all(target.parent().unwrap()).await?;
             tokio::fs::copy(src.join(relative_src_path), target).await?;
         } else {
-            let metadata = std::fs::metadata(&src_path)?;
+            let metadata = tokio::fs::metadata(&src_path).await?;
             return Err(InstallBinaryRockError::NotAFileOrDirectory(
                 src_path.to_string_lossy().to_string(),
                 metadata,
@@ -244,6 +249,53 @@ mod test {
     };
 
     use super::*;
+
+    #[tokio::test]
+    async fn install_binary_rock() {
+        let content = std::fs::read("resources/test/sample-project-0.1.0-1.all.rock").unwrap();
+        let rock_bytes = Bytes::copy_from_slice(&content);
+        let packed_rock_file_name = "sample-project-0.1.0-1.all.rock".to_string();
+        let cursor = Cursor::new(rock_bytes.clone());
+        let mut zip = zip::ZipArchive::new(cursor).unwrap();
+        let manifest_index = zip.index_for_path("rock_manifest").unwrap();
+        let mut manifest_file = zip.by_index(manifest_index).unwrap();
+        let mut content = String::new();
+        manifest_file.read_to_string(&mut content).unwrap();
+        let rock = DownloadedPackedRockBytes {
+            name: "sample-project".into(),
+            version: "0.1.0-1".parse().unwrap(),
+            bytes: rock_bytes,
+            file_name: packed_rock_file_name.clone(),
+            url: "https://test.org".parse().unwrap(),
+        };
+        let rockspec = unpack_rockspec(&rock).await.unwrap();
+        let install_root = assert_fs::TempDir::new().unwrap();
+        let config = ConfigBuilder::new()
+            .unwrap()
+            .user_tree(Some(install_root.to_path_buf()))
+            .build()
+            .unwrap();
+        let progress = MultiProgress::new();
+        let bar = progress.new_bar();
+        let tree = config
+            .user_tree(config.lua_version().unwrap().clone())
+            .unwrap();
+        let local_package = BinaryRockInstall::new(
+            &rockspec,
+            RemotePackageSource::Test,
+            rock.bytes,
+            tree::EntryType::Entrypoint,
+            &config,
+            &tree,
+            &Progress::Progress(bar),
+        )
+        .install()
+        .await
+        .unwrap();
+        let rock_layout = tree.entrypoint_layout(&local_package);
+        let foo_bar_module = rock_layout.src.join("foo").join("bar.lua");
+        assert!(foo_bar_module.is_file());
+    }
 
     /// This relatively large integration test case tests the following:
     ///
@@ -303,6 +355,9 @@ mod test {
         .await
         .unwrap();
         let rock_layout = tree.entrypoint_layout(&local_package);
+
+        assert!(rock_layout.lib.join("toml_edit.so").is_file());
+
         let orig_install_tree_integrity = rock_layout.rock_path.hash().unwrap();
 
         let pack_dest_dir = assert_fs::TempDir::new().unwrap();

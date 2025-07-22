@@ -17,6 +17,12 @@ async fn pack_project_with_etc_directories() {
     let temp_dir = TempDir::new().unwrap();
     temp_dir.copy_from(&project_root, &["**"]).unwrap();
     let project_root = temp_dir.path();
+    let foo_module_dir = project_root.join("src").join("foo");
+    tokio::fs::create_dir_all(&foo_module_dir).await.unwrap();
+    let bar_module_file = foo_module_dir.join("bar.lua");
+    tokio::fs::write(&bar_module_file, "print('foo.bar')")
+        .await
+        .unwrap();
     let plugin_dir = project_root.join("plugin");
     tokio::fs::create_dir_all(&plugin_dir).await.unwrap();
     let plugin_script = plugin_dir.join("foo.lua");
@@ -63,7 +69,7 @@ url = "https://github.com/nvim-neorocks/luarocks-stub"
         .unwrap()
         .unwrap();
     let archive_path = Pack::new(dest_dir, tree, package).pack().await.unwrap();
-    let archive_file = File::open(archive_path).unwrap();
+    let archive_file = File::open(&archive_path).unwrap();
     let mut archive = ZipArchive::new(archive_file).unwrap();
     let mut rock_manifest_entry = archive.by_name("rock_manifest").unwrap();
     let mut rock_manifest_content = String::new();
@@ -75,6 +81,10 @@ url = "https://github.com/nvim-neorocks/luarocks-stub"
     lua.load(rock_manifest_content).exec().unwrap();
     let globals = lua.globals();
     let rock_manifest: mlua::Table = globals.get("rock_manifest").unwrap();
+    let lua_mod: mlua::Table = rock_manifest.get("lua").unwrap();
+    assert!(lua_mod.contains_key("foo").unwrap());
+    let foo: mlua::Table = lua_mod.get("foo").unwrap();
+    assert!(foo.contains_key("bar.lua").unwrap());
     let conf: mlua::Table = rock_manifest.get("conf").unwrap();
     assert!(conf.contains_key("cfg.toml").unwrap());
     let plugin: mlua::Table = rock_manifest.get("plugin").unwrap();
