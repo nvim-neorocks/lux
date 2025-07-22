@@ -51,10 +51,9 @@ async fn get_manifest(
 ) -> Result<String, ManifestFromServerError> {
     let response = client.get(url.clone()).send().await?;
     if response.status().is_client_error() {
-        // Fall back to plain text manifest
-        let url: Url = url.to_string().trim_end_matches(".zip").parse()?;
+        let url = fallback_unzipped_url(&url)?;
         let manifest_bytes = client
-            .get(url.clone())
+            .get(url)
             .send()
             .await?
             .error_for_status()?
@@ -116,7 +115,13 @@ async fn manifest_from_cache_or_server(
         let last_modified_local: SystemTime = metadata.modified()?;
 
         // Ask the server for the last modified date of its manifest.
-        let response = client.head(url.clone()).send().await?.error_for_status()?;
+        let response = match client.head(url.clone()).send().await? {
+            response if response.status().is_client_error() => {
+                let url = fallback_unzipped_url(&url)?;
+                client.head(url).send().await?.error_for_status()?
+            }
+            response => response.error_for_status()?,
+        };
 
         if let Some(last_modified_header) = response.headers().get("Last-Modified") {
             let server_last_modified = httpdate::parse_http_date(last_modified_header.to_str()?)?;
@@ -393,6 +398,11 @@ struct ManifestRockEntry {
 struct IntermediateManifest {
     /// The key of each package's HashMap is the version string
     repository: HashMap<PackageName, HashMap<String, Vec<ManifestRockEntry>>>,
+}
+
+/// Given a URL to a zip file, create a URL to the same file without the .zip extension
+fn fallback_unzipped_url(url: &Url) -> Result<Url, url::ParseError> {
+    url.to_string().trim_end_matches(".zip").parse()
 }
 
 #[cfg(test)]
