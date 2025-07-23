@@ -4,9 +4,8 @@ use crate::{
     build::BuildBehaviour,
     config::Config,
     lockfile::{LocalPackage, LocalPackageLockType, LockfileIntegrityError},
-    luarc,
     luarocks::luarocks_installation::LUAROCKS_VERSION,
-    operations,
+    operations::{self, UpdateLuaRcError},
     package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress},
     project::{
@@ -125,6 +124,8 @@ pub enum SyncError {
     ProjectError(#[from] ProjectError),
     #[error(transparent)]
     LocalProjectTomlValidationError(#[from] LocalProjectTomlValidationError),
+    #[error("failed to update `.luarc.json`:\n{0}")]
+    UpdateLuaRc(#[from] UpdateLuaRcError),
 }
 
 async fn do_sync(
@@ -283,7 +284,11 @@ async fn do_sync(
         project_lockfile.sync(dest_lockfile.local_pkg_lock(), lock_type);
     }
 
-    operations::update_luarc(args.config);
+    operations::UpdateLuaRc::new()
+        .config(args.config)
+        .project(args.project)
+        .update()
+        .await?;
 
     Ok(report)
 }

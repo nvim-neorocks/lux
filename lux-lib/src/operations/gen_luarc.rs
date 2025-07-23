@@ -3,10 +3,42 @@ use crate::lockfile::LocalPackageLockType;
 use crate::lockfile::ProjectLockfile;
 use crate::lockfile::ReadOnly;
 use crate::project::Project;
+use crate::project::ProjectError;
+use crate::project::ProjectTreeError;
+use bon::Builder;
+use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::fs;
+use std::io;
 use std::path::PathBuf;
+use thiserror::Error;
+use tokio::fs;
+
+#[derive(Error, Debug)]
+pub enum UpdateLuaRcError {
+    #[error(transparent)]
+    Project(#[from] ProjectError),
+    #[error(transparent)]
+    ProjectTree(#[from] ProjectTreeError),
+    #[error("failed to write {0}:\n{1}")]
+    Write(PathBuf, io::Error),
+}
+
+#[derive(Builder)]
+#[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
+pub(crate) struct UpdateLuaRc<'a> {
+    config: &'a Config,
+    project: &'a Project,
+}
+
+impl<State> UpdateLuaRcBuilder<'_, State>
+where
+    State: update_lua_rc_builder::State + update_lua_rc_builder::IsComplete,
+{
+    pub async fn update(self) -> Result<(), UpdateLuaRcError> {
+        do_update_luarc(self._build()).await
+    }
+}
 
 #[derive(Serialize, Deserialize, Default, PartialEq, Debug)]
 #[serde(default)]
@@ -27,31 +59,29 @@ struct Workspace {
     library: Vec<String>,
 }
 
-pub fn update_luarc(config: &Config) {
+async fn do_update_luarc(args: UpdateLuaRc<'_>) -> Result<(), UpdateLuaRcError> {
+    let config = args.config;
     if !config.generate_luarc() {
-        return; // do nothing
+        return Ok(());
     }
-    let project = Project::current_or_err().expect("failed to get current project");
-    let lockfile = project.lockfile().expect("should have a lockfile");
+    let project = args.project;
+    let lockfile = project.lockfile()?;
     let luarc_path = project.luarc_path();
-    let dependency_tree = project.tree(config).expect("failed to get project tree");
-    let dependency_tree_root_relative_path = dependency_tree
-        .root()
-        .strip_prefix(project.root())
-        .expect("tree root should be a subpath of project root")
+    let dependency_tree = project.tree(config)?;
+    let dependency_tree_root_relative_path = diff_paths(dependency_tree.root(), project.root())
+        .expect("tree root should be a subpath of the project root")
         .to_path_buf();
 
-    let test_dependency_tree = project
-        .test_tree(config)
-        .expect("failed to get project test tree");
-    let test_dependency_tree_root_relative_path = test_dependency_tree
-        .root()
-        .strip_prefix(project.root())
-        .expect("test tree root should be a subpath of project root")
-        .to_path_buf();
+    let test_dependency_tree = project.test_tree(config)?;
+    let test_dependency_tree_root_relative_path =
+        diff_paths(test_dependency_tree.root(), project.root())
+            .expect("test tree root should be a subpath of the project root")
+            .to_path_buf();
 
     // read the existing .luarc file or create a new one if it doesn't exist
-    let luarc_content = fs::read_to_string(&luarc_path).unwrap_or_else(|_| String::from("{}"));
+    let luarc_content = fs::read_to_string(&luarc_path)
+        .await
+        .unwrap_or_else(|_| "{}".into());
 
     let dependency_dirs = find_dependency_dirs(
         &lockfile,
@@ -68,14 +98,16 @@ pub fn update_luarc(config: &Config) {
     let all_dependecy_dirs: Vec<PathBuf> = dependency_dirs
         .into_iter()
         .chain(test_dependency_dirs)
-        // make sure the paths actually exist
-        .filter(|path| fs::exists(path).is_ok_and(|exists| exists))
+        .filter(|path| path.is_dir())
         .collect();
 
     let file = generate_luarc(luarc_content.as_str(), all_dependecy_dirs);
 
     fs::write(&luarc_path, file)
-        .unwrap_or_else(|_| panic!("failed to write {} file", luarc_path.display()));
+        .await
+        .map_err(|err| UpdateLuaRcError::Write(luarc_path, err))?;
+
+    Ok(())
 }
 
 fn find_dependency_dirs(
