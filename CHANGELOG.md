@@ -6,6 +6,22 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.11.0](https://github.com/nvim-neorocks/lux/compare/v0.10.2...v0.11.0) - 2025-07-23
+
+### Added
+- [**breaking**] auto-generate `.luarc.json` ([#910](https://github.com/nvim-neorocks/lux/pull/910))
+
+### Other
+- move shared dependencies to workspace manifest ([#908](https://github.com/nvim-neorocks/lux/pull/908))
+
+## `lux-lib` - [0.16.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.15.1...lux-lib-v0.16.0) - 2025-07-23
+
+### Added
+- [**breaking**] auto-generate `.luarc.json` ([#910](https://github.com/nvim-neorocks/lux/pull/910))
+
+### Other
+- move shared dependencies to workspace manifest ([#908](https://github.com/nvim-neorocks/lux/pull/908))
+
 ## `lux-cli` - [0.10.2](https://github.com/nvim-neorocks/lux/compare/v0.10.1...v0.10.2) - 2025-07-23
 
 ### Other
