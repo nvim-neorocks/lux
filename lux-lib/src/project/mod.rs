@@ -43,8 +43,8 @@ pub mod project_toml;
 pub use project_toml::PROJECT_TOML;
 
 pub const EXTRA_ROCKSPEC: &str = "extra.rockspec";
-pub const LUARC: &str = ".luarc.json";
-pub const EMMYRC: &str = ".emmyrc.json";
+const LUARC: &str = ".luarc.json";
+const EMMYRC: &str = ".emmyrc.json";
 
 #[derive(Error, Debug)]
 #[error(transparent)]
@@ -319,7 +319,7 @@ impl Project {
     }
 
     /// Get the `.luarc.json` or `.emmyrc.json` path.
-    pub fn luarc_path(&self) -> PathBuf {
+    pub(crate) fn luarc_path(&self) -> PathBuf {
         let luarc_path = self.root.join(LUARC);
         if luarc_path.is_file() {
             luarc_path
