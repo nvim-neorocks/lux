@@ -4,7 +4,6 @@ use std::path::PathBuf;
 
 use add::Add;
 use build::Build;
-use check::Check;
 use clap::{Parser, Subcommand};
 use config::ConfigCmd;
 use debug::Debug;
@@ -15,6 +14,7 @@ use generate_rockspec::GenerateRockspec;
 use info::Info;
 use install::Install;
 use install_rockspec::InstallRockspec;
+use lint::Lint;
 use list::ListCmd;
 use lux_lib::config::LuaVersion;
 use outdated::Outdated;
@@ -35,7 +35,6 @@ use which::Which;
 
 pub mod add;
 pub mod build;
-pub mod check;
 pub mod completion;
 pub mod config;
 pub mod debug;
@@ -49,6 +48,7 @@ pub mod info;
 pub mod install;
 pub mod install_lua;
 pub mod install_rockspec;
+pub mod lint;
 pub mod list;
 pub mod outdated;
 pub mod pack;
@@ -149,8 +149,6 @@ pub enum Commands {
     Add(Add),
     /// Build/compile a project.
     Build(Build),
-    /// Runs `luacheck` in the current project.
-    Check(Check),
     /// Interact with the lux configuration.
     #[command(subcommand, arg_required_else_help = true)]
     Config(ConfigCmd),
@@ -179,8 +177,8 @@ pub enum Commands {
     InstallRockspec(InstallRockspec),
     /// Manually install and manage Lua headers for various Lua versions.
     InstallLua,
-    /// [UNIMPLEMENTED] Check syntax of a rockspec.
-    Lint,
+    /// Lints the current project using `luacheck`.
+    Lint(Lint),
     /// List currently installed rocks.
     List(ListCmd),
     /// Run lua, with the `LUA_PATH` and `LUA_CPATH` set to the specified lux tree.
