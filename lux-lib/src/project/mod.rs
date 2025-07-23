@@ -43,6 +43,7 @@ pub mod project_toml;
 pub use project_toml::PROJECT_TOML;
 
 pub const EXTRA_ROCKSPEC: &str = "extra.rockspec";
+pub(crate) const LUX_DIR_NAME: &str = ".lux";
 const LUARC: &str = ".luarc.json";
 const EMMYRC: &str = ".emmyrc.json";
 
@@ -385,7 +386,7 @@ impl Project {
     }
 
     pub(crate) fn default_tree_root_dir(&self) -> PathBuf {
-        self.root.join(".lux")
+        self.root.join(LUX_DIR_NAME)
     }
 
     pub fn tree(&self, config: &Config) -> Result<Tree, ProjectTreeError> {

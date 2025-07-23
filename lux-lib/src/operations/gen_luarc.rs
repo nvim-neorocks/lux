@@ -5,6 +5,7 @@ use crate::lockfile::ReadOnly;
 use crate::project::Project;
 use crate::project::ProjectError;
 use crate::project::ProjectTreeError;
+use crate::project::LUX_DIR_NAME;
 use bon::Builder;
 use itertools::Itertools;
 use pathdiff::diff_paths;
@@ -113,7 +114,7 @@ fn update_luarc_content(prev_contents: &str, extra_paths: Vec<PathBuf>) -> Strin
     luarc
         .workspace
         .library
-        .retain(|path| !path.starts_with(".lux/"));
+        .retain(|path| !path.starts_with(&format!("{LUX_DIR_NAME}/")));
 
     for p in extra_paths {
         let path = p.clone().into_os_string().into_string();
