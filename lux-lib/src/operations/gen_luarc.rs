@@ -6,6 +6,7 @@ use crate::project::Project;
 use crate::project::ProjectError;
 use crate::project::ProjectTreeError;
 use bon::Builder;
+use itertools::Itertools;
 use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -67,63 +68,45 @@ async fn do_generate_luarc(args: GenLuaRc<'_>) -> Result<(), GenLuaRcError> {
     let project = args.project;
     let lockfile = project.lockfile()?;
     let luarc_path = project.luarc_path();
-    let dependency_tree = project.tree(config)?;
-    let dependency_tree_root_relative_path = diff_paths(dependency_tree.root(), project.root())
-        .expect("tree root should be a subpath of the project root")
-        .to_path_buf();
 
-    let test_dependency_tree = project.test_tree(config)?;
-    let test_dependency_tree_root_relative_path =
-        diff_paths(test_dependency_tree.root(), project.root())
-            .expect("test tree root should be a subpath of the project root")
-            .to_path_buf();
-
-    // read the existing .luarc file or create a new one if it doesn't exist
+    // read the existing .luarc file or initialise a new one if it doesn't exist
     let luarc_content = fs::read_to_string(&luarc_path)
         .await
         .unwrap_or_else(|_| "{}".into());
 
-    let dependency_dirs = find_dependency_dirs(
-        &lockfile,
-        dependency_tree_root_relative_path,
-        &LocalPackageLockType::Regular,
-    );
+    let dependency_tree = project.tree(config)?;
+    let test_dependency_tree = project.test_tree(config)?;
 
-    let test_dependency_dirs = find_dependency_dirs(
-        &lockfile,
-        test_dependency_tree_root_relative_path,
-        &LocalPackageLockType::Test,
-    );
+    let library_dirs = lockfile
+        .local_pkg_lock(&LocalPackageLockType::Regular)
+        .rocks()
+        .values()
+        .map(|pkg| {
+            diff_paths(dependency_tree.root_for(pkg), project.root())
+                .expect("tree root should be a subpath of the project root")
+        })
+        .chain(
+            lockfile
+                .local_pkg_lock(&LocalPackageLockType::Test)
+                .rocks()
+                .values()
+                .map(|pkg| {
+                    diff_paths(test_dependency_tree.root_for(pkg), project.root())
+                        .expect("test tree root should be a subpath of the project root")
+                }),
+        )
+        .collect_vec();
 
-    let all_dependecy_dirs: Vec<PathBuf> = dependency_dirs
-        .into_iter()
-        .chain(test_dependency_dirs)
-        .filter(|path| path.is_dir())
-        .collect();
+    let luarc_content = update_luarc_content(&luarc_content, library_dirs);
 
-    let file = generate_luarc(luarc_content.as_str(), all_dependecy_dirs);
-
-    fs::write(&luarc_path, file)
+    fs::write(&luarc_path, luarc_content)
         .await
         .map_err(|err| GenLuaRcError::Write(luarc_path, err))?;
 
     Ok(())
 }
 
-fn find_dependency_dirs(
-    lockfile: &ProjectLockfile<ReadOnly>,
-    lux_tree_base_dir: PathBuf,
-    local_package_lock_type: &LocalPackageLockType,
-) -> Vec<PathBuf> {
-    let rocks = lockfile.local_pkg_lock(local_package_lock_type).rocks();
-
-    rocks
-        .iter()
-        .map(|t| lux_tree_base_dir.join(format!("{}-{}@{}/src", t.0, t.1.name(), t.1.version())))
-        .collect()
-}
-
-fn generate_luarc(prev_contents: &str, extra_paths: Vec<PathBuf>) -> String {
+fn update_luarc_content(prev_contents: &str, extra_paths: Vec<PathBuf>) -> String {
     let mut luarc: LuaRC = serde_json::from_str(prev_contents).unwrap();
 
     // remove any preexisting lux library paths
@@ -199,7 +182,7 @@ mod test {
         ];
 
         for (description, initial, new_libs, expected) in cases {
-            let content = super::generate_luarc(initial, new_libs.clone());
+            let content = super::update_luarc_content(initial, new_libs.clone());
 
             assert_eq!(
                 serde_json::from_str::<LuaRC>(&content).unwrap(),
