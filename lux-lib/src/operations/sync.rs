@@ -6,6 +6,7 @@ use crate::{
     lockfile::{LocalPackage, LocalPackageLockType, LockfileIntegrityError},
     luarc,
     luarocks::luarocks_installation::LUAROCKS_VERSION,
+    operations,
     package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress},
     project::{
@@ -282,7 +283,7 @@ async fn do_sync(
         project_lockfile.sync(dest_lockfile.local_pkg_lock(), lock_type);
     }
 
-    luarc::update_luarc(args.config);
+    operations::update_luarc(args.config);
 
     Ok(report)
 }
