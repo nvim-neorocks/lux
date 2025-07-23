@@ -96,6 +96,7 @@ async fn do_generate_luarc(args: GenLuaRc<'_>) -> Result<(), GenLuaRcError> {
                         .expect("test tree root should be a subpath of the project root")
                 }),
         )
+        .sorted()
         .collect_vec();
 
     let luarc_content = update_luarc_content(&luarc_content, library_dirs);
@@ -122,8 +123,6 @@ fn update_luarc_content(prev_contents: &str, extra_paths: Vec<PathBuf>) -> Strin
             luarc.workspace.library.push(path_str);
         }
     }
-
-    luarc.workspace.library.sort();
 
     serde_json::to_string_pretty(&luarc).expect("failed to serialize .luarc.json")
 }
