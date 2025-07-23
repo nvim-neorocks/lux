@@ -1,7 +1,5 @@
 use crate::config::Config;
 use crate::lockfile::LocalPackageLockType;
-use crate::lockfile::ProjectLockfile;
-use crate::lockfile::ReadOnly;
 use crate::project::Project;
 use crate::project::ProjectError;
 use crate::project::ProjectTreeError;
@@ -23,6 +21,8 @@ pub enum GenLuaRcError {
     Project(#[from] ProjectError),
     #[error(transparent)]
     ProjectTree(#[from] ProjectTreeError),
+    #[error("failed to serialize luarc content:\n{0}")]
+    Serialize(#[from] serde_json::Error),
     #[error("failed to write {0}:\n{1}")]
     Write(PathBuf, io::Error),
 }
@@ -83,8 +83,8 @@ async fn do_generate_luarc(args: GenLuaRc<'_>) -> Result<(), GenLuaRcError> {
         .local_pkg_lock(&LocalPackageLockType::Regular)
         .rocks()
         .values()
-        .map(|pkg| {
-            diff_paths(dependency_tree.root_for(pkg), project.root())
+        .map(|dependency| {
+            diff_paths(dependency_tree.root_for(dependency), project.root())
                 .expect("tree root should be a subpath of the project root")
         })
         .chain(
@@ -92,15 +92,18 @@ async fn do_generate_luarc(args: GenLuaRc<'_>) -> Result<(), GenLuaRcError> {
                 .local_pkg_lock(&LocalPackageLockType::Test)
                 .rocks()
                 .values()
-                .map(|pkg| {
-                    diff_paths(test_dependency_tree.root_for(pkg), project.root())
-                        .expect("test tree root should be a subpath of the project root")
+                .map(|test_dependency| {
+                    diff_paths(
+                        test_dependency_tree.root_for(test_dependency),
+                        project.root(),
+                    )
+                    .expect("test tree root should be a subpath of the project root")
                 }),
         )
         .sorted()
         .collect_vec();
 
-    let luarc_content = update_luarc_content(&luarc_content, library_dirs);
+    let luarc_content = update_luarc_content(&luarc_content, library_dirs)?;
 
     fs::write(&luarc_path, luarc_content)
         .await
@@ -109,7 +112,10 @@ async fn do_generate_luarc(args: GenLuaRc<'_>) -> Result<(), GenLuaRcError> {
     Ok(())
 }
 
-fn update_luarc_content(prev_contents: &str, extra_paths: Vec<PathBuf>) -> String {
+fn update_luarc_content(
+    prev_contents: &str,
+    extra_paths: Vec<PathBuf>,
+) -> Result<String, GenLuaRcError> {
     let mut luarc: LuaRC = serde_json::from_str(prev_contents).unwrap();
 
     // remove any preexisting lux library paths
@@ -123,7 +129,7 @@ fn update_luarc_content(prev_contents: &str, extra_paths: Vec<PathBuf>) -> Strin
         .map(|path| path.to_slash_lossy().to_string())
         .for_each(|path_str| luarc.workspace.library.push(path_str));
 
-    serde_json::to_string_pretty(&luarc).expect("failed to serialize .luarc.json")
+    Ok(serde_json::to_string_pretty(&luarc)?)
 }
 
 #[cfg(test)]
@@ -181,7 +187,7 @@ mod test {
         ];
 
         for (description, initial, new_libs, expected) in cases {
-            let content = super::update_luarc_content(initial, new_libs.clone());
+            let content = super::update_luarc_content(initial, new_libs.clone()).unwrap();
 
             assert_eq!(
                 serde_json::from_str::<LuaRC>(&content).unwrap(),
