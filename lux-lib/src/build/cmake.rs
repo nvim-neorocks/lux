@@ -15,7 +15,7 @@ use crate::{
     lua_rockspec::CMakeBuildSpec,
     path::{Paths, PathsError},
     tree::TreeError,
-    variables::{self, HasVariables, VariableSubstitutionError},
+    variables::{self, GetVariableError, HasVariables, VariableSubstitutionError},
 };
 
 const CMAKE_BUILD_FILE: &str = "build.lux";
@@ -46,13 +46,13 @@ pub enum CMakeError {
 struct CMakeVariables;
 
 impl HasVariables for CMakeVariables {
-    fn get_variable(&self, input: &str) -> Option<String> {
-        match input {
+    fn get_variable(&self, input: &str) -> Result<Option<String>, GetVariableError> {
+        Ok(match input {
             "CMAKE_MODULE_PATH" => Some(env::var("CMAKE_MODULE_PATH").unwrap_or("".into())),
             "CMAKE_LIBRARY_PATH" => Some(env::var("CMAKE_LIBRARY_PATH").unwrap_or("".into())),
             "CMAKE_INCLUDE_PATH" => Some(env::var("CMAKE_INCLUDE_PATH").unwrap_or("".into())),
             _ => None,
-        }
+        })
     }
 }
 

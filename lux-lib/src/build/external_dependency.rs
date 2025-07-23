@@ -8,8 +8,9 @@ use std::{
 use thiserror::Error;
 
 use crate::{
-    config::external_deps::ExternalDependencySearchConfig, lua_rockspec::ExternalDependencySpec,
-    variables::HasVariables,
+    config::external_deps::ExternalDependencySearchConfig,
+    lua_rockspec::ExternalDependencySpec,
+    variables::{GetVariableError, HasVariables},
 };
 
 use super::utils::{c_lib_extension, format_path};
@@ -265,8 +266,8 @@ impl ExternalDependencyInfo {
 }
 
 impl HasVariables for HashMap<String, ExternalDependencyInfo> {
-    fn get_variable(&self, input: &str) -> Option<String> {
-        input.split_once('_').and_then(|(dep_key, dep_dir_type)| {
+    fn get_variable(&self, input: &str) -> Result<Option<String>, GetVariableError> {
+        Ok(input.split_once('_').and_then(|(dep_key, dep_dir_type)| {
             self.get(dep_key)
                 .and_then(|dep| match dep_dir_type {
                     "DIR" => dep
@@ -280,7 +281,7 @@ impl HasVariables for HashMap<String, ExternalDependencyInfo> {
                 })
                 .as_deref()
                 .map(format_path)
-        })
+        }))
     }
 }
 

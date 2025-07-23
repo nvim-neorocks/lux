@@ -8,7 +8,7 @@ use thiserror::Error;
 use crate::{
     lua_rockspec::{RockSourceInternal, SourceUrl, SourceUrlError},
     package::{PackageName, PackageSpec, PackageVersion, PackageVersionParseError},
-    variables::{self, Environment, HasVariables, VariableSubstitutionError},
+    variables::{self, Environment, GetVariableError, HasVariables, VariableSubstitutionError},
 };
 
 use super::ProjectRoot;
@@ -66,13 +66,14 @@ pub enum GenerateSourceError {
 struct GitProject<'a>(&'a ProjectRoot);
 
 impl HasVariables for GitProject<'_> {
-    fn get_variable(&self, input: &str) -> Option<String> {
-        match input {
-            "REF" => Repository::open(self.0)
-                .ok()
-                .and_then(|repo| current_tag_or_revision(&repo).ok()),
+    fn get_variable(&self, input: &str) -> Result<Option<String>, GetVariableError> {
+        Ok(match input {
+            "REF" => {
+                let repo = Repository::open(self.0).map_err(GetVariableError::new)?;
+                Some(current_tag_or_revision(&repo).map_err(GetVariableError::new)?)
+            }
             _ => None,
-        }
+        })
     }
 }
 

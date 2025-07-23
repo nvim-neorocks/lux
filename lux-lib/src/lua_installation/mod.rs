@@ -17,6 +17,7 @@ use crate::build::utils::recursive_copy_dir;
 use crate::build::utils::{c_lib_extension, format_path};
 use crate::config::external_deps::ExternalDependencySearchConfig;
 use crate::lua_rockspec::ExternalDependencySpec;
+use crate::variables::GetVariableError;
 use crate::{
     config::{Config, LuaVersion},
     package::PackageVersion,
@@ -275,8 +276,8 @@ impl LuaInstallation {
 }
 
 impl HasVariables for LuaInstallation {
-    fn get_variable(&self, input: &str) -> Option<String> {
-        let result = match input {
+    fn get_variable(&self, input: &str) -> Result<Option<String>, GetVariableError> {
+        Ok(match input {
             "LUA_INCDIR" => self
                 .dependency_info
                 .include_dir
@@ -302,8 +303,7 @@ impl HasVariables for LuaInstallation {
                 .map(|lua| format_path(&lua)),
             "LUALIB" => self.lua_lib().or(Some("".into())),
             _ => None,
-        }?;
-        Some(result)
+        })
     }
 }
 

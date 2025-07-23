@@ -9,16 +9,29 @@ pub enum VariableSubstitutionError {
     RecursionLimit,
 }
 
+#[derive(Error, Debug, Clone)]
+#[error("{0}")]
+pub(crate) struct GetVariableError(String);
+
+impl GetVariableError {
+    pub(crate) fn new<E>(error: E) -> Self
+    where
+        E: std::error::Error,
+    {
+        Self(error.to_string())
+    }
+}
+
 pub(crate) trait HasVariables {
-    fn get_variable(&self, input: &str) -> Option<String>;
+    fn get_variable(&self, input: &str) -> Result<Option<String>, GetVariableError>;
 }
 
 /// Helper for variable substitution with environment variables
 pub(crate) struct Environment {}
 
 impl HasVariables for Environment {
-    fn get_variable(&self, input: &str) -> Option<String> {
-        std::env::var(input).ok()
+    fn get_variable(&self, input: &str) -> Result<Option<String>, GetVariableError> {
+        Ok(std::env::var(input).ok())
     }
 }
 
@@ -31,7 +44,13 @@ fn parser<'a>(
             .try_map(|s: String, span| {
                 variables
                     .iter()
-                    .find_map(|v| v.get_variable(&s))
+                    .map(|v| v.get_variable(&s))
+                    .collect::<Result<Vec<Option<String>>, GetVariableError>>()
+                    .map_err(|err| {
+                        Rich::custom(span, format!("could not expand variable $({s}):\n{err}"))
+                    })?
+                    .into_iter()
+                    .find_map(|v| v)
                     .ok_or(Rich::custom(
                         span,
                         format!("could not expand variable $({s})"),
@@ -83,8 +102,8 @@ mod tests {
     struct TestVariables;
 
     impl HasVariables for TestVariables {
-        fn get_variable(&self, input: &str) -> Option<String> {
-            match input {
+        fn get_variable(&self, input: &str) -> Result<Option<String>, GetVariableError> {
+            Ok(match input {
                 "TEST_VAR" => Some("foo".into()),
                 "RECURSIVE_VAR" => Some("$(TEST_VAR)".into()),
                 "FLATTEN_VAR" => Some("TEST_VAR".into()),
@@ -92,7 +111,7 @@ mod tests {
                 "INFINITELY_RECURSIVE_2" => Some("$(INFINITELY_RECURSIVE_1)".into()),
                 "EMPTY_STRING" => Some("".into()),
                 _ => None,
-            }
+            })
         }
     }
 

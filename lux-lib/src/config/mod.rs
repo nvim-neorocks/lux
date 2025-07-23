@@ -11,6 +11,7 @@ use tree::RockLayoutConfig;
 use url::Url;
 
 use crate::tree::{Tree, TreeError};
+use crate::variables::GetVariableError;
 use crate::{
     build::utils,
     package::{PackageVersion, PackageVersionReq},
@@ -313,8 +314,8 @@ impl Config {
 }
 
 impl HasVariables for Config {
-    fn get_variable(&self, input: &str) -> Option<String> {
-        self.variables.get(input).cloned()
+    fn get_variable(&self, input: &str) -> Result<Option<String>, GetVariableError> {
+        Ok(self.variables.get(input).cloned())
     }
 }
 

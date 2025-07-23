@@ -19,7 +19,7 @@ use crate::{
     package::version::HasModRev,
     remote_package_source::RemotePackageSource,
     rockspec::lua_dependency::LuaDependencySpec,
-    variables::HasVariables,
+    variables::{GetVariableError, HasVariables},
 };
 
 #[derive(Debug, Error)]
@@ -102,12 +102,12 @@ impl mlua::UserData for PackageSpec {
 }
 
 impl HasVariables for PackageSpec {
-    fn get_variable(&self, input: &str) -> Option<String> {
-        match input {
+    fn get_variable(&self, input: &str) -> Result<Option<String>, GetVariableError> {
+        Ok(match input {
             "PACKAGE" => Some(self.name.to_string()),
             "VERSION" => Some(self.version.to_modrev_string()),
             _ => None,
-        }
+        })
     }
 }
 

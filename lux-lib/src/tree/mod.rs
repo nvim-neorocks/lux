@@ -3,7 +3,7 @@ use crate::{
     config::{tree::RockLayoutConfig, Config, LuaVersion},
     lockfile::{LocalPackage, LocalPackageId, Lockfile, LockfileError, OptState, ReadOnly},
     package::PackageReq,
-    variables::HasVariables,
+    variables::{GetVariableError, HasVariables},
 };
 use std::{io, path::PathBuf};
 
@@ -87,8 +87,8 @@ impl RockLayout {
 }
 
 impl HasVariables for RockLayout {
-    fn get_variable(&self, var: &str) -> Option<String> {
-        let path = match var {
+    fn get_variable(&self, var: &str) -> Result<Option<String>, GetVariableError> {
+        Ok(match var {
             "PREFIX" => Some(format_path(&self.rock_path)),
             "LIBDIR" => Some(format_path(&self.lib)),
             "LUADIR" => Some(format_path(&self.src)),
@@ -96,8 +96,7 @@ impl HasVariables for RockLayout {
             "CONFDIR" => Some(format_path(&self.conf)),
             "DOCDIR" => Some(format_path(&self.doc)),
             _ => None,
-        }?;
-        Some(path)
+        })
     }
 }
 
