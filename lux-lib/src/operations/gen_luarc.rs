@@ -20,6 +20,9 @@ struct LuaRC {
 
 #[derive(Serialize, Deserialize, Default, PartialEq, Debug)]
 struct Workspace {
+    #[serde(flatten)] // <-- capture any unknown keys here
+    other: BTreeMap<String, serde_json::Value>,
+
     #[serde(default)]
     library: Vec<String>,
 }
