@@ -124,34 +124,40 @@ pub(crate) struct DisplayLuaKV {
 
 impl Display for DisplayLuaValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use std::fmt::Write;
+        let mut buf = String::new();
         match self {
             //DisplayLuaValue::Nil => write!(f, "nil"),
             //DisplayLuaValue::Number(n) => write!(f, "{n}"),
-            DisplayLuaValue::Boolean(b) => write!(f, "{b}"),
-            DisplayLuaValue::String(s) => write!(f, "\"{s}\""),
+            DisplayLuaValue::Boolean(b) => write!(buf, "{b}")?,
+            DisplayLuaValue::String(s) => write!(buf, "\"{s}\"")?,
             DisplayLuaValue::List(l) => {
-                writeln!(f, "{{")?;
-
+                writeln!(buf, "{{")?;
                 for item in l {
-                    writeln!(f, "{item},")?;
+                    writeln!(buf, "{item},")?;
                 }
-
-                write!(f, "}}")?;
-
-                Ok(())
+                write!(buf, "}}")?;
             }
             DisplayLuaValue::Table(t) => {
-                writeln!(f, "{{")?;
+                writeln!(buf, "{{")?;
 
                 for item in t {
-                    writeln!(f, "{item},")?;
+                    writeln!(buf, "{item},")?;
                 }
 
-                write!(f, "}}")?;
-
-                Ok(())
+                write!(buf, "}}")?;
             }
-        }
+        };
+        let output = match stylua_lib::format_code(
+            &buf,
+            stylua_lib::Config::default(),
+            None,
+            stylua_lib::OutputVerification::Full,
+        ) {
+            Ok(formatted_code) => formatted_code,
+            Err(_) => buf,
+        };
+        write!(f, "{output}")
     }
 }
 

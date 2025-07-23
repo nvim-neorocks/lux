@@ -2323,6 +2323,7 @@ dependencies = [
  "ssri",
  "strum 0.27.1",
  "strum_macros 0.27.1",
+ "stylua",
  "tar",
  "target-lexicon 0.13.2",
  "tempdir",
