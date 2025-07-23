@@ -5,7 +5,7 @@ use crate::{
     config::Config,
     lockfile::{LocalPackage, LocalPackageLockType, LockfileIntegrityError},
     luarocks::luarocks_installation::LUAROCKS_VERSION,
-    operations::{self, UpdateLuaRcError},
+    operations::{self, GenLuaRcError},
     package::{PackageName, PackageReq},
     progress::{MultiProgress, Progress},
     project::{
@@ -124,8 +124,8 @@ pub enum SyncError {
     ProjectError(#[from] ProjectError),
     #[error(transparent)]
     LocalProjectTomlValidationError(#[from] LocalProjectTomlValidationError),
-    #[error("failed to update `.luarc.json`:\n{0}")]
-    UpdateLuaRc(#[from] UpdateLuaRcError),
+    #[error("failed to generate `.luarc.json`:\n{0}")]
+    GenLuaRc(#[from] GenLuaRcError),
 }
 
 async fn do_sync(
@@ -284,10 +284,10 @@ async fn do_sync(
         project_lockfile.sync(dest_lockfile.local_pkg_lock(), lock_type);
     }
 
-    operations::UpdateLuaRc::new()
+    operations::GenLuaRc::new()
         .config(args.config)
         .project(args.project)
-        .update()
+        .generate_luarc()
         .await?;
 
     Ok(report)

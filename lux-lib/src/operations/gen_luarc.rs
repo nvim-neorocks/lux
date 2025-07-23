@@ -15,7 +15,7 @@ use thiserror::Error;
 use tokio::fs;
 
 #[derive(Error, Debug)]
-pub enum UpdateLuaRcError {
+pub enum GenLuaRcError {
     #[error(transparent)]
     Project(#[from] ProjectError),
     #[error(transparent)]
@@ -26,17 +26,17 @@ pub enum UpdateLuaRcError {
 
 #[derive(Builder)]
 #[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
-pub(crate) struct UpdateLuaRc<'a> {
+pub(crate) struct GenLuaRc<'a> {
     config: &'a Config,
     project: &'a Project,
 }
 
-impl<State> UpdateLuaRcBuilder<'_, State>
+impl<State> GenLuaRcBuilder<'_, State>
 where
-    State: update_lua_rc_builder::State + update_lua_rc_builder::IsComplete,
+    State: gen_lua_rc_builder::State + gen_lua_rc_builder::IsComplete,
 {
-    pub async fn update(self) -> Result<(), UpdateLuaRcError> {
-        do_update_luarc(self._build()).await
+    pub async fn generate_luarc(self) -> Result<(), GenLuaRcError> {
+        do_generate_luarc(self._build()).await
     }
 }
 
@@ -59,7 +59,7 @@ struct Workspace {
     library: Vec<String>,
 }
 
-async fn do_update_luarc(args: UpdateLuaRc<'_>) -> Result<(), UpdateLuaRcError> {
+async fn do_generate_luarc(args: GenLuaRc<'_>) -> Result<(), GenLuaRcError> {
     let config = args.config;
     if !config.generate_luarc() {
         return Ok(());
@@ -105,7 +105,7 @@ async fn do_update_luarc(args: UpdateLuaRc<'_>) -> Result<(), UpdateLuaRcError> 
 
     fs::write(&luarc_path, file)
         .await
-        .map_err(|err| UpdateLuaRcError::Write(luarc_path, err))?;
+        .map_err(|err| GenLuaRcError::Write(luarc_path, err))?;
 
     Ok(())
 }
