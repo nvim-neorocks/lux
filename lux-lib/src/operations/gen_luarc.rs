@@ -8,6 +8,7 @@ use crate::project::ProjectTreeError;
 use crate::project::LUX_DIR_NAME;
 use bon::Builder;
 use itertools::Itertools;
+use path_slash::PathBufExt;
 use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -117,12 +118,10 @@ fn update_luarc_content(prev_contents: &str, extra_paths: Vec<PathBuf>) -> Strin
         .library
         .retain(|path| !path.starts_with(&format!("{LUX_DIR_NAME}/")));
 
-    for p in extra_paths {
-        let path = p.clone().into_os_string().into_string();
-        if let Ok(path_str) = path {
-            luarc.workspace.library.push(path_str);
-        }
-    }
+    extra_paths
+        .iter()
+        .map(|path| path.to_slash_lossy().to_string())
+        .for_each(|path_str| luarc.workspace.library.push(path_str));
 
     serde_json::to_string_pretty(&luarc).expect("failed to serialize .luarc.json")
 }
