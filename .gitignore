@@ -27,5 +27,6 @@
 /spec/
 /.busted
 /*.rock
+/.luarc.json
 
 .pre-commit-config.yaml
