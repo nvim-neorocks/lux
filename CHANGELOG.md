@@ -6,6 +6,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.10.2](https://github.com/nvim-neorocks/lux/compare/v0.10.1...v0.10.2) - 2025-07-23
+
+### Other
+- release ([#901](https://github.com/nvim-neorocks/lux/pull/901))
+
+## `lux-lib` - [0.15.1](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.15.0...lux-lib-v0.15.1) - 2025-07-23
+
+### Added
+- pretty-print generated lua code ([#907](https://github.com/nvim-neorocks/lux/pull/907))
+- more detailed error message when variable substitution fails ([#905](https://github.com/nvim-neorocks/lux/pull/905))
+
 ## `lux-cli` - [0.10.2](https://github.com/nvim-neorocks/lux/compare/v0.10.1...v0.10.2) - 2025-07-22
 
 ### Other
