@@ -77,9 +77,7 @@ async fn do_generate_luarc(args: GenLuaRc<'_>) -> Result<(), GenLuaRcError> {
         .unwrap_or_else(|_| "{}".into());
 
     let dependency_tree = project.tree(config)?;
-    let test_dependency_tree = project.test_tree(config)?;
-
-    let library_dirs = lockfile
+    let dependency_dirs = lockfile
         .local_pkg_lock(&LocalPackageLockType::Regular)
         .rocks()
         .values()
@@ -88,19 +86,22 @@ async fn do_generate_luarc(args: GenLuaRc<'_>) -> Result<(), GenLuaRcError> {
         .map(|dependency_dir| {
             diff_paths(dependency_dir, project.root())
                 .expect("tree root should be a subpath of the project root")
-        })
-        .chain(
-            lockfile
-                .local_pkg_lock(&LocalPackageLockType::Test)
-                .rocks()
-                .values()
-                .map(|test_dependency| test_dependency_tree.root_for(test_dependency))
-                .filter(|dir| dir.is_dir())
-                .map(|test_dependency_dir| {
-                    diff_paths(test_dependency_dir, project.root())
-                        .expect("test tree root should be a subpath of the project root")
-                }),
-        )
+        });
+
+    let test_dependency_tree = project.test_tree(config)?;
+    let test_dependency_dirs = lockfile
+        .local_pkg_lock(&LocalPackageLockType::Test)
+        .rocks()
+        .values()
+        .map(|test_dependency| test_dependency_tree.root_for(test_dependency))
+        .filter(|dir| dir.is_dir())
+        .map(|test_dependency_dir| {
+            diff_paths(test_dependency_dir, project.root())
+                .expect("test tree root should be a subpath of the project root")
+        });
+
+    let library_dirs = dependency_dirs
+        .chain(test_dependency_dirs)
         .sorted()
         .collect_vec();
 
