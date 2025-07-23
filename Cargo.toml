@@ -13,6 +13,31 @@ resolver = "2"
 [workspace.package]
 version = "0.10.2"
 
+[workspace.dependencies]
+git-url-parse = "0.4.5"
+git2 = "0.20.2"
+ignore = "0.4.23"
+indicatif = "0.18.0"
+itertools = "0.14.0"
+lux-workspace-hack = { version = "0.1", path = "./lux-workspace-hack" }
+mlua = { version = "0.10.5", features = [
+  "serialize",
+  "macros",
+  "error-send",
+  "async",
+] }
+path-absolutize = "3.1.1"
+path-slash = "0.2.1"
+pathdiff = "0.2.3"
+serde_json = { version = "1.0.140", features = ["preserve_order"] }
+strum = { version = "0.27" }
+strum_macros = "0.27.1"
+stylua = { version = "2.1.0", features = ["fromstr", "lua52"] }
+tempdir = "0.3.7"
+tokio = { version = "1.46.0", features = ["full"] }
+walkdir = "2.5.0"
+which = "8.0.0"
+
 [profile.release]
 lto = true
 codegen-units = 1

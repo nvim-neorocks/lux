@@ -19,37 +19,38 @@ bench = false
 [dependencies]
 clap = { version = "4.5.38", features = ["derive"] }
 clap_complete = "4.5.54"
+edit = "0.1.5"
 eyre = "0.6.12"
-git-url-parse = "0.4.5"
-git2 = "0.20.2"
 inquire = "0.7.5"
-itertools = "0.14.0"
 nucleo = "0.5.0"
 octocrab = "0.44.1"
-serde_json = "1.0.140"
+open = "5.3.2"
 spdx = "0.10.8"
 spinners = "4.1.1"
-stylua = { version = "2.1.0", features = ["fromstr", "lua52"] }
-strum = "0.27.1"
-strum_macros = "0.27.1"
-tempdir = "0.3.7"
 termcolor = "1.4.1"
-text_trees = "0.1.2"
-tokio = { version = "1.46.0", features = ["full"] }
-toml = "0.9.0"
-walkdir = "2.5.0"
-which = "8.0.0"
-indicatif = "0.17.11"
-path-absolutize = "3.1.1"
-url = "2.5.4"
-open = "5.3.2"
-edit = "0.1.5"
-lux-workspace-hack = { version = "0.1", path = "../lux-workspace-hack" }
-pathdiff = "0.2.3"
 termtree = "0.5.1"
+text_trees = "0.1.2"
+toml = "0.9.0"
+url = "2.5.4"
 whoami = "1.6.0"
-ignore = "0.4.23"
-path-slash = "0.2.1"
+
+git-url-parse = { workspace = true }
+git2 = { workspace = true }
+ignore = { workspace = true }
+indicatif = { workspace = true }
+itertools = { workspace = true }
+lux-workspace-hack = { workspace = true }
+path-absolutize = { workspace = true }
+path-slash = { workspace = true }
+pathdiff = { workspace = true }
+serde_json = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+stylua = { workspace = true }
+tempdir = { workspace = true }
+tokio = { workspace = true }
+walkdir = { workspace = true }
+which = { workspace = true }
 
 [dev-dependencies]
 serial_test = { version = "3.2.0" }
