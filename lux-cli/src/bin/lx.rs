@@ -23,18 +23,19 @@ async fn main() -> Result<()> {
     let mut config_builder = ConfigBuilder::new()
         .unwrap()
         .dev(Some(cli.dev))
+        .extra_servers(cli.extra_servers)
+        .generate_luarc(Some(!cli.no_luarc))
         .lua_dir(cli.lua_dir)
         .lua_version(cli.lua_version)
         .namespace(cli.namespace)
-        .extra_servers(cli.extra_servers)
+        .no_project(Some(cli.no_project))
         .only_sources(cli.only_sources)
         .server(cli.server)
-        .user_tree(cli.tree)
         .timeout(
             cli.timeout
                 .map(|duration| Duration::from_secs(duration as u64)),
         )
-        .no_project(Some(cli.no_project))
+        .user_tree(cli.tree)
         .variables(
             cli.variables
                 .map(|variables| variables.into_iter().collect()),
