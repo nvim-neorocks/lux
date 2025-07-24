@@ -100,13 +100,40 @@ impl RockSourceTemplate {
             &[&package_spec, &Environment {}, &GitProject(project_root)],
             url_template_str,
         )?;
+        let dir = match self.dir.as_ref() {
+            Some(dir) => Some(
+                variables::substitute(
+                    &[&package_spec, &Environment {}, &GitProject(project_root)],
+                    &dir.to_string_lossy(),
+                )?
+                .into(),
+            ),
+            None => None,
+        };
+        let file = match self.file.as_ref() {
+            Some(file) => Some(
+                variables::substitute(
+                    &[&package_spec, &Environment {}, &GitProject(project_root)],
+                    &file.to_string_lossy(),
+                )?
+                .into(),
+            ),
+            None => None,
+        };
+        let tag = match self.tag.as_ref() {
+            Some(tag) => Some(variables::substitute(
+                &[&package_spec, &Environment {}, &GitProject(project_root)],
+                tag,
+            )?),
+            None => None,
+        };
         match SourceUrl::from_str(&url_str)? {
             SourceUrl::File(_) | SourceUrl::Url(_) => Ok(RockSourceInternal {
                 url: Some(url_str.to_string()),
-                file: self.file.clone(),
-                dir: self.dir.clone(),
+                file,
+                dir,
                 branch: None,
-                tag: None,
+                tag,
             }),
             SourceUrl::Git(_) if self.tag.is_none() => {
                 if let Ok(repo) = Repository::open(project_root) {
@@ -114,8 +141,8 @@ impl RockSourceTemplate {
                     Ok(RockSourceInternal {
                         url: Some(url_str.to_string()),
                         tag: Some(tag_or_rev),
-                        file: self.file.clone(),
-                        dir: self.dir.clone(),
+                        file,
+                        dir,
                         branch: None,
                     })
                 } else {
@@ -124,9 +151,9 @@ impl RockSourceTemplate {
             }
             SourceUrl::Git(_) => Ok(RockSourceInternal {
                 url: Some(url_str.to_string()),
-                file: self.file.clone(),
-                dir: self.dir.clone(),
-                tag: self.tag.clone(),
+                file,
+                dir,
+                tag,
                 branch: None,
             }),
         }

@@ -1579,13 +1579,15 @@ mod tests {
         init_sample_project_repo(&project_root);
         let project = Project::from(&project_root).unwrap().unwrap();
         let remote_project_toml = project.toml().into_remote().unwrap();
-        let source_spec = &remote_project_toml.source.current_platform().source_spec;
+        let source = remote_project_toml.source.current_platform();
+        let source_spec = &source.source_spec;
         assert!(matches!(source_spec, &RockSourceSpec::Git { .. }));
         if let RockSourceSpec::Git(GitSource { url, checkout_ref }) = source_spec {
             let expected_url: GitUrl = "https://github.com/nvim-neorocks/lux.git".parse().unwrap();
             assert_eq!(url, &expected_url);
             assert!(checkout_ref.is_some());
         }
+        assert_eq!(source.unpack_dir, Some("lux-dev".into()));
     }
 
     #[test]
@@ -1596,13 +1598,15 @@ mod tests {
         create_tag(&repo, tag_name);
         let project = Project::from(&project_root).unwrap().unwrap();
         let remote_project_toml = project.toml().into_remote().unwrap();
-        let source_spec = &remote_project_toml.source.current_platform().source_spec;
+        let source = remote_project_toml.source.current_platform();
+        let source_spec = &source.source_spec;
         assert!(matches!(source_spec, &RockSourceSpec::Git { .. }));
         if let RockSourceSpec::Git(GitSource { url, checkout_ref }) = source_spec {
             let expected_url: GitUrl = "https://github.com/nvim-neorocks/lux.git".parse().unwrap();
             assert_eq!(url, &expected_url);
             assert_eq!(checkout_ref, &Some(tag_name.to_string()));
         }
+        assert_eq!(source.unpack_dir, Some("lux-dev".into()));
     }
 
     #[test]
@@ -1614,7 +1618,8 @@ mod tests {
         create_tag(&repo, tag_name);
         let project = Project::from(&project_root).unwrap().unwrap();
         let remote_project_toml = project.toml().into_remote().unwrap();
-        let source_spec = &remote_project_toml.source.current_platform().source_spec;
+        let source = remote_project_toml.source.current_platform();
+        let source_spec = &source.source_spec;
         assert!(matches!(source_spec, &RockSourceSpec::Url { .. }));
         if let RockSourceSpec::Url(url) = source_spec {
             let expected_url: Url =
@@ -1623,6 +1628,7 @@ mod tests {
                     .unwrap();
             assert_eq!(url, &expected_url);
         }
+        assert_eq!(source.unpack_dir, Some("lux-1.0.0".into()));
     }
 
     #[test]
@@ -1634,7 +1640,8 @@ mod tests {
         create_tag(&repo, tag_name);
         let project = Project::from(&project_root).unwrap().unwrap();
         let remote_project_toml = project.toml().into_remote().unwrap();
-        let source_spec = &remote_project_toml.source.current_platform().source_spec;
+        let source = remote_project_toml.source.current_platform();
+        let source_spec = &source.source_spec;
         assert!(matches!(source_spec, &RockSourceSpec::Url { .. }));
         if let RockSourceSpec::Url(url) = source_spec {
             let expected_url: Url =
@@ -1643,5 +1650,6 @@ mod tests {
                     .unwrap();
             assert_eq!(url, &expected_url);
         }
+        assert_eq!(source.unpack_dir, Some("lux-1.0.0".into()));
     }
 }
