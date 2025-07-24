@@ -1,4 +1,7 @@
-use std::{path::PathBuf, str::FromStr};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use ::serde::Deserialize;
 use git2::Repository;
@@ -69,11 +72,25 @@ impl HasVariables for GitProject<'_> {
     fn get_variable(&self, input: &str) -> Result<Option<String>, GetVariableError> {
         Ok(match input {
             "REF" => {
-                let repo = Repository::open(self.0).map_err(GetVariableError::new)?;
+                let repo = find_git_repo(self.0).map_err(GetVariableError::new)?;
                 Some(current_tag_or_revision(&repo).map_err(GetVariableError::new)?)
             }
             _ => None,
         })
+    }
+}
+
+fn find_git_repo(path: impl AsRef<Path>) -> Result<Repository, git2::Error> {
+    let mut path: PathBuf = path.as_ref().to_path_buf();
+    loop {
+        match Repository::open(&path) {
+            Ok(repo) => return Ok(repo),
+            Err(err) => {
+                if !path.pop() {
+                    return Err(err);
+                }
+            }
+        }
     }
 }
 
@@ -179,7 +196,7 @@ impl PackageVersionTemplate {
         if let Some(version) = &self.0 {
             Ok(version.clone())
         } else {
-            let repo = Repository::open(project_root)?;
+            let repo = find_git_repo(project_root)?;
             if let Some(version) = version_from_semver_tag(&repo)? {
                 Ok(version)
             } else {

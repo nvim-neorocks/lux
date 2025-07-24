@@ -1011,7 +1011,7 @@ impl UserData for RemoteProjectToml {
 mod tests {
     use std::path::PathBuf;
 
-    use assert_fs::prelude::PathCopy;
+    use assert_fs::prelude::{PathChild, PathCopy, PathCreateDir};
     use git2::{Repository, RepositoryInitOptions};
     use git_url_parse::GitUrl;
     use url::Url;
@@ -1639,6 +1639,46 @@ mod tests {
         let tag_name = "1.0.0";
         create_tag(&repo, tag_name);
         let project = Project::from(&project_root).unwrap().unwrap();
+        let remote_project_toml = project.toml().into_remote().unwrap();
+        let source = remote_project_toml.source.current_platform();
+        let source_spec = &source.source_spec;
+        assert!(matches!(source_spec, &RockSourceSpec::Url { .. }));
+        if let RockSourceSpec::Url(url) = source_spec {
+            let expected_url: Url =
+                "https://github.com/nvim-neorocks/lux/archive/refs/tags/1.0.0.zip"
+                    .parse()
+                    .unwrap();
+            assert_eq!(url, &expected_url);
+        }
+        assert_eq!(source.unpack_dir, Some("lux-1.0.0".into()));
+    }
+
+    #[test]
+    fn test_git_project_in_subdirectory() {
+        let temp_dir = assert_fs::TempDir::new().unwrap();
+        let sample_project: PathBuf = "resources/test/sample-projects/source-template/".into();
+        let project_dir = temp_dir.child("lux");
+        project_dir.create_dir_all().unwrap();
+        project_dir.copy_from(&sample_project, &["**"]).unwrap();
+        let repo = Repository::init(&temp_dir).unwrap();
+        let mut opts = RepositoryInitOptions::new();
+        opts.initial_head("main");
+        {
+            let mut config = repo.config().unwrap();
+            config.set_str("user.name", "name").unwrap();
+            config.set_str("user.email", "email").unwrap();
+            let mut index = repo.index().unwrap();
+            let id = index.write_tree().unwrap();
+
+            let tree = repo.find_tree(id).unwrap();
+            let sig = repo.signature().unwrap();
+            repo.commit(Some("HEAD"), &sig, &sig, "initial\n\nbody", &tree, &[])
+                .unwrap();
+        }
+        create_tag(&repo, "bla");
+        let tag_name = "1.0.0";
+        create_tag(&repo, tag_name);
+        let project = Project::from(&project_dir).unwrap().unwrap();
         let remote_project_toml = project.toml().into_remote().unwrap();
         let source = remote_project_toml.source.current_platform();
         let source_spec = &source.source_spec;
