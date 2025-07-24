@@ -684,13 +684,21 @@ pub(crate) fn format_path(path: &Path) -> String {
 mod tests {
     use tokio::process::Command;
 
-    use crate::config::ConfigBuilder;
+    use crate::{
+        config::{ConfigBuilder, LuaVersion},
+        lua_installation::detect_installed_lua_version,
+    };
 
     use super::*;
 
     #[tokio::test]
     async fn test_is_compatible_lua_script() {
-        let config = ConfigBuilder::new().unwrap().build().unwrap();
+        let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
+        let config = ConfigBuilder::new()
+            .unwrap()
+            .lua_version(lua_version)
+            .build()
+            .unwrap();
         let lua_version = config.lua_version().unwrap();
         let lua = LuaInstallation::new(lua_version, &config).await.unwrap();
         let valid_script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

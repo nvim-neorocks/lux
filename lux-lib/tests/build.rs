@@ -13,6 +13,9 @@ use lux_lib::{
 };
 use tokio::runtime::Builder;
 
+#[cfg(not(target_env = "msvc"))]
+use lux_lib::build::BuildBehaviour;
+
 #[tokio::test]
 async fn builtin_build() {
     let dir = TempDir::new().unwrap();
@@ -353,4 +356,42 @@ async fn build_project_with_git_dependency() {
     .build()
     .await
     .unwrap();
+}
+
+#[cfg(not(target_env = "msvc"))]
+#[tokio::test]
+async fn test_multiline_command_build() {
+    let sample_project: PathBuf = "resources/test/sample-projects/command-build/".into();
+    let project_root = TempDir::new().unwrap();
+    project_root.copy_from(&sample_project, &["**"]).unwrap();
+    let project = Project::from(&project_root).unwrap().unwrap();
+    let project_toml = project.toml().into_local().unwrap();
+
+    let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
+
+    let config = ConfigBuilder::new()
+        .unwrap()
+        .lua_version(lua_version)
+        .build()
+        .unwrap();
+
+    let tree = project.tree(&config).unwrap();
+    let progress = MultiProgress::new();
+    let bar = progress.new_bar();
+
+    let package = Build::new(
+        &project_toml,
+        &tree,
+        tree::EntryType::Entrypoint,
+        &config,
+        &Progress::Progress(bar),
+    )
+    .behaviour(BuildBehaviour::Force)
+    .build()
+    .await
+    .unwrap();
+
+    let rock_layout = tree.installed_rock_layout(&package).unwrap();
+    let success_dir = rock_layout.src.join("success");
+    assert!(success_dir.is_dir());
 }

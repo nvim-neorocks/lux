@@ -44,7 +44,18 @@ fn parser<'a>(
             .try_map(|s: String, span| {
                 variables
                     .iter()
-                    .map(|v| v.get_variable(&s))
+                    .map(|v| {
+                        // Only allow variable substitution if s is all uppercase, digits,
+                        // or underscores.
+                        // This is because some commands may use shell expansion, e.g. $(which lua)
+                        if s.chars()
+                            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+                        {
+                            v.get_variable(&s)
+                        } else {
+                            Ok(Some(s.clone()))
+                        }
+                    })
                     .collect::<Result<Vec<Option<String>>, GetVariableError>>()
                     .map_err(|err| {
                         Rich::custom(span, format!("could not expand variable $({s}):\n{err}"))

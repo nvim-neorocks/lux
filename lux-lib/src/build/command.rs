@@ -1,4 +1,3 @@
-use shell_words::split;
 use std::{
     collections::HashMap,
     io,
@@ -7,6 +6,7 @@ use std::{
 };
 use thiserror::Error;
 use tokio::process::Command;
+use which::which;
 
 use crate::{
     build::backend::{BuildBackend, BuildInfo, RunBuildArgs},
@@ -34,6 +34,8 @@ pub enum CommandError {
         err: shell_words::ParseError,
         command: String,
     },
+    #[error("cannot find a shell to execute the command:\n{0}")]
+    ShellNotFoundError(#[from] which::Error),
     #[error("error executing command:\n{command}\n\nerror: {err}")]
     Io { err: io::Error, command: String },
     #[error("failed to execute command:\n{command}\n\nstatus: {status}\nstdout: {stdout}\nstderr: {stderr}")]
@@ -109,13 +111,19 @@ async fn run_command(
     let bin_path = build_paths.path_prepended().joined();
     let substituted_cmd =
         utils::substitute_variables(command, output_paths, lua, external_dependencies, config)?;
-    let cmd_parts = split(&substituted_cmd).map_err(|err| CommandError::ParseError {
-        err,
-        command: substituted_cmd.clone(),
-    })?;
-    let (program, args) = cmd_parts.split_first().ok_or(CommandError::EmptyCommand)?;
-    match Command::new(program)
-        .args(args)
+
+    if substituted_cmd.is_empty() {
+        return Err(CommandError::EmptyCommand);
+    }
+
+    #[cfg(target_env = "msvc")]
+    let (shell, shell_arg) = (which("cmd.exe")?, "/C");
+    #[cfg(not(target_env = "msvc"))]
+    let (shell, shell_arg) = (which("sh")?, "-c");
+
+    match Command::new(shell)
+        .arg(shell_arg)
+        .arg(&substituted_cmd)
         .current_dir(build_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
