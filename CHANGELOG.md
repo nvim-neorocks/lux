@@ -6,6 +6,23 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.11.1](https://github.com/nvim-neorocks/lux/compare/v0.11.0...v0.11.1) - 2025-07-25
+
+### Other
+- *(readme)* update feature list
+
+## `lux-lib` - [0.16.1](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.16.0...lux-lib-v0.16.1) - 2025-07-25
+
+### Added
+- expand variables in `source` `.dir`, `.file` and `.tag` ([#915](https://github.com/nvim-neorocks/lux/pull/915))
+
+### Fixed
+- *(build)* support multiline scripts in `command` backend ([#918](https://github.com/nvim-neorocks/lux/pull/918))
+- search upwards when substituting `$(REF)` ([#917](https://github.com/nvim-neorocks/lux/pull/917))
+
+### Other
+- *(readme)* update feature list
+
 ## `lux-cli` - [0.11.0](https://github.com/nvim-neorocks/lux/compare/v0.10.2...v0.11.0) - 2025-07-23
 
 ### Added
