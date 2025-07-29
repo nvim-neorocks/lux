@@ -47,6 +47,10 @@ async fn main() -> Result<()> {
 
     let config = config_builder.build()?;
 
+    if config.verbose() {
+        std::env::set_var("CC_ENABLE_DEBUG_OUTPUT", "1");
+    }
+
     match cli.command {
         Commands::Completion(completion_args) => completion::completion(completion_args).await?,
         Commands::Search(search_data) => search::search(search_data, config).await?,

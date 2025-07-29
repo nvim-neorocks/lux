@@ -29,6 +29,7 @@ jobs:
         github.event_name == 'workflow_dispatch'
       )
     runs-on: ${{ matrix.os }}
+    continue-on-error: true
     strategy:
       matrix:
         include:
@@ -77,6 +78,7 @@ jobs:
 
       - name: Install Rust Toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
+        if: endsWith(matrix.target, 'windows-msvc')
 
       - name: Install C/C++ Compiler
         uses: rlalik/setup-cpp-compiler@master

@@ -77,9 +77,23 @@ where
 
     pub async fn sync_build_dependencies(mut self) -> Result<SyncReport, SyncError> {
         if cfg!(target_family = "unix") && !self.extra_packages.is_empty() {
-            let luarocks =
-                PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into())).unwrap();
-            self = self.add_package(luarocks);
+            let toml = self.project.toml().into_local()?;
+            if toml
+                .build()
+                .current_platform()
+                .build_backend
+                .as_ref()
+                .is_some_and(|build_backend| {
+                    matches!(
+                        build_backend,
+                        crate::lua_rockspec::BuildBackendSpec::LuaRock(_)
+                    )
+                })
+            {
+                let luarocks =
+                    PackageReq::new("luarocks".into(), Some(LUAROCKS_VERSION.into())).unwrap();
+                self = self.add_package(luarocks);
+            }
         }
         do_sync(self._build(), &LocalPackageLockType::Build).await
     }

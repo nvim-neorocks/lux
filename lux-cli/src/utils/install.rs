@@ -5,7 +5,7 @@ use inquire::Confirm;
 use lux_lib::{
     build::BuildBehaviour,
     lockfile::{LocalPackageId, OptState, PinnedState},
-    operations::PackageInstallSpec,
+    operations::install::PackageInstallSpec,
     package::PackageReq,
     tree::{self, RockMatches, Tree},
 };

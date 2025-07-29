@@ -1,4 +1,4 @@
-use std::{io, process::ExitStatus};
+use std::io;
 use tokio::process::Command;
 
 use crate::{
@@ -61,13 +61,14 @@ where
 
 #[derive(Error, Debug)]
 pub enum ExecError {
-    #[error("failed to execute `{name}`.\n\n{status}\n\nstdout:\n{stdout}\n\nstderr:\n{stderr}")]
-    RunCommandFailure {
-        name: String,
-        status: ExitStatus,
-        stdout: String,
-        stderr: String,
+    #[error("failed to run {cmd}: {source}")]
+    RunCommandFailed {
+        cmd: String,
+        #[source]
+        source: io::Error,
     },
+    #[error("{cmd} exited with non-zero exit code: {}", exit_code.map(|code| code.to_string()).unwrap_or("unknown".into()))]
+    RunCommandNonZeroExitCode { cmd: String, exit_code: Option<i32> },
     #[error(transparent)]
     LuaVersionUnset(#[from] LuaVersionUnset),
     #[error(transparent)]
@@ -110,23 +111,28 @@ async fn exec(run: Exec<'_>) -> Result<(), ExecError> {
         Some(paths.init())
     };
 
-    match Command::new(run.command)
+    let status = match Command::new(run.command)
         .args(run.args)
         .env("PATH", paths.path_prepended().joined())
         .env("LUA_INIT", lua_init.unwrap_or_default())
         .env("LUA_PATH", paths.package_path().joined())
         .env("LUA_CPATH", paths.package_cpath().joined())
-        .output()
+        .status()
         .await
     {
-        Ok(output) if output.status.success() => Ok(()),
-        Ok(output) => Err(ExecError::RunCommandFailure {
-            name: run.command.to_string(),
-            status: output.status,
-            stdout: String::from_utf8_lossy(&output.stdout).into(),
-            stderr: String::from_utf8_lossy(&output.stderr).into(),
+        Ok(status) => Ok(status),
+        Err(err) => Err(ExecError::RunCommandFailed {
+            cmd: run.command.to_string(),
+            source: err,
         }),
-        Err(err) => Err(ExecError::Io(run.command.to_string(), err)),
+    }?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(ExecError::RunCommandNonZeroExitCode {
+            cmd: run.command.to_string(),
+            exit_code: status.code(),
+        })
     }
 }
 

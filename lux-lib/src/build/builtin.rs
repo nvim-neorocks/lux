@@ -13,7 +13,7 @@ use crate::{
         backend::{BuildBackend, BuildInfo, RunBuildArgs},
         utils,
     },
-    lua_rockspec::{BuiltinBuildSpec, DeploySpec, LuaModule, ModuleSpec},
+    lua_rockspec::{BuiltinBuildSpec, LuaModule, ModuleSpec},
     tree::TreeError,
 };
 
@@ -129,7 +129,7 @@ impl BuildBackend for BuiltinBuildSpec {
             // If package maintainers want to disable wrapping via the rockspec, they should
             // specify binaries in the rockspec.
             let installed_bin_script =
-                utils::install_binary(&source, &target, tree, lua, &DeploySpec::default(), config)
+                utils::install_binary(&source, &target, tree, lua, args.deploy, config)
                     .await
                     .map_err(|err| BuiltinBuildError::InstallBinary(target.clone(), err))?;
             binaries.push(

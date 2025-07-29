@@ -73,7 +73,7 @@ pub mod which;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None, arg_required_else_help = true)]
 pub struct Cli {
-    /// Enable the sub-repositories in luarocks servers forrockspecs of in-development versions.
+    /// Enable the sub-repositories in luarocks servers for rockspecs of in-development versions.
     #[arg(long)]
     pub dev: bool,
 
@@ -94,7 +94,8 @@ pub struct Cli {
     #[arg(long, value_name = "namespace")]
     pub namespace: Option<String>,
 
-    /// Specify the luarocks server namespace to use.
+    /// Specify the directory in which to install Lua{n}
+    /// if not found.
     #[arg(long, value_name = "prefix")]
     pub lua_dir: Option<PathBuf>,
 

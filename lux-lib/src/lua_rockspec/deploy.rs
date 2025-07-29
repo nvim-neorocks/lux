@@ -2,6 +2,8 @@ use std::convert::Infallible;
 
 use serde::Deserialize;
 
+use crate::lua_rockspec::{DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue};
+
 use super::{PartialOverride, PerPlatform, PlatformOverridable};
 
 /// An undocumented part of the rockspec format.
@@ -12,7 +14,6 @@ pub struct DeploySpec {
     /// Whether to wrap installed Lua bin scripts to be executed with
     /// the detected or configured Lua installation.
     /// Defaults to `true`.
-    /// This only affects lua bin scripts that are declared in the rockspec.
     #[serde(default = "default_wrap_bin_scripts")]
     pub wrap_bin_scripts: bool,
 }
@@ -44,6 +45,18 @@ impl PlatformOverridable for DeploySpec {
         T: Default,
     {
         Ok(PerPlatform::default())
+    }
+}
+
+impl DisplayAsLuaKV for DeploySpec {
+    fn display_lua(&self) -> DisplayLuaKV {
+        DisplayLuaKV {
+            key: "deploy".to_string(),
+            value: DisplayLuaValue::Table(vec![DisplayLuaKV {
+                key: "wrap_bin_scripts".to_string(),
+                value: DisplayLuaValue::Boolean(self.wrap_bin_scripts),
+            }]),
+        }
     }
 }
 
