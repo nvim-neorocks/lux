@@ -7,7 +7,7 @@ args @ {self, ...}: final: prev: let
     pkg-config
     libxcrypt
     cmakeMinimal
-    zlib
+    # no zlib because it messes up `apk`
     gnum4
     gnumake
   ];
