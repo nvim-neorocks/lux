@@ -20,11 +20,12 @@ pub use deploy::*;
 pub use partial::*;
 pub use platform::*;
 pub use rock_source::*;
-pub use serde_util::*;
 use ssri::Integrity;
 pub use test_spec::*;
 use thiserror::Error;
 use url::Url;
+
+pub(crate) use serde_util::*;
 
 use crate::{
     config::{LuaVersion, LuaVersionUnset},
@@ -976,7 +977,10 @@ mod tests {
         }\n
         build = {\n
             install = {\n
-                lua = {['foo.bar'] = 'src/bar.lua'},\n
+                lua = {\n
+                    'foo.lua',\n
+                    ['foo.bar'] = 'src/bar.lua',\n
+                },\n
                 bin = {['foo.bar'] = 'bin/bar'},\n
             },\n
         }\n
@@ -987,15 +991,15 @@ mod tests {
             rockspec.local.build.default.build_backend,
             Some(BuildBackendSpec::Builtin { .. })
         ));
-        let foo_bar_path = rockspec
-            .local
-            .build
-            .default
-            .install
-            .lua
+        let install_lua_spec = rockspec.local.build.default.install.lua;
+        let foo_bar_path = install_lua_spec
             .get(&LuaModule::from_str("foo.bar").unwrap())
             .unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("src/bar.lua"));
+        let foo_path = install_lua_spec
+            .get(&LuaModule::from_str("foo").unwrap())
+            .unwrap();
+        assert_eq!(*foo_path, PathBuf::from("foo.lua"));
         let foo_bar_path = rockspec
             .local
             .build

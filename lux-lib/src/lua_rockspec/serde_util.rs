@@ -1,11 +1,11 @@
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
 use itertools::Itertools;
 use serde::{de, Deserialize, Deserializer};
 use thiserror::Error;
 
 #[derive(Hash, Debug, Eq, PartialEq, Clone)]
-pub enum LuaTableKey {
+pub(crate) enum LuaTableKey {
     IntKey(u64),
     StringKey(String),
 }
@@ -32,7 +32,7 @@ impl<'de> Deserialize<'de> for LuaTableKey {
 /// If the json value is a string, this returns a singleton vector containing that value.
 /// This is needed to be able to deserialise RockSpec tables that luarocks
 /// also allows to be strings.
-pub fn deserialize_vec_from_lua_array_or_string<'de, D, T>(
+pub(crate) fn deserialize_vec_from_lua_array_or_string<'de, D, T>(
     deserializer: D,
 ) -> std::result::Result<Vec<T>, D::Error>
 where
@@ -50,39 +50,13 @@ where
 
 #[derive(Error, Debug)]
 #[error("expected list of strings")]
-pub struct ExpectedListOfStrings;
-
-#[derive(Error, Debug)]
-#[error("expected table with strings as keys")]
-pub struct ExpectedTableOfStrings;
-
-/// Convert a json value into a HashMap<String, T>.
-/// This is needed to be able to deserialise Lua tables.
-pub fn mlua_json_value_to_map<T>(
-    values: serde_json::Value,
-) -> Result<HashMap<String, T>, ExpectedTableOfStrings>
-where
-    T: From<String>,
-{
-    values
-        .as_object()
-        .ok_or(ExpectedTableOfStrings)?
-        .clone()
-        .into_iter()
-        .map(|(key, value)| {
-            let value: String = value
-                .as_str()
-                .map(|s| s.into())
-                .ok_or(ExpectedTableOfStrings)?;
-
-            Ok((key, value.into()))
-        })
-        .try_collect()
-}
+pub(crate) struct ExpectedListOfStrings;
 
 /// Convert a json value into a Vec<T>, treating empty json objects as empty lists
 /// This is needed to be able to deserialise Lua tables.
-pub fn mlua_json_value_to_vec<T>(values: serde_json::Value) -> Result<Vec<T>, ExpectedListOfStrings>
+pub(crate) fn mlua_json_value_to_vec<T>(
+    values: serde_json::Value,
+) -> Result<Vec<T>, ExpectedListOfStrings>
 where
     T: From<String>,
 {

@@ -27,8 +27,8 @@ use thiserror::Error;
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
 use super::{
-    mlua_json_value_to_map, mlua_json_value_to_vec, DisplayAsLuaKV, DisplayAsLuaValue,
-    DisplayLuaKV, DisplayLuaValue, LuaTableKey, PartialOverride, PerPlatform, PlatformIdentifier,
+    mlua_json_value_to_vec, DisplayAsLuaKV, DisplayAsLuaValue, DisplayLuaKV, DisplayLuaValue,
+    LuaTableKey, PartialOverride, PerPlatform, PlatformIdentifier,
 };
 
 /// The build specification for a given rock, serialized from `rockspec.build = { ... }`.
@@ -302,43 +302,31 @@ impl UserData for CommandBuildSpec {
     }
 }
 
-#[derive(Clone, Debug)]
-pub(crate) enum InstallBinaries {
-    Array(Vec<PathBuf>),
-    Table(HashMap<String, PathBuf>),
-}
+#[derive(Clone, Debug, Deserialize)]
+struct LuaPathBufTable(HashMap<LuaTableKey, PathBuf>);
 
-impl<'de> Deserialize<'de> for InstallBinaries {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+impl LuaPathBufTable {
+    fn coerce<S>(self) -> Result<HashMap<S, PathBuf>, S::Err>
     where
-        D: Deserializer<'de>,
+        S: FromStr + Eq + std::hash::Hash,
     {
-        let value: serde_json::Value = Deserialize::deserialize(deserializer)?;
-        if value.is_array() {
-            let array = mlua_json_value_to_vec(value).map_err(de::Error::custom)?;
-            Ok(InstallBinaries::Array(array))
-        } else {
-            let table: HashMap<String, PathBuf> =
-                mlua_json_value_to_map(value).map_err(de::Error::custom)?;
-            Ok(InstallBinaries::Table(table))
-        }
-    }
-}
-
-impl InstallBinaries {
-    pub(crate) fn coerce(self) -> HashMap<String, PathBuf> {
-        match self {
-            InstallBinaries::Array(array) => array
-                .into_iter()
-                .map(|path| {
-                    (
-                        path.file_stem().unwrap().to_str().unwrap().to_string(),
-                        path,
-                    )
-                })
-                .collect(),
-            InstallBinaries::Table(table) => table,
-        }
+        self.0
+            .into_iter()
+            .map(|(key, value)| {
+                let key = match key {
+                    LuaTableKey::IntKey(_) => value
+                        .with_extension("")
+                        .file_name()
+                        .unwrap_or_else(|| {
+                            panic!("unable to determine base name of {0}", value.display())
+                        })
+                        .to_string_lossy()
+                        .to_string(),
+                    LuaTableKey::StringKey(key) => key,
+                };
+                Ok((S::from_str(&key)?, value))
+            })
+            .try_collect()
     }
 }
 
@@ -353,10 +341,10 @@ impl InstallBinaries {
 #[derive(Debug, PartialEq, Default, Deserialize, Clone)]
 pub struct InstallSpec {
     /// Lua modules written in Lua.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_module_path_map")]
     pub lua: HashMap<LuaModule, PathBuf>,
     /// Dynamic libraries implemented compiled Lua modules.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_module_path_map")]
     pub lib: HashMap<LuaModule, PathBuf>,
     /// Configuration files.
     #[serde(default)]
@@ -364,7 +352,7 @@ pub struct InstallSpec {
     /// Lua command-line scripts.
     // TODO(vhyrro): The String component should be checked to ensure that it consists of a single
     // path component, such that targets like `my.binary` are not allowed.
-    #[serde(default, deserialize_with = "deserialize_binaries")]
+    #[serde(default, deserialize_with = "deserialize_file_name_path_map")]
     pub bin: HashMap<String, PathBuf>,
 }
 
@@ -377,12 +365,24 @@ impl UserData for InstallSpec {
     }
 }
 
-fn deserialize_binaries<'de, D>(deserializer: D) -> Result<HashMap<String, PathBuf>, D::Error>
+fn deserialize_module_path_map<'de, D>(
+    deserializer: D,
+) -> Result<HashMap<LuaModule, PathBuf>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let binaries = InstallBinaries::deserialize(deserializer)?;
-    Ok(binaries.coerce())
+    let modules = LuaPathBufTable::deserialize(deserializer)?;
+    modules.coerce().map_err(de::Error::custom)
+}
+
+fn deserialize_file_name_path_map<'de, D>(
+    deserializer: D,
+) -> Result<HashMap<String, PathBuf>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let binaries = LuaPathBufTable::deserialize(deserializer)?;
+    binaries.coerce().map_err(de::Error::custom)
 }
 
 fn deserialize_copy_directories<'de, D>(deserializer: D) -> Result<Option<Vec<PathBuf>>, D::Error>
