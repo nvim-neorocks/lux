@@ -6,6 +6,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.11.2](https://github.com/nvim-neorocks/lux/compare/v0.11.1...v0.11.2) - 2025-07-30
+
+### Other
+- update Cargo.toml dependencies
+
+## `lux-lib` - [0.17.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.16.1...lux-lib-v0.17.0) - 2025-07-30
+
+### Fixed
+- *(rockspec)* [**breaking**] support list elements in install spec ([#939](https://github.com/nvim-neorocks/lux/pull/939))
+
 ## `lux-cli` - [0.11.1](https://github.com/nvim-neorocks/lux/compare/v0.11.0...v0.11.1) - 2025-07-25
 
 ### Other
