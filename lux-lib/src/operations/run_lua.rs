@@ -99,10 +99,8 @@ To suppress this warning, set the `--no-loader` option.
         };
         let lua_init = format!(
             r#"print([==[{}]==])
-            {}
-            print([==[
 {}
-]==])
+{}
         "#,
             args.welcome_message.unwrap_or_default(),
             args.lua_init.unwrap_or_default(),
