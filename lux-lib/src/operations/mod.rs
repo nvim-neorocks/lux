@@ -1,5 +1,6 @@
 #![allow(ambiguous_glob_reexports)]
 
+mod build_lua;
 mod build_project;
 mod download;
 mod exec;
@@ -17,6 +18,7 @@ mod test;
 mod unpack;
 mod update;
 
+pub use build_lua::*;
 pub use build_project::*;
 pub use download::*;
 pub use exec::*;

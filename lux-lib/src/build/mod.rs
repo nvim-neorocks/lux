@@ -372,7 +372,7 @@ where
                 tree::EntryType::DependencyOnly => tree.dependency(&package)?,
             };
 
-            let lua = LuaInstallation::new(&lua_version, build.config).await?;
+            let lua = LuaInstallation::new(&lua_version, build.config, build.progress).await?;
 
             let rock_source = rockspec.source().current_platform();
             let build_dir = match &rock_source.unpack_dir {
@@ -541,7 +541,11 @@ mod tests {
             doc: dest_dir.join("doc"),
         };
         let lua_version = config.lua_version().unwrap_or(&LuaVersion::Lua51);
-        let lua = LuaInstallation::new(lua_version, &config).await.unwrap();
+        let progress = MultiProgress::new();
+        let bar = Progress::Progress(progress.new_bar());
+        let lua = LuaInstallation::new(lua_version, &config, &bar)
+            .await
+            .unwrap();
         let project = Project::from(&project_root).unwrap().unwrap();
         let rockspec = project.toml().into_remote().unwrap();
         let progress = Progress::Progress(MultiProgress::new());

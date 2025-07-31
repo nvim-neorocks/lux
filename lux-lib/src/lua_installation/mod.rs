@@ -6,17 +6,18 @@ use std::fmt::Display;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
-use target_lexicon::Triple;
-use tempdir::TempDir;
 use thiserror::Error;
 use which::which;
 
 use crate::build::external_dependency::to_lib_name;
 use crate::build::external_dependency::ExternalDependencyInfo;
-use crate::build::utils::recursive_copy_dir;
 use crate::build::utils::{c_lib_extension, format_path};
 use crate::config::external_deps::ExternalDependencySearchConfig;
 use crate::lua_rockspec::ExternalDependencySpec;
+use crate::operations;
+use crate::operations::BuildLuaError;
+use crate::progress::Progress;
+use crate::progress::ProgressBar;
 use crate::variables::GetVariableError;
 use crate::{
     config::{Config, LuaVersion},
@@ -75,12 +76,16 @@ pub enum DetectLuaVersionError {
 
 #[derive(Error, Debug)]
 pub enum LuaInstallationError {
-    #[error("error building Lua from source:\n{0}")]
-    Build(String),
+    #[error("could not find a Lua installation and failed to build Lua from source:\n{0}")]
+    Build(#[from] BuildLuaError),
 }
 
 impl LuaInstallation {
-    pub async fn new(version: &LuaVersion, config: &Config) -> Result<Self, LuaInstallationError> {
+    pub async fn new(
+        version: &LuaVersion,
+        config: &Config,
+        progress: &Progress<ProgressBar>,
+    ) -> Result<Self, LuaInstallationError> {
         let _lock = NEW_MUTEX.lock().await;
         if let Some(lua_intallation) = Self::probe(version, config.external_deps()) {
             return Ok(lua_intallation);
@@ -109,7 +114,7 @@ impl LuaInstallation {
                 bin,
             })
         } else {
-            Self::install(version, config).await
+            Self::install(version, config, progress).await
         }
     }
 
@@ -154,63 +159,25 @@ impl LuaInstallation {
         }
     }
 
-    // XXX: lua_src and luajit_src panic on failure, so we just unwrap errors here.
     pub async fn install(
         version: &LuaVersion,
         config: &Config,
+        progress: &Progress<ProgressBar>,
     ) -> Result<Self, LuaInstallationError> {
         let _lock = INSTALL_MUTEX.lock().await;
-        let host = Triple::host();
-        let target = &host.to_string();
-        let host_operating_system = &host.operating_system.to_string();
-
-        let output = TempDir::new("lux_lua_installation")
-            .expect("failed to create lua_installation temp directory");
-
-        let (include_dir, lib_dir) = match version {
-            LuaVersion::LuaJIT | LuaVersion::LuaJIT52 => {
-                // XXX: luajit_src panics if this is not set.
-                let target_pointer_width =
-                    std::env::var("CARGO_CFG_TARGET_POINTER_WIDTH").unwrap_or("64".into());
-                std::env::set_var("CARGO_CFG_TARGET_POINTER_WIDTH", target_pointer_width);
-                let build = luajit_src::Build::new()
-                    .target(target)
-                    .host(host_operating_system)
-                    .out_dir(&output)
-                    .lua52compat(matches!(version, LuaVersion::LuaJIT52))
-                    .build();
-
-                (
-                    build.include_dir().to_path_buf(),
-                    build.lib_dir().to_path_buf(),
-                )
-            }
-            _ => {
-                let build = lua_src::Build::new()
-                    .target(target)
-                    .host(host_operating_system)
-                    .out_dir(&output)
-                    .try_build(match version {
-                        LuaVersion::Lua51 => lua_src::Version::Lua51,
-                        LuaVersion::Lua52 => lua_src::Version::Lua52,
-                        LuaVersion::Lua53 => lua_src::Version::Lua53,
-                        LuaVersion::Lua54 => lua_src::Version::Lua54,
-                        _ => unreachable!(),
-                    })
-                    .map_err(|err| LuaInstallationError::Build(err.to_string()))?;
-
-                (
-                    build.include_dir().to_path_buf(),
-                    build.lib_dir().to_path_buf(),
-                )
-            }
-        };
 
         let target = Self::root_dir(version, config);
-        recursive_copy_dir(&output.into_path(), &target)
-            .await
-            .expect("error copying lua installation");
 
+        operations::BuildLua::new()
+            .lua_version(version)
+            .install_dir(&target)
+            .config(config)
+            .progress(progress)
+            .build()
+            .await?;
+
+        let include_dir = target.join("include");
+        let lib_dir = target.join("lib");
         let bin_dir = Some(target.join("bin")).filter(|bin_path| bin_path.is_dir());
         let bin = bin_dir
             .as_ref()
@@ -407,7 +374,7 @@ fn find_lua_executable(bin_path: &Path) -> Option<PathBuf> {
                     && file.file_name().is_some_and(|name| {
                         matches!(
                             name.to_string_lossy().to_string().as_str(),
-                            "lua" | "luajit"
+                            "lua" | "luajit" | "lua.exe" | "luajit.exe"
                         )
                     })
             })
@@ -489,7 +456,7 @@ fn parse_lua_version_from_output(
 
 #[cfg(test)]
 mod test {
-    use crate::config::ConfigBuilder;
+    use crate::{config::ConfigBuilder, progress::MultiProgress};
 
     use super::*;
 
@@ -514,7 +481,11 @@ mod test {
         }
         let config = ConfigBuilder::new().unwrap().build().unwrap();
         let lua_version = config.lua_version().unwrap();
-        let lua_installation = LuaInstallation::new(lua_version, &config).await.unwrap();
+        let progress = MultiProgress::new();
+        let bar = Progress::Progress(progress.new_bar());
+        let lua_installation = LuaInstallation::new(lua_version, &config, &bar)
+            .await
+            .unwrap();
         // FIXME: This fails when run in the nix checkPhase
         assert!(lua_installation.bin.is_some());
         let lua_binary: LuaBinary = lua_installation.bin.unwrap().into();
