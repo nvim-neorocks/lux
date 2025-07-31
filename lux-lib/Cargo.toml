@@ -35,8 +35,6 @@ infer = "0.19.0"
 is_executable = "1.0.4"
 lazy_static = "1.5.0"
 lets_find_up = "0.0.4"
-lua-src = "548.1.1"
-luajit-src = "210.5.12"
 md5 = "0.8.0"
 nix-nar = "0.3.0"
 nonempty = { version = "0.12.0", features = ["serialize"] }

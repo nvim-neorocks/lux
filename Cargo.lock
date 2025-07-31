@@ -2217,15 +2217,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lua-src"
-version = "548.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00bc4bd1f1d5c65b30717333cbec4fa7aa378978940a1bca62f404498d423233"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "luajit-src"
 version = "210.5.12+a4f56a4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2310,8 +2301,6 @@ dependencies = [
  "itertools 0.14.0",
  "lazy_static",
  "lets_find_up",
- "lua-src 548.1.1",
- "luajit-src",
  "lux-workspace-hack",
  "md5",
  "mlua",
@@ -2533,7 +2522,7 @@ checksum = "380c1f7e2099cafcf40e51d3a9f20a346977587aa4d012eae1f043149a728a93"
 dependencies = [
  "cc",
  "cfg-if",
- "lua-src 547.0.0",
+ "lua-src",
  "luajit-src",
  "pkg-config",
 ]
