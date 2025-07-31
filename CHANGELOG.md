@@ -6,6 +6,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.12.0](https://github.com/nvim-neorocks/lux/compare/v0.11.2...v0.12.0) - 2025-07-31
+
+### Added
+- *(cli)* [**breaking**] rename `check` -> `lint` ([#836](https://github.com/nvim-neorocks/lux/pull/836))
+
+## `lux-lib` - [0.18.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.17.0...lux-lib-v0.18.0) - 2025-07-31
+
+### Added
+- *(cli)* [**breaking**] rename `check` -> `lint` ([#836](https://github.com/nvim-neorocks/lux/pull/836))
+
 ## `lux-cli` - [0.11.2](https://github.com/nvim-neorocks/lux/compare/v0.11.1...v0.11.2) - 2025-07-30
 
 ### Other
