@@ -6,6 +6,25 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.13.0](https://github.com/nvim-neorocks/lux/compare/v0.12.1...v0.13.0) - 2025-08-03
+
+### Added
+- *(build)* [**breaking**] pass in `LuaInstallation`
+- [**breaking**] manage lua installations internally
+
+### Other
+- *(build)* [**breaking**] tidy up builder
+
+## `lux-lib` - [0.19.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.18.1...lux-lib-v0.19.0) - 2025-08-03
+
+### Added
+- *(lockfile)* diff-friendly entrypoints ([#948](https://github.com/nvim-neorocks/lux/pull/948))
+- *(build)* [**breaking**] pass in `LuaInstallation`
+- [**breaking**] manage lua installations internally
+
+### Other
+- *(build)* [**breaking**] tidy up builder
+
 ## `lux-cli` - [0.12.1](https://github.com/nvim-neorocks/lux/compare/v0.12.0...v0.12.1) - 2025-07-31
 
 ### Other
