@@ -657,6 +657,8 @@ pub(crate) struct LocalPackageLock {
     // NOTE: We cannot directly serialize to a `Sha256` object as they don't implement serde traits.
     // NOTE: We want to retain ordering of rocks and entrypoints when de/serializing.
     rocks: BTreeMap<LocalPackageId, LocalPackage>,
+
+    #[serde(serialize_with = "serialize_sorted_package_ids")]
     entrypoints: Vec<LocalPackageId>,
 }
 
@@ -1409,6 +1411,20 @@ impl UserData for Lockfile<ReadWrite> {
         });
         methods.add_method_mut("flush", |_, this, ()| this.flush().into_lua_err());
     }
+}
+
+fn serialize_sorted_package_ids<S>(
+    package_ids: &[LocalPackageId],
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    package_ids
+        .iter()
+        .sorted()
+        .collect_vec()
+        .serialize(serializer)
 }
 
 fn integrity_err_not_found(package: &LocalPackage) -> LockfileIntegrityError {
