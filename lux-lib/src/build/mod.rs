@@ -61,16 +61,10 @@ pub mod external_dependency;
 #[derive(Builder)]
 #[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
 pub struct Build<'a, R: Rockspec + HasIntegrity> {
-    #[builder(start_fn)]
     rockspec: &'a R,
-    #[builder(start_fn)]
     tree: &'a Tree,
-    #[builder(start_fn)]
     entry_type: tree::EntryType,
-    #[builder(start_fn)]
     config: &'a Config,
-
-    #[builder(start_fn)]
     progress: &'a Progress<ProgressBar>,
 
     #[builder(default)]

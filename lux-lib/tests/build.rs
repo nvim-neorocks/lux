@@ -41,17 +41,16 @@ async fn builtin_build() {
         .user_tree(LuaVersion::from(&config).unwrap().clone())
         .unwrap();
 
-    Build::new(
-        &rockspec,
-        &tree,
-        tree::EntryType::Entrypoint,
-        &config,
-        &Progress::Progress(bar),
-    )
-    .behaviour(Force)
-    .build()
-    .await
-    .unwrap();
+    Build::new()
+        .rockspec(&rockspec)
+        .tree(&tree)
+        .entry_type(tree::EntryType::Entrypoint)
+        .config(&config)
+        .progress(&Progress::Progress(bar))
+        .behaviour(Force)
+        .build()
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -80,17 +79,16 @@ async fn make_build() {
         .user_tree(LuaVersion::from(&config).unwrap().clone())
         .unwrap();
 
-    Build::new(
-        &rockspec,
-        &tree,
-        tree::EntryType::Entrypoint,
-        &config,
-        &Progress::Progress(bar),
-    )
-    .behaviour(Force)
-    .build()
-    .await
-    .unwrap();
+    Build::new()
+        .rockspec(&rockspec)
+        .tree(&tree)
+        .entry_type(tree::EntryType::Entrypoint)
+        .config(&config)
+        .progress(&Progress::Progress(bar))
+        .behaviour(Force)
+        .build()
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -133,17 +131,16 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
         .user_tree(LuaVersion::from(&config).unwrap().clone())
         .unwrap();
 
-    Build::new(
-        &rockspec,
-        &tree,
-        tree::EntryType::Entrypoint,
-        &config,
-        &Progress::Progress(bar),
-    )
-    .behaviour(Force)
-    .build()
-    .await
-    .unwrap();
+    Build::new()
+        .rockspec(&rockspec)
+        .tree(&tree)
+        .entry_type(tree::EntryType::Entrypoint)
+        .config(&config)
+        .progress(&Progress::Progress(bar))
+        .behaviour(Force)
+        .build()
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -177,17 +174,16 @@ async fn treesitter_parser_build() {
         .user_tree(LuaVersion::from(&config).unwrap().clone())
         .unwrap();
 
-    Build::new(
-        &rockspec,
-        &tree,
-        tree::EntryType::Entrypoint,
-        &config,
-        &Progress::Progress(bar),
-    )
-    .behaviour(Force)
-    .build()
-    .await
-    .unwrap();
+    Build::new()
+        .rockspec(&rockspec)
+        .tree(&tree)
+        .entry_type(tree::EntryType::Entrypoint)
+        .config(&config)
+        .progress(&Progress::Progress(bar))
+        .behaviour(Force)
+        .build()
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -211,17 +207,16 @@ async fn test_build_local_project_no_source() {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    let package = Build::new(
-        &project_toml,
-        &tree,
-        tree::EntryType::Entrypoint,
-        &config,
-        &Progress::Progress(bar),
-    )
-    .behaviour(Force)
-    .build()
-    .await
-    .unwrap();
+    let package = Build::new()
+        .rockspec(&project_toml)
+        .tree(&tree)
+        .entry_type(tree::EntryType::Entrypoint)
+        .config(&config)
+        .progress(&Progress::Progress(bar))
+        .behaviour(Force)
+        .build()
+        .await
+        .unwrap();
 
     let rock_layout = tree.installed_rock_layout(&package).unwrap();
     let conf_file = rock_layout.conf.join("foo").join("bar.toml");
@@ -252,17 +247,16 @@ async fn test_build_local_project_only_src() {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    let pkg = Build::new(
-        &project_toml,
-        &tree,
-        tree::EntryType::Entrypoint,
-        &config,
-        &Progress::Progress(bar),
-    )
-    .behaviour(Force)
-    .build()
-    .await
-    .unwrap();
+    let pkg = Build::new()
+        .rockspec(&project_toml)
+        .tree(&tree)
+        .entry_type(tree::EntryType::Entrypoint)
+        .config(&config)
+        .progress(&Progress::Progress(bar))
+        .behaviour(Force)
+        .build()
+        .await
+        .unwrap();
 
     let layout = tree.installed_rock_layout(&pkg).unwrap();
     assert!(layout.src.is_dir());
@@ -307,17 +301,16 @@ fn test_build_multiple_treesitter_parsers() {
         let rockspec = rockspec.clone();
 
         handles.push(runtime.spawn(async move {
-            Build::new(
-                &rockspec,
-                &tree,
-                tree::EntryType::Entrypoint,
-                &config,
-                &Progress::NoProgress,
-            )
-            .behaviour(Force)
-            .build()
-            .await
-            .unwrap()
+            Build::new()
+                .rockspec(&rockspec)
+                .tree(&tree)
+                .entry_type(tree::EntryType::Entrypoint)
+                .config(&config)
+                .progress(&Progress::NoProgress)
+                .behaviour(Force)
+                .build()
+                .await
+                .unwrap()
         }));
     }
 
@@ -345,17 +338,16 @@ async fn build_project_with_git_dependency() {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    Build::new(
-        &project_toml,
-        &tree,
-        tree::EntryType::Entrypoint,
-        &config,
-        &Progress::Progress(bar),
-    )
-    .behaviour(Force)
-    .build()
-    .await
-    .unwrap();
+    Build::new()
+        .rockspec(&project_toml)
+        .tree(&tree)
+        .entry_type(tree::EntryType::Entrypoint)
+        .config(&config)
+        .progress(&Progress::Progress(bar))
+        .behaviour(Force)
+        .build()
+        .await
+        .unwrap();
 }
 
 #[cfg(not(target_env = "msvc"))]
@@ -379,17 +371,16 @@ async fn test_multiline_command_build() {
     let progress = MultiProgress::new();
     let bar = progress.new_bar();
 
-    let package = Build::new(
-        &project_toml,
-        &tree,
-        tree::EntryType::Entrypoint,
-        &config,
-        &Progress::Progress(bar),
-    )
-    .behaviour(BuildBehaviour::Force)
-    .build()
-    .await
-    .unwrap();
+    let package = Build::new()
+        .rockspec(&project_toml)
+        .tree(&tree)
+        .entry_type(tree::EntryType::Entrypoint)
+        .config(&config)
+        .progress(&Progress::Progress(bar))
+        .behaviour(BuildBehaviour::Force)
+        .build()
+        .await
+        .unwrap();
 
     let rock_layout = tree.installed_rock_layout(&package).unwrap();
     let success_dir = rock_layout.src.join("success");

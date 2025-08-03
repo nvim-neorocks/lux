@@ -126,7 +126,12 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
             let bar = progress.map(|p| p.new_bar());
             let config = config.with_tree(temp_dir);
             let tree = config.user_tree(lua_version)?;
-            let package = Build::new(&rockspec, &tree, tree::EntryType::Entrypoint, &config, &bar)
+            let package = Build::new()
+                .rockspec(&rockspec)
+                .tree(&tree)
+                .entry_type(tree::EntryType::Entrypoint)
+                .config(&config)
+                .progress(&bar)
                 .build()
                 .await?;
             let rock_path = operations::Pack::new(dest_dir, tree, package)

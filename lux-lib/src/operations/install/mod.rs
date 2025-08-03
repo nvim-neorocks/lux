@@ -204,18 +204,17 @@ async fn install_impl(
         // so that each transitive build dependency is available for the
         // next build dependencies that may depend on it.
         let mut build_lockfile = build_tree.lockfile()?.write_guard();
-        let pkg = Build::new(
-            rockspec,
-            &build_tree,
-            tree::EntryType::Entrypoint,
-            config,
-            &bar,
-        )
-        .constraint(build_dep_spec.spec.constraint())
-        .behaviour(build_dep_spec.build_behaviour)
-        .build()
-        .await
-        .map_err(|err| InstallError::BuildDependencyError(package, err))?;
+        let pkg = Build::new()
+            .rockspec(rockspec)
+            .tree(&build_tree)
+            .entry_type(tree::EntryType::Entrypoint)
+            .config(config)
+            .progress(&bar)
+            .constraint(build_dep_spec.spec.constraint())
+            .behaviour(build_dep_spec.build_behaviour)
+            .build()
+            .await
+            .map_err(|err| InstallError::BuildDependencyError(package, err))?;
         build_lockfile.add_entrypoint(&pkg);
     }
 
@@ -371,7 +370,12 @@ async fn install_rockspec(
         None => RemotePackageSourceSpec::RockSpec(rockspec_download.source_url),
     };
 
-    let pkg = Build::new(&rockspec, tree, entry_type, config, &bar)
+    let pkg = Build::new()
+        .rockspec(&rockspec)
+        .tree(tree)
+        .entry_type(entry_type)
+        .config(config)
+        .progress(&bar)
         .pin(pin)
         .opt(opt)
         .constraint(constraint)

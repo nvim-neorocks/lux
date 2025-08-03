@@ -104,17 +104,16 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
         luarocks.ensure_installed(&bar).await?;
     }
 
-    build::Build::new(
-        &rockspec,
-        &tree,
-        tree::EntryType::Entrypoint,
-        &config,
-        &progress.map(|p| p.new_bar()),
-    )
-    .pin(pin)
-    .behaviour(BuildBehaviour::Force)
-    .build()
-    .await?;
+    build::Build::new()
+        .rockspec(&rockspec)
+        .tree(&tree)
+        .entry_type(tree::EntryType::Entrypoint)
+        .config(&config)
+        .progress(&progress.map(|p| p.new_bar()))
+        .pin(pin)
+        .behaviour(BuildBehaviour::Force)
+        .build()
+        .await?;
 
     Ok(())
 }

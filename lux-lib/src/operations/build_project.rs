@@ -164,16 +164,15 @@ impl<State: build_project_builder::State + build_project_builder::IsComplete>
         }
 
         if !args.only_deps {
-            let package = Build::new(
-                &project_toml,
-                &project_tree,
-                tree::EntryType::Entrypoint,
-                config,
-                &progress.map(|p| p.new_bar()),
-            )
-            .behaviour(BuildBehaviour::Force)
-            .build()
-            .await?;
+            let package = Build::new()
+                .rockspec(&project_toml)
+                .tree(&project_tree)
+                .entry_type(tree::EntryType::Entrypoint)
+                .config(config)
+                .progress(&progress.map(|p| p.new_bar()))
+                .behaviour(BuildBehaviour::Force)
+                .build()
+                .await?;
 
             let lockfile = project_tree.lockfile()?;
             let dependencies = lockfile
