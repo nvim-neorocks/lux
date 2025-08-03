@@ -7,6 +7,7 @@ use lux_lib::{
     build::{self, BuildBehaviour},
     config::Config,
     lockfile::{OptState, PinnedState},
+    lua_installation::LuaInstallation,
     lua_rockspec::{BuildBackendSpec, RemoteLuaRockspec},
     luarocks::luarocks_installation::LuaRocksInstallation,
     operations::{Install, PackageInstallSpec},
@@ -37,13 +38,20 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
     {
         return Err(eyre!("Provided path is not a valid rockspec!"));
     }
-    let content = std::fs::read_to_string(path)?;
-    let rockspec = RemoteLuaRockspec::new(&content)?;
-    let lua_version = rockspec.lua_version_matches(&config)?;
-    let tree = config.user_tree(lua_version)?;
 
     let progress_arc = MultiProgress::new_arc();
     let progress = Arc::clone(&progress_arc);
+
+    let content = std::fs::read_to_string(path)?;
+    let rockspec = RemoteLuaRockspec::new(&content)?;
+    let lua_version = rockspec.lua_version_matches(&config)?;
+    let lua = LuaInstallation::new(
+        &lua_version,
+        &config,
+        &progress.map(|progress| progress.new_bar()),
+    )
+    .await?;
+    let tree = config.user_tree(lua_version)?;
 
     // Ensure all dependencies and build dependencies are installed first
 
@@ -101,12 +109,13 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
         let build_tree = tree.build_tree(&config)?;
         let luarocks = LuaRocksInstallation::new(&config, build_tree)?;
         let bar = progress.map(|p| p.new_bar());
-        luarocks.ensure_installed(&bar).await?;
+        luarocks.ensure_installed(&lua, &bar).await?;
     }
 
     build::Build::new()
         .rockspec(&rockspec)
         .tree(&tree)
+        .lua(&lua)
         .entry_type(tree::EntryType::Entrypoint)
         .config(&config)
         .progress(&progress.map(|p| p.new_bar()))

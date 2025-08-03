@@ -8,6 +8,7 @@ use crate::{
     build::{Build, BuildBehaviour, BuildError},
     config::Config,
     lockfile::LocalPackage,
+    lua_installation::{LuaInstallation, LuaInstallationError},
     luarocks::luarocks_installation::{LuaRocksError, LuaRocksInstallError, LuaRocksInstallation},
     progress::{MultiProgress, Progress},
     project::{project_toml::LocalProjectTomlValidationError, Project, ProjectTreeError},
@@ -23,6 +24,8 @@ pub enum BuildProjectError {
     LocalProjectTomlValidation(#[from] LocalProjectTomlValidationError),
     #[error(transparent)]
     ProjectTree(#[from] ProjectTreeError),
+    #[error(transparent)]
+    LuaInstallation(#[from] LuaInstallationError),
     #[error(transparent)]
     Tree(#[from] TreeError),
     #[error(transparent)]
@@ -89,6 +92,9 @@ impl<State: build_project_builder::State + build_project_builder::IsComplete>
             .collect_vec();
 
         let build_tree = project.build_tree(config)?;
+        let lua =
+            LuaInstallation::new_from_config(config, &progress.map(|progress| progress.new_bar()))
+                .await?;
         let luarocks = LuaRocksInstallation::new(config, build_tree.clone())?;
 
         if args.no_lock {
@@ -140,7 +146,7 @@ impl<State: build_project_builder::State + build_project_builder::IsComplete>
 
             if !build_dependencies_to_install.is_empty() {
                 let bar = progress.map(|p| p.new_bar());
-                luarocks.ensure_installed(&bar).await?;
+                luarocks.ensure_installed(&lua, &bar).await?;
                 Install::new(config)
                     .packages(build_dependencies_to_install)
                     .tree(build_tree)
@@ -166,6 +172,7 @@ impl<State: build_project_builder::State + build_project_builder::IsComplete>
         if !args.only_deps {
             let package = Build::new()
                 .rockspec(&project_toml)
+                .lua(&lua)
                 .tree(&project_tree)
                 .entry_type(tree::EntryType::Entrypoint)
                 .config(config)

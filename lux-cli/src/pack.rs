@@ -6,6 +6,7 @@ use eyre::{eyre, Result};
 use lux_lib::{
     build::{Build, BuildBehaviour},
     config::{Config, LuaVersion},
+    lua_installation::LuaInstallation,
     lua_rockspec::RemoteLuaRockspec,
     operations::{self, Install, PackageInstallSpec},
     package::PackageReq,
@@ -125,9 +126,16 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
             let temp_dir = TempDir::new("lux-pack")?.into_path();
             let bar = progress.map(|p| p.new_bar());
             let config = config.with_tree(temp_dir);
+            let lua = LuaInstallation::new(
+                &lua_version,
+                &config,
+                &progress.map(|progress| progress.new_bar()),
+            )
+            .await?;
             let tree = config.user_tree(lua_version)?;
             let package = Build::new()
                 .rockspec(&rockspec)
+                .lua(&lua)
                 .tree(&tree)
                 .entry_type(tree::EntryType::Entrypoint)
                 .config(&config)

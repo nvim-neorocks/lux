@@ -2365,6 +2365,7 @@ dependencies = [
  "clap 4.5.40",
  "clap_builder",
  "crossbeam-utils",
+ "either",
  "futures-channel",
  "futures-core",
  "futures-sink",

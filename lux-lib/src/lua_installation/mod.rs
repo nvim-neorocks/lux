@@ -13,6 +13,7 @@ use crate::build::external_dependency::to_lib_name;
 use crate::build::external_dependency::ExternalDependencyInfo;
 use crate::build::utils::{c_lib_extension, format_path};
 use crate::config::external_deps::ExternalDependencySearchConfig;
+use crate::config::LuaVersionUnset;
 use crate::lua_rockspec::ExternalDependencySpec;
 use crate::operations;
 use crate::operations::BuildLuaError;
@@ -78,9 +79,18 @@ pub enum DetectLuaVersionError {
 pub enum LuaInstallationError {
     #[error("could not find a Lua installation and failed to build Lua from source:\n{0}")]
     Build(#[from] BuildLuaError),
+    #[error(transparent)]
+    LuaVersionUnset(#[from] LuaVersionUnset),
 }
 
 impl LuaInstallation {
+    pub async fn new_from_config(
+        config: &Config,
+        progress: &Progress<ProgressBar>,
+    ) -> Result<Self, LuaInstallationError> {
+        Self::new(LuaVersion::from(config)?, config, progress).await
+    }
+
     pub async fn new(
         version: &LuaVersion,
         config: &Config,

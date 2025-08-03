@@ -63,9 +63,13 @@ pub trait Rockspec {
 }
 
 pub trait LuaVersionCompatibility {
+    /// Ensures that the rockspec is compatible with the specified lua version.
+    /// Returns an error if the rockspec is not compatible.
+    fn validate_lua_version(&self, lua_version: &LuaVersion) -> Result<(), LuaVersionError>;
+
     /// Ensures that the rockspec is compatible with the lua version established in the config.
     /// Returns an error if the rockspec is not compatible.
-    fn validate_lua_version(&self, config: &Config) -> Result<(), LuaVersionError>;
+    fn validate_lua_version_from_config(&self, config: &Config) -> Result<(), LuaVersionError>;
 
     /// Ensures that the rockspec is compatible with the lua version established in the config,
     /// and returns the lua version from the config if it is compatible.
@@ -79,7 +83,19 @@ pub trait LuaVersionCompatibility {
 }
 
 impl<T: Rockspec> LuaVersionCompatibility for T {
-    fn validate_lua_version(&self, config: &Config) -> Result<(), LuaVersionError> {
+    fn validate_lua_version(&self, version: &LuaVersion) -> Result<(), LuaVersionError> {
+        if self.supports_lua_version(version) {
+            Ok(())
+        } else {
+            Err(LuaVersionError::LuaVersionUnsupported(
+                version.clone(),
+                self.package().to_owned(),
+                self.version().to_owned(),
+            ))
+        }
+    }
+
+    fn validate_lua_version_from_config(&self, config: &Config) -> Result<(), LuaVersionError> {
         let _ = self.lua_version_matches(config)?;
         Ok(())
     }

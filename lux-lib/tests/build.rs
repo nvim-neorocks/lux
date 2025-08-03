@@ -5,9 +5,9 @@ use assert_fs::TempDir;
 use lux_lib::{
     build::{Build, BuildBehaviour::Force},
     config::{ConfigBuilder, LuaVersion},
-    lua_installation::detect_installed_lua_version,
+    lua_installation::{detect_installed_lua_version, LuaInstallation},
     lua_rockspec::RemoteLuaRockspec,
-    progress::{MultiProgress, Progress},
+    progress::Progress,
     project::Project,
     tree,
 };
@@ -34,19 +34,21 @@ async fn builtin_build() {
         .build()
         .unwrap();
 
-    let progress = MultiProgress::new();
-    let bar = progress.new_bar();
+    let bar = Progress::NoProgress;
 
-    let tree = config
-        .user_tree(LuaVersion::from(&config).unwrap().clone())
+    let lua = LuaInstallation::new_from_config(&config, &bar)
+        .await
         .unwrap();
+
+    let tree = config.user_tree(lua.version.clone()).unwrap();
 
     Build::new()
         .rockspec(&rockspec)
+        .lua(&lua)
         .tree(&tree)
         .entry_type(tree::EntryType::Entrypoint)
         .config(&config)
-        .progress(&Progress::Progress(bar))
+        .progress(&bar)
         .behaviour(Force)
         .build()
         .await
@@ -72,19 +74,21 @@ async fn make_build() {
         .build()
         .unwrap();
 
-    let progress = MultiProgress::new();
-    let bar = progress.new_bar();
+    let bar = Progress::NoProgress;
 
-    let tree = config
-        .user_tree(LuaVersion::from(&config).unwrap().clone())
+    let lua = LuaInstallation::new_from_config(&config, &bar)
+        .await
         .unwrap();
+
+    let tree = config.user_tree(lua.version.clone()).unwrap();
 
     Build::new()
         .rockspec(&rockspec)
+        .lua(&lua)
         .tree(&tree)
         .entry_type(tree::EntryType::Entrypoint)
         .config(&config)
-        .progress(&Progress::Progress(bar))
+        .progress(&bar)
         .behaviour(Force)
         .build()
         .await
@@ -124,19 +128,21 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
         .build()
         .unwrap();
 
-    let progress = MultiProgress::new();
-    let bar = progress.new_bar();
+    let bar = Progress::NoProgress;
 
-    let tree = config
-        .user_tree(LuaVersion::from(&config).unwrap().clone())
+    let lua = LuaInstallation::new_from_config(&config, &bar)
+        .await
         .unwrap();
+
+    let tree = config.user_tree(lua.version.clone()).unwrap();
 
     Build::new()
         .rockspec(&rockspec)
+        .lua(&lua)
         .tree(&tree)
         .entry_type(tree::EntryType::Entrypoint)
         .config(&config)
-        .progress(&Progress::Progress(bar))
+        .progress(&bar)
         .behaviour(Force)
         .build()
         .await
@@ -167,8 +173,11 @@ async fn treesitter_parser_build() {
         .build()
         .unwrap();
 
-    let progress = MultiProgress::new();
-    let bar = progress.new_bar();
+    let bar = Progress::NoProgress;
+
+    let lua = LuaInstallation::new_from_config(&config, &bar)
+        .await
+        .unwrap();
 
     let tree = config
         .user_tree(LuaVersion::from(&config).unwrap().clone())
@@ -176,10 +185,11 @@ async fn treesitter_parser_build() {
 
     Build::new()
         .rockspec(&rockspec)
+        .lua(&lua)
         .tree(&tree)
         .entry_type(tree::EntryType::Entrypoint)
         .config(&config)
-        .progress(&Progress::Progress(bar))
+        .progress(&bar)
         .behaviour(Force)
         .build()
         .await
@@ -204,15 +214,19 @@ async fn test_build_local_project_no_source() {
         .unwrap();
 
     let tree = project.tree(&config).unwrap();
-    let progress = MultiProgress::new();
-    let bar = progress.new_bar();
+    let bar = Progress::NoProgress;
+
+    let lua = LuaInstallation::new_from_config(&config, &bar)
+        .await
+        .unwrap();
 
     let package = Build::new()
         .rockspec(&project_toml)
+        .lua(&lua)
         .tree(&tree)
         .entry_type(tree::EntryType::Entrypoint)
         .config(&config)
-        .progress(&Progress::Progress(bar))
+        .progress(&bar)
         .behaviour(Force)
         .build()
         .await
@@ -244,15 +258,19 @@ async fn test_build_local_project_only_src() {
         .unwrap();
 
     let tree = project.tree(&config).unwrap();
-    let progress = MultiProgress::new();
-    let bar = progress.new_bar();
+    let bar = Progress::NoProgress;
+
+    let lua = LuaInstallation::new_from_config(&config, &bar)
+        .await
+        .unwrap();
 
     let pkg = Build::new()
         .rockspec(&project_toml)
+        .lua(&lua)
         .tree(&tree)
         .entry_type(tree::EntryType::Entrypoint)
         .config(&config)
-        .progress(&Progress::Progress(bar))
+        .progress(&bar)
         .behaviour(Force)
         .build()
         .await
@@ -301,12 +319,18 @@ fn test_build_multiple_treesitter_parsers() {
         let rockspec = rockspec.clone();
 
         handles.push(runtime.spawn(async move {
+            let bar = Progress::NoProgress;
+            let lua = LuaInstallation::new_from_config(&config, &bar)
+                .await
+                .unwrap();
+
             Build::new()
                 .rockspec(&rockspec)
+                .lua(&lua)
                 .tree(&tree)
                 .entry_type(tree::EntryType::Entrypoint)
                 .config(&config)
-                .progress(&Progress::NoProgress)
+                .progress(&bar)
                 .behaviour(Force)
                 .build()
                 .await
@@ -335,15 +359,19 @@ async fn build_project_with_git_dependency() {
         .unwrap();
 
     let tree = project.tree(&config).unwrap();
-    let progress = MultiProgress::new();
-    let bar = progress.new_bar();
+    let bar = Progress::NoProgress;
+
+    let lua = LuaInstallation::new_from_config(&config, &bar)
+        .await
+        .unwrap();
 
     Build::new()
         .rockspec(&project_toml)
+        .lua(&lua)
         .tree(&tree)
         .entry_type(tree::EntryType::Entrypoint)
         .config(&config)
-        .progress(&Progress::Progress(bar))
+        .progress(&bar)
         .behaviour(Force)
         .build()
         .await
@@ -368,15 +396,19 @@ async fn test_multiline_command_build() {
         .unwrap();
 
     let tree = project.tree(&config).unwrap();
-    let progress = MultiProgress::new();
-    let bar = progress.new_bar();
+    let bar = Progress::NoProgress;
+
+    let lua = LuaInstallation::new_from_config(&config, &bar)
+        .await
+        .unwrap();
 
     let package = Build::new()
         .rockspec(&project_toml)
+        .lua(&lua)
         .tree(&tree)
         .entry_type(tree::EntryType::Entrypoint)
         .config(&config)
-        .progress(&Progress::Progress(bar))
+        .progress(&bar)
         .behaviour(BuildBehaviour::Force)
         .build()
         .await

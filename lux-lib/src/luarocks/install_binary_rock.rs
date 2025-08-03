@@ -123,7 +123,7 @@ impl<'a> BinaryRockInstall<'a> {
             let _ = ExternalDependencyInfo::probe(name, dep, self.config.external_deps())?;
         }
 
-        rockspec.validate_lua_version(self.config)?;
+        rockspec.validate_lua_version_from_config(self.config)?;
 
         let hashes = LocalPackageHashes {
             rockspec: rockspec.hash()?,

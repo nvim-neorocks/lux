@@ -6,6 +6,7 @@ use crate::{
     lockfile::{
         LocalPackage, LocalPackageId, LockConstraint, Lockfile, OptState, PinnedState, ReadWrite,
     },
+    lua_installation::{LuaInstallation, LuaInstallationError},
     lua_rockspec::BuildBackendSpec,
     luarocks::{
         install_binary_rock::{BinaryRockInstall, InstallBinaryRockError},
@@ -139,6 +140,8 @@ pub enum InstallError {
     #[error(transparent)]
     LuaVersionUnset(#[from] LuaVersionUnset),
     #[error(transparent)]
+    LuaInstallation(#[from] LuaInstallationError),
+    #[error(transparent)]
     Io(#[from] io::Error),
     #[error(transparent)]
     Tree(#[from] TreeError),
@@ -189,6 +192,11 @@ async fn install_impl(
     )
     .await?;
 
+    let lua = Arc::new(
+        LuaInstallation::new_from_config(config, &progress_arc.map(|progress| progress.new_bar()))
+            .await?,
+    );
+
     // We have to install transitive build dependencies sequentially
     while let Some(build_dep_spec) = build_dep_rx.recv().await {
         let rockspec = build_dep_spec.downloaded_rock.rockspec();
@@ -206,6 +214,7 @@ async fn install_impl(
         let mut build_lockfile = build_tree.lockfile()?.write_guard();
         let pkg = Build::new()
             .rockspec(rockspec)
+            .lua(&lua)
             .tree(&build_tree)
             .entry_type(tree::EntryType::Entrypoint)
             .config(config)
@@ -228,6 +237,7 @@ async fn install_impl(
         let downloaded_rock = install_spec.downloaded_rock;
         let config = config.clone();
         let tree = tree.clone();
+        let lua = lua.clone();
 
         tokio::spawn({
             async move {
@@ -241,6 +251,7 @@ async fn install_impl(
                             install_spec.pin,
                             install_spec.opt,
                             install_spec.entry_type,
+                            &lua,
                             &tree,
                             &config,
                             progress_arc,
@@ -282,6 +293,7 @@ async fn install_impl(
                             install_spec.pin,
                             install_spec.opt,
                             install_spec.entry_type,
+                            &lua,
                             &tree,
                             &config,
                             progress_arc,
@@ -349,6 +361,7 @@ async fn install_rockspec(
     pin: PinnedState,
     opt: OptState,
     entry_type: tree::EntryType,
+    lua: &LuaInstallation,
     tree: &Tree,
     config: &Config,
     progress_arc: Arc<Progress<MultiProgress>>,
@@ -362,7 +375,7 @@ async fn install_rockspec(
     if let Some(BuildBackendSpec::LuaRock(_)) = &rockspec.build().current_platform().build_backend {
         let luarocks_tree = tree.build_tree(config)?;
         let luarocks = LuaRocksInstallation::new(config, luarocks_tree)?;
-        luarocks.ensure_installed(&bar).await?;
+        luarocks.ensure_installed(lua, &bar).await?;
     }
 
     let source_spec = match src_rock_source {
@@ -372,6 +385,7 @@ async fn install_rockspec(
 
     let pkg = Build::new()
         .rockspec(&rockspec)
+        .lua(lua)
         .tree(tree)
         .entry_type(entry_type)
         .config(config)

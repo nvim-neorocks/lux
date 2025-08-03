@@ -453,7 +453,21 @@ impl PartialProjectToml {
 // but we also add a special implementation for `ProjectToml` (as providing a lua version
 // is required even by the non-validated struct).
 impl LuaVersionCompatibility for PartialProjectToml {
-    fn validate_lua_version(&self, config: &Config) -> Result<(), LuaVersionError> {
+    fn validate_lua_version(&self, version: &LuaVersion) -> Result<(), LuaVersionError> {
+        if self.supports_lua_version(version) {
+            Ok(())
+        } else {
+            Err(LuaVersionError::LuaVersionUnsupported(
+                version.clone(),
+                self.package().to_owned(),
+                self.version_template
+                    .try_generate(&self.project_root)
+                    .unwrap_or(PackageVersion::default_dev_version()),
+            ))
+        }
+    }
+
+    fn validate_lua_version_from_config(&self, config: &Config) -> Result<(), LuaVersionError> {
         let _ = self.lua_version_matches(config)?;
         Ok(())
     }

@@ -66,6 +66,7 @@ pub struct Build<'a, R: Rockspec + HasIntegrity> {
     entry_type: tree::EntryType,
     config: &'a Config,
     progress: &'a Progress<ProgressBar>,
+    lua: &'a LuaInstallation,
 
     #[builder(default)]
     pin: PinnedState,
@@ -306,7 +307,9 @@ where
         ))
     });
 
-    let lua_version = rockspec.lua_version_matches(build.config)?;
+    let lua = build.lua;
+
+    rockspec.validate_lua_version(&lua.version)?;
 
     let tree = build.tree;
 
@@ -366,8 +369,6 @@ where
                 tree::EntryType::DependencyOnly => tree.dependency(&package)?,
             };
 
-            let lua = LuaInstallation::new(&lua_version, build.config, build.progress).await?;
-
             let rock_source = rockspec.source().current_platform();
             let build_dir = match &rock_source.unpack_dir {
                 Some(unpack_dir) => temp_dir.path().join(unpack_dir),
@@ -424,7 +425,7 @@ where
                 RunBuildArgs::new()
                     .output_paths(&output_paths)
                     .no_install(false)
-                    .lua(&lua)
+                    .lua(lua)
                     .external_dependencies(&external_dependencies)
                     .deploy(rockspec.deploy().current_platform())
                     .config(build.config)
@@ -441,7 +442,7 @@ where
                 rockspec,
                 tree,
                 &output_paths,
-                &lua,
+                lua,
                 &external_dependencies,
                 &build_dir,
                 &build.entry_type,
@@ -503,7 +504,7 @@ mod tests {
 
     use crate::{
         config::{ConfigBuilder, LuaVersion},
-        lua_installation::LuaInstallation,
+        lua_installation::{detect_installed_lua_version, LuaInstallation},
         progress::MultiProgress,
         project::Project,
         tree::RockLayout,
@@ -511,11 +512,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_builtin_build() {
+        let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
         let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("resources/test/sample-projects/no-build-spec/");
         let tree_dir = assert_fs::TempDir::new().unwrap();
         let config = ConfigBuilder::new()
             .unwrap()
+            .lua_version(lua_version)
             .user_tree(Some(tree_dir.to_path_buf()))
             .build()
             .unwrap();

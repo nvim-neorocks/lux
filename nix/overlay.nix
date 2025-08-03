@@ -173,13 +173,19 @@ in {
       inherit (luxCargo) version;
       src = self;
 
-      buildInputs = commonArgs.buildInputs ++ [final.lua5_4];
+      buildInputs =
+        commonArgs.buildInputs
+        ++ [
+          # make sure this is the same as the nativeCheckInputs lua
+          final.lua5_4
+        ];
 
       nativeCheckInputs = with final; [
+        # make sure this is the same as the buildInputs lua, otherwise pkg-config won't find it
+        lua5_4
         cacert
         cargo-nextest
         zlib # used for checking external dependencies
-        lua
         nix # we use nix-hash in tests
       ];
 

@@ -113,6 +113,7 @@ impl LuaRocksInstallation {
     #[cfg(target_family = "unix")]
     pub async fn ensure_installed(
         &self,
+        lua: &LuaInstallation,
         progress: &Progress<ProgressBar>,
     ) -> Result<(), LuaRocksInstallError> {
         use crate::{lua_rockspec::RemoteLuaRockspec, package::PackageReq};
@@ -126,6 +127,7 @@ impl LuaRocksInstallation {
             let rockspec = RemoteLuaRockspec::new(LUAROCKS_ROCKSPEC).unwrap();
             let pkg = Build::new()
                 .rockspec(&rockspec)
+                .lua(lua)
                 .tree(&self.tree)
                 .entry_type(tree::EntryType::Entrypoint)
                 .config(&self.config)
@@ -141,6 +143,7 @@ impl LuaRocksInstallation {
     #[cfg(target_family = "windows")]
     pub async fn ensure_installed(
         &self,
+        _lua: &LuaInstallation,
         progress: &Progress<ProgressBar>,
     ) -> Result<(), LuaRocksInstallError> {
         use crate::{hash::HasIntegrity, operations};

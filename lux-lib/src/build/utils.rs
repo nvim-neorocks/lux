@@ -719,9 +719,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_install_wrapped_binary() {
+        let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
         let temp = assert_fs::TempDir::new().unwrap();
         let config = ConfigBuilder::new()
             .unwrap()
+            .lua_version(lua_version)
             .user_tree(Some(temp.to_path_buf()))
             .build()
             .unwrap();
