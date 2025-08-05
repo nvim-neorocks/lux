@@ -19,10 +19,10 @@ license = "LGPL-3.0+"
 aho-corasick = { version = "1" }
 bitflags = { version = "2", default-features = false, features = ["std"] }
 bstr = { version = "1" }
-clap = { version = "4", features = ["derive", "env"] }
-clap_builder = { version = "4", default-features = false, features = ["color", "env", "help", "std", "suggestions", "usage"] }
+clap = { version = "4", features = ["derive", "env", "wrap_help"] }
+clap_builder = { version = "4", default-features = false, features = ["color", "env", "std", "suggestions", "usage", "wrap_help"] }
 crossbeam-utils = { version = "0.8" }
-either = { version = "1" }
+either = { version = "1", features = ["use_std"] }
 futures-channel = { version = "0.3", features = ["sink"] }
 futures-core = { version = "0.3" }
 futures-sink = { version = "0.3" }
@@ -38,9 +38,13 @@ num-traits = { version = "0.2", default-features = false, features = ["i128", "s
 parking_lot = { version = "0.12", features = ["arc_lock", "send_guard"] }
 percent-encoding = { version = "2" }
 predicates = { version = "3" }
+proc-macro2 = { version = "1", features = ["span-locations"] }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa", "perf", "unicode"] }
+regex-syntax = { version = "0.8" }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
+serde_json = { version = "1", features = ["alloc", "preserve_order"] }
 smallvec = { version = "1", default-features = false, features = ["const_new"] }
+stable_deref_trait = { version = "1", default-features = false, features = ["alloc"] }
 time = { version = "0.3", default-features = false, features = ["formatting", "macros", "parsing"] }
 tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec", "io"] }
@@ -50,12 +54,22 @@ tracing = { version = "0.1", features = ["log"] }
 winnow = { version = "0.7" }
 
 [build-dependencies]
+aho-corasick = { version = "1" }
+bstr = { version = "1" }
+crossbeam-utils = { version = "0.8" }
+either = { version = "1", features = ["use_std"] }
 hashbrown = { version = "0.15" }
 indexmap = { version = "1", default-features = false, features = ["std"] }
+log = { version = "0.4", default-features = false, features = ["std"] }
 memchr = { version = "2" }
-proc-macro2 = { version = "1" }
+proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = { version = "1" }
+regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa", "perf", "unicode"] }
+regex-syntax = { version = "0.8" }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
+serde_json = { version = "1", features = ["alloc", "preserve_order"] }
+stable_deref_trait = { version = "1", default-features = false, features = ["alloc"] }
 syn = { version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
+winnow = { version = "0.7" }
 
 ### END HAKARI SECTION
