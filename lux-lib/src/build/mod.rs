@@ -214,7 +214,6 @@ async fn install<R: Rockspec + HasIntegrity>(
     tree: &Tree,
     output_paths: &RockLayout,
     lua: &LuaInstallation,
-    external_dependencies: &HashMap<String, ExternalDependencyInfo>,
     build_dir: &Path,
     entry_type: &EntryType,
     progress: &Progress<ProgressBar>,
@@ -248,15 +247,9 @@ async fn install<R: Rockspec + HasIntegrity>(
         progress.map(|p| p.set_message("Compiling C libraries..."));
     }
     for (target, source) in &install_spec.lib {
-        utils::compile_c_files(
-            &vec![build_dir.join(source)],
-            target,
-            &output_paths.lib,
-            lua,
-            external_dependencies,
-            config,
-        )
-        .await?;
+        let absolute_source = build_dir.join(source);
+        let resolved_target = output_paths.lib.join(target);
+        tokio::fs::copy(absolute_source, resolved_target).await?;
         progress.map(|p| p.set_position(p.position() + 1));
     }
     if entry_type.is_entrypoint() {
@@ -443,7 +436,6 @@ where
                 tree,
                 &output_paths,
                 lua,
-                &external_dependencies,
                 &build_dir,
                 &build.entry_type,
                 build.progress,

@@ -330,6 +330,33 @@ impl LuaPathBufTable {
     }
 }
 
+#[derive(Clone, Debug, Deserialize)]
+struct LibPathBufTable(HashMap<LuaTableKey, PathBuf>);
+
+impl LibPathBufTable {
+    fn coerce<S>(self) -> Result<HashMap<S, PathBuf>, S::Err>
+    where
+        S: FromStr + Eq + std::hash::Hash,
+    {
+        self.0
+            .into_iter()
+            .map(|(key, value)| {
+                let key = match key {
+                    LuaTableKey::IntKey(_) => value
+                        .file_name()
+                        .unwrap_or_else(|| {
+                            panic!("unable to determine base name of {0}", value.display())
+                        })
+                        .to_string_lossy()
+                        .to_string(),
+                    LuaTableKey::StringKey(key) => key,
+                };
+                Ok((S::from_str(&key)?, value))
+            })
+            .try_collect()
+    }
+}
+
 /// For packages which don't provide means to install modules
 /// and expect the user to copy the .lua or library files by hand to the proper locations.
 /// This struct contains categories of files. Each category is itself a table,
@@ -344,8 +371,8 @@ pub struct InstallSpec {
     #[serde(default, deserialize_with = "deserialize_module_path_map")]
     pub lua: HashMap<LuaModule, PathBuf>,
     /// Dynamic libraries implemented compiled Lua modules.
-    #[serde(default, deserialize_with = "deserialize_module_path_map")]
-    pub lib: HashMap<LuaModule, PathBuf>,
+    #[serde(default, deserialize_with = "deserialize_file_name_path_map")]
+    pub lib: HashMap<String, PathBuf>,
     /// Configuration files.
     #[serde(default)]
     pub conf: HashMap<String, PathBuf>,
@@ -381,7 +408,7 @@ fn deserialize_file_name_path_map<'de, D>(
 where
     D: Deserializer<'de>,
 {
-    let binaries = LuaPathBufTable::deserialize(deserializer)?;
+    let binaries = LibPathBufTable::deserialize(deserializer)?;
     binaries.coerce().map_err(de::Error::custom)
 }
 
