@@ -5,11 +5,17 @@ edition = "2021"
 publish = false
 
 [dependencies]
+cargo-packager = { version = "0.11.5", default-features = false, features = ["rustls-tls"] }
 clap = { version = "4.5.23", features = ["derive"] }
 clap_complete = "4.5.40"
 clap_mangen = "0.2.24"
 lux-workspace-hack = { version = "0.1", path = "../lux-workspace-hack" }
+serde = { version = "1.0.219", default-features = false }
 toml = "0.9.0"
+
+[dependencies.xtask-lua]
+version = "0.1.0"
+path = "../xtask-lua/"
 
 [dependencies.lux-cli]
 path = "../lux-cli"
