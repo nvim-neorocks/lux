@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use assert_fs::prelude::PathCopy;
 use assert_fs::TempDir;
+use lux_lib::rockspec::Rockspec;
 use lux_lib::{
     build::{Build, BuildBehaviour::Force},
     config::{ConfigBuilder, LuaVersion},
@@ -417,4 +418,59 @@ async fn test_multiline_command_build() {
     let rock_layout = tree.installed_rock_layout(&package).unwrap();
     let success_dir = rock_layout.src.join("success");
     assert!(success_dir.is_dir());
+}
+
+#[tokio::test]
+async fn builtin_build_install_include() {
+    let dir = TempDir::new().unwrap();
+
+    let content =
+        String::from_utf8(std::fs::read("resources/test/luyoga-1.3-3.rockspec").unwrap()).unwrap();
+    let rockspec = RemoteLuaRockspec::new(&content).unwrap();
+
+    let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
+
+    let config = ConfigBuilder::new()
+        .unwrap()
+        .user_tree(Some(dir.to_path_buf()))
+        .lua_version(lua_version.clone())
+        .build()
+        .unwrap();
+
+    let bar = Progress::NoProgress;
+
+    let lua = LuaInstallation::new_from_config(&config, &bar)
+        .await
+        .unwrap();
+
+    let tree = config.user_tree(lua.version.clone()).unwrap();
+
+    Build::new()
+        .rockspec(&rockspec)
+        .lua(&lua)
+        .tree(&tree)
+        .entry_type(tree::EntryType::Entrypoint)
+        .config(&config)
+        .progress(&bar)
+        .behaviour(Force)
+        .build()
+        .await
+        .unwrap();
+
+    let install_path = dir.path().join(lua_version.unwrap().to_string());
+    let mut install_dir_entries = tokio::fs::read_dir(install_path).await.unwrap();
+    let mut luyoga_path = None;
+    while let Some(entry) = install_dir_entries.next_entry().await.unwrap() {
+        if entry.file_type().await.unwrap().is_dir()
+            && entry.file_name().into_string().unwrap().contains("luyoga")
+        {
+            luyoga_path = Some(entry.path());
+        }
+    }
+
+    let install_spec = &rockspec.build().current_platform().install;
+    for target in install_spec.lib.keys() {
+        let full_path = &luyoga_path.as_ref().unwrap().join("lib").join(target);
+        tokio::fs::try_exists(full_path).await.unwrap();
+    }
 }

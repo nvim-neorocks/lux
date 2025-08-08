@@ -1059,7 +1059,7 @@ mod tests {
         build = {\n
             type = 'make',\n
             install = {\n
-                lib = {['foo.bar'] = 'lib/bar.so'},\n
+                lib = {['foo.so'] = 'lib/bar.so'},\n
             },\n
             copy_directories = {\n
                 'plugin',\n
@@ -1086,7 +1086,7 @@ mod tests {
             .default
             .install
             .lib
-            .get(&LuaModule::from_str("foo.bar").unwrap())
+            .get("foo.so")
             .unwrap();
         assert_eq!(*foo_bar_path, PathBuf::from("lib/bar.so"));
         let copy_directories = rockspec.local.build.default.copy_directories;
@@ -1654,7 +1654,7 @@ mod tests {
 
         assert_eq!(
             rockspec.build().current_platform().install.bin,
-            HashMap::from([("wsapi".into(), PathBuf::from("src/launcher/wsapi.cgi"))])
+            HashMap::from([("wsapi.cgi".into(), PathBuf::from("src/launcher/wsapi.cgi"))])
         );
     }
 
