@@ -302,9 +302,9 @@ dependencies = [
 
 [[package]]
 name = "bon"
-version = "3.6.3"
+version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ced38439e7a86a4761f7f7d5ded5ff009135939ecb464a24452eaa4c1696af7d"
+checksum = "67a0c21249ad725ebcadcb1b1885f8e3d56e8e6b8924f560268aab000982d637"
 dependencies = [
  "bon-macros",
  "rustversion",
@@ -312,11 +312,11 @@ dependencies = [
 
 [[package]]
 name = "bon-macros"
-version = "3.6.3"
+version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ce61d2d3844c6b8d31b2353d9f66cf5e632b3e9549583fe3cac2f4f6136725e"
+checksum = "a660ebdea4d4d3ec7788cfc9c035b66efb66028b9b97bf6cde7023ccc8e77e28"
 dependencies = [
- "darling 0.20.10",
+ "darling 0.21.1",
  "ident_case",
  "prettyplease",
  "proc-macro2",
@@ -800,6 +800,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6b136475da5ef7b6ac596c0e956e37bad51b85b987ff3d5e230e964936736b2"
+dependencies = [
+ "darling_core 0.21.1",
+ "darling_macro 0.21.1",
+]
+
+[[package]]
 name = "darling_core"
 version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -827,6 +837,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling_core"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b44ad32f92b75fb438b04b68547e521a548be8acc339a6dacc4a7121488f53e6"
+dependencies = [
+ "fnv",
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "strsim 0.11.1",
+ "syn 2.0.87",
+]
+
+[[package]]
 name = "darling_macro"
 version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -844,6 +868,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d336a2a514f6ccccaa3e09b02d41d35330c07ddf03a62165fcec10bb561c7806"
 dependencies = [
  "darling_core 0.20.10",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b5be8a7a562d315a5b92a630c30cec6bcf663e6673f00fbb69cca66a6f521b9"
+dependencies = [
+ "darling_core 0.21.1",
  "quote",
  "syn 2.0.87",
 ]
