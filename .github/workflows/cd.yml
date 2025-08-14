@@ -4,6 +4,7 @@ permissions:
   contents: write
 
 on:
+  pull_request:
   release:
     types: [published]
   workflow_dispatch:
@@ -23,6 +24,8 @@ jobs:
     if: github.repository_owner == 'nvim-neorocks' && (
       ( github.event_name == 'release' && startsWith(github.event.release.name, 'v')) ||
         github.event_name == 'workflow_dispatch'
+       ||
+        github.event_name == 'pull_request'
       )
     continue-on-error: true
     strategy:
@@ -130,6 +133,12 @@ jobs:
           LUX_SIGN_PRIVATE_KEY: ${{ secrets.LUX_SIGN_PRIVATE_KEY }}
           LUX_SIGN_PRIVATE_KEY_PASS: ${{ secrets.LUX_SIGN_PRIVATE_KEY_PASS }}
 
+      - name: Archive macos .app bundle
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          brew install create-dmg
+          create-dmg --volname "lux-cli" "lx-${{ github.event.release.name }}-${{ matrix.target }}.dmg" target/dist/lux-cli.app
+
       - name: Upload .deb package
         uses: actions/upload-artifact@v4
         if: startsWith(matrix.os, 'ubuntu') && github.event_name != 'release'
@@ -162,21 +171,13 @@ jobs:
           overwrite: true
           name: lux-${{ matrix.target }}.tar.gz
 
-      - name: Upload dmg installer
+      - name: Upload dmg archive
         uses: actions/upload-artifact@v4
         if: startsWith(matrix.os, 'macos') && github.event_name != 'release'
         with:
-          path: target/dist/*.dmg
+          path: ./*.dmg
           overwrite: true
           name: lux-${{ matrix.target }}.dmg
-
-      - name: Upload macos app
-        uses: actions/upload-artifact@v4
-        if: startsWith(matrix.os, 'macos') && github.event_name != 'release'
-        with:
-          path: target/dist/*.app
-          overwrite: true
-          name: lux-${{ matrix.target }}.app
 
       - name: Upload exe installer
         uses: actions/upload-artifact@v4
@@ -234,22 +235,12 @@ jobs:
           overwrite: true
           file_glob: true
 
-      - name: Upload dmg installer to release
+      - name: Upload dmg archive to release
         uses: svenstaro/upload-release-action@v2
         if: startsWith(matrix.os, 'macos') && github.event_name == 'release'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/dist/*.dmg
-          tag: ${{ github.ref }}
-          overwrite: true
-          file_glob: true
-
-      - name: Upload macos app to release
-        uses: svenstaro/upload-release-action@v2
-        if: startsWith(matrix.os, 'macos') && github.event_name == 'release'
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/dist/*.app
+          file: ./*.dmg
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
