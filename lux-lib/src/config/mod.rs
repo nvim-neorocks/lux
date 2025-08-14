@@ -3,6 +3,8 @@ use external_deps::ExternalDependencySearchConfig;
 use itertools::Itertools;
 use mlua::{ExternalError, ExternalResult, FromLua, IntoLua, UserData};
 use serde::{Deserialize, Serialize, Serializer};
+use std::env::current_exe;
+use std::path::Path;
 use std::{
     collections::HashMap, env, fmt::Display, io, path::PathBuf, str::FromStr, time::Duration,
 };
@@ -110,10 +112,11 @@ impl LuaVersion {
 
     /// Searches for the path to the lux-lua library for this version
     pub fn lux_lib_dir(&self) -> Option<PathBuf> {
-        let lib_name = format!("lux-lua{self}");
         option_env!("LUX_LIB_DIR")
             .map(PathBuf::from)
+            .map(|path| path.join(self.to_string()))
             .or_else(|| {
+                let lib_name = format!("lux-lua{self}");
                 pkg_config::Config::new()
                     .print_system_libs(false)
                     .cargo_metadata(false)
@@ -122,7 +125,47 @@ impl LuaVersion {
                     .ok()
                     .and_then(|library| library.link_paths.first().cloned())
             })
-            .map(|path| path.join(self.to_string()))
+            .or_else(|| lux_lib_resource_dir().map(|path| path.join(self.to_string())))
+    }
+}
+
+/// Searches for the lux-lib directory in a binary distribution's resources
+fn lux_lib_resource_dir() -> Option<PathBuf> {
+    if cfg!(target_env = "msvc") {
+        // The msvc .exe and .msi binary installers install lux-lua to the executable's directory.
+        current_exe()
+            .ok()
+            .and_then(|exe_path| exe_path.parent().map(Path::to_path_buf))
+            .and_then(|exe_dir| {
+                let lib_dir = exe_dir.join("lux-lua");
+                if lib_dir.is_dir() {
+                    Some(lib_dir)
+                } else {
+                    None
+                }
+            })
+    } else if cfg!(target_os = "macos") {
+        // Currently, we only bundle resources with an .app ApplicationBundle
+        current_exe()
+            .ok()
+            .and_then(|exe_path| exe_path.parent().map(Path::to_path_buf))
+            .and_then(|macos_dir| macos_dir.parent().map(Path::to_path_buf))
+            .and_then(|contents_dir| {
+                let lib_dir = contents_dir.join("Resources").join("lux-lua");
+                if lib_dir.is_dir() {
+                    Some(lib_dir)
+                } else {
+                    None
+                }
+            })
+    } else {
+        // .deb and AppImage packages
+        let lib_dir = PathBuf::from("/usr/share/lux-lua");
+        if lib_dir.is_dir() {
+            Some(lib_dir)
+        } else {
+            None
+        }
     }
 }
 

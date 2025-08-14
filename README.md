@@ -139,15 +139,19 @@ Lux includes the following packages and libraries:
 
 Dependencies:
 
-- `openssl`
 - `libgit2`
 - `gnupg`, `libgpg-error` and `gpgme` (*nix only)
-- `lua` (optional, if building without the `vendored-lua` feature)
 
-We recommend building with the `vendored-lua` feature enabled:
+If building without the `vendored` feature:
+
+- `lua`
+- `openssl`
+
+We recommend building with the `vendored` feature enabled,
+to statically link `lua` and `openssl`.
 
 ```bash
-cargo build --features vendored-lua
+cargo build --features vendored
 ```
 
 You can build `lux-lua` for a given Lua version with:

@@ -31,6 +31,7 @@
         ...
       }: let
         pkgs = attrs.pkgs.extend self.overlays.default;
+        lib = pkgs.lib;
         git-hooks-check = git-hooks.lib.${system}.run {
           src = self;
           hooks = {
@@ -54,12 +55,13 @@
         };
 
         devShells = let
-          mkDevShell = lua_pkg:
+          mkDevShell = extra_pkgs:
             pkgs.mkShell {
               name = "lux devShell";
               inherit (git-hooks-check) shellHook;
               buildInputs =
-                (with pkgs; [
+                extra_pkgs
+                ++ (with pkgs; [
                   rust-analyzer
                   ra-multiplex
                   cargo-nextest
@@ -68,7 +70,6 @@
                   cargo-cross
                   clippy
                   taplo
-                  lua_pkg
                   # Needed for integration test builds
                   pkg-config
                   libxcrypt
@@ -77,16 +78,19 @@
                   gnum4
                 ])
                 ++ self.checks.${system}.git-hooks-check.enabledPackages
-                ++ pkgs.lux-cli.buildInputs
+                ++ (lib.filter (pkg: !(lib.hasPrefix "lua" pkg.name)) pkgs.lux-cli.buildInputs)
                 ++ pkgs.lux-cli.nativeBuildInputs;
             };
         in rec {
-          default = lua51;
-          lua51 = mkDevShell pkgs.lua5_1;
-          lua52 = mkDevShell pkgs.lua5_2;
-          lua53 = mkDevShell pkgs.lua5_3;
-          lua54 = mkDevShell pkgs.lua5_4;
-          luajit = mkDevShell pkgs.luajit;
+          default = lua54;
+          lua51 = mkDevShell [pkgs.lua5_1];
+          lua52 = mkDevShell [pkgs.lua5_2];
+          lua53 = mkDevShell [pkgs.lua5_3];
+          lua54 = mkDevShell [pkgs.lua5_4];
+          luajit = mkDevShell [pkgs.luajit];
+          # NOTE: rustup will be needed for cross-compilation
+          # cd = mkDevShell [pkgs.rustup];
+          cd = mkDevShell [];
         };
 
         checks = rec {

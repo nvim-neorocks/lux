@@ -30,7 +30,6 @@ spinners = "4.1.1"
 termcolor = "1.4.1"
 termtree = "0.5.1"
 text_trees = "0.1.2"
-toml = "0.9.0"
 url = "2.5.4"
 whoami = "1.6.0"
 
@@ -48,6 +47,7 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 stylua = { workspace = true }
 tempdir = { workspace = true }
+toml = { workspace = true }
 tokio = { workspace = true }
 walkdir = { workspace = true }
 which = { workspace = true }
@@ -63,10 +63,11 @@ path = "../lux-lib/"
 features = ["clap"]
 
 [features]
-default = ["lua54", "vendored-lua"]
+default = ["lua54"]
 lua51 = ["lux-lib/lua51"]
 lua52 = ["lux-lib/lua52"]
 lua53 = ["lux-lib/lua53"]
 lua54 = ["lux-lib/lua54"]
 luajit = ["lux-lib/luajit"]
+vendored = ["lux-lib/vendored"]
 vendored-lua = ["lux-lib/vendored-lua"]
