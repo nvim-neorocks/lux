@@ -18,7 +18,7 @@ use bon::{builder, Builder};
 use itertools::Itertools;
 use thiserror::Error;
 
-use super::{Install, InstallError, PackageInstallSpec, Remove, RemoveError};
+use super::{Install, InstallError, PackageInstallSpec, RemoveError, Uninstall};
 
 /// A rocks sync builder, for synchronising a tree with a lockfile.
 #[derive(Builder)]
@@ -244,7 +244,7 @@ async fn do_sync(
         .map(|pkg| pkg.id())
         .collect_vec();
 
-    Remove::new(args.config)
+    Uninstall::new(args.config)
         .packages(packages_to_remove)
         .progress(progress.clone())
         .remove()
