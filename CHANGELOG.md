@@ -6,6 +6,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## `lux-cli` - [0.15.0](https://github.com/nvim-neorocks/lux/compare/v0.14.0...v0.15.0) - 2025-08-14
+
+### Other
+- *(operations)* [**breaking**] rename `Remove` to `Uninstall` for consistent terminology ([#795](https://github.com/nvim-neorocks/lux/pull/795))
+
+## `lux-lib` - [0.21.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.20.0...lux-lib-v0.21.0) - 2025-08-14
+
+### Other
+- *(operations)* [**breaking**] rename `Remove` to `Uninstall` for consistent terminology ([#795](https://github.com/nvim-neorocks/lux/pull/795))
+
 ## `lux-cli` - [0.14.0](https://github.com/nvim-neorocks/lux/compare/v0.13.3...v0.14.0) - 2025-08-14
 
 ### Other
