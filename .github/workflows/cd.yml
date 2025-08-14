@@ -19,6 +19,11 @@ env:
 
 jobs:
   dist-package:
+    name: ${{ matrix.target }}
+    if: github.repository_owner == 'nvim-neorocks' && (
+      ( github.event_name == 'release' && startsWith(github.event.release.name, 'v')) ||
+        github.event_name == 'workflow_dispatch'
+      )
     continue-on-error: true
     strategy:
       matrix:
