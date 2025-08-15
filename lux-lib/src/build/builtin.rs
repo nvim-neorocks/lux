@@ -125,9 +125,6 @@ impl BuildBackend for BuiltinBuildSpec {
             std::fs::create_dir_all(target.parent().unwrap())?;
             let target = target.to_string_lossy().to_string();
             let source = build_dir.join("src").join("bin").join(&target);
-            // Let's not care about the rockspec's deploy field for auto-detected bin scripts
-            // If package maintainers want to disable wrapping via the rockspec, they should
-            // specify binaries in the rockspec.
             let installed_bin_script =
                 utils::install_binary(&source, &target, tree, lua, args.deploy, config)
                     .await
