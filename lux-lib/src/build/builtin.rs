@@ -6,7 +6,7 @@ use std::{
     str::FromStr,
 };
 use thiserror::Error;
-use walkdir::WalkDir;
+use walkdir::{DirEntry, WalkDir};
 
 use crate::{
     build::{
@@ -121,20 +121,20 @@ impl BuildBackend for BuiltinBuildSpec {
         }
 
         let mut binaries = Vec::new();
-        for target in autodetect_src_bin_scripts(build_dir) {
-            std::fs::create_dir_all(target.parent().unwrap())?;
-            let target = target.to_string_lossy().to_string();
-            let source = build_dir.join("src").join("bin").join(&target);
-            let installed_bin_script =
-                utils::install_binary(&source, &target, tree, lua, args.deploy, config)
-                    .await
-                    .map_err(|err| BuiltinBuildError::InstallBinary(target.clone(), err))?;
-            binaries.push(
-                installed_bin_script
-                    .file_name()
-                    .expect("no file name")
-                    .into(),
-            );
+        for bin_script in autodetect_bin_scripts(build_dir) {
+            if let Some(target) = bin_script.file_name() {
+                let file_name = target.to_string_lossy().to_string();
+                let installed_bin_script =
+                    utils::install_binary(&bin_script, &file_name, tree, lua, args.deploy, config)
+                        .await
+                        .map_err(|err| BuiltinBuildError::InstallBinary(file_name.clone(), err))?;
+                binaries.push(
+                    installed_bin_script
+                        .file_name()
+                        .expect("no file name")
+                        .into(),
+                );
+            }
         }
 
         Ok(BuildInfo { binaries })
@@ -199,15 +199,12 @@ fn autodetect_modules(
         .collect()
 }
 
-fn autodetect_src_bin_scripts(build_dir: &Path) -> Vec<PathBuf> {
+fn autodetect_bin_scripts(build_dir: &Path) -> Vec<PathBuf> {
     WalkDir::new(build_dir.join("src").join("bin"))
         .into_iter()
+        .chain(WalkDir::new(build_dir.join("bin")))
         .filter_map(|file| file.ok())
         .filter(|file| file.clone().into_path().is_file())
-        .map(|file| {
-            let diff = pathdiff::diff_paths(build_dir.join(file.into_path()), build_dir)
-                .expect("failed to autodetect bin scripts");
-            diff.components().skip(2).collect::<PathBuf>()
-        })
+        .map(DirEntry::into_path)
         .collect()
 }
