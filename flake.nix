@@ -9,6 +9,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     crane.url = "github:ipetkov/crane";
+    nixpkgs-cross-overlay = {
+      url = "github:alekseysidorov/nixpkgs-cross-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     flake-parts.url = "github:hercules-ci/flake-parts";
     git-hooks = {
       url = "github:cachix/git-hooks.nix";
@@ -67,7 +71,6 @@
                   cargo-nextest
                   cargo-hakari
                   cargo-insta
-                  cargo-cross
                   clippy
                   taplo
                   # Needed for integration test builds
@@ -82,16 +85,41 @@
                 ++ pkgs.lux-cli.nativeBuildInputs;
             };
 
-          mkBuildShell = pkgs':
-            pkgs'.mkShell {
+          mkBuildShell = {
+            buildInputs ? [],
+            shellHook ? "",
+          }:
+            pkgs.mkShell {
               name = "lux buildShell";
               buildInputs =
-                (
-                  lib.filter
+                buildInputs
+                ++ pkgs.lux-cli.nativeBuildInputs;
+              inherit shellHook;
+            };
+
+          mkCrossBuildShell = target: let
+            crossSystem = {
+              config = target;
+              isStatic = true;
+              useLLVM = true;
+            };
+            pkgsCross = import nixpkgs {
+              localSystem = system;
+              inherit crossSystem;
+              overlays = [
+                inputs.nixpkgs-cross-overlay.overlays.default
+              ];
+            };
+          in
+            mkBuildShell
+            {
+              buildInputs =
+                [pkgsCross.rustCrossHook]
+                ++ (lib.filter
                   (pkg: !(lib.hasPrefix "lua" pkg.name))
-                  pkgs'.lux-cli.buildInputs
-                )
-                ++ pkgs'.lux-cli.nativeBuildInputs;
+                  pkgsCross.lux-cli.buildInputs)
+                ++ pkgsCross.lux-cli.nativeBuildInputs;
+              shellHook = pkgsCross.crossBashPrompt;
             };
         in rec {
           default = lua54;
@@ -100,7 +128,27 @@
           lua53 = mkDevShell [pkgs.lua5_3];
           lua54 = mkDevShell [pkgs.lua5_4];
           luajit = mkDevShell [pkgs.luajit];
-          cd = mkBuildShell pkgs;
+          cd =
+            mkBuildShell
+            {
+              buildInputs =
+                (lib.filter
+                  (pkg: !(lib.hasPrefix "lua" pkg.name))
+                  pkgs.lux-cli.buildInputs)
+                ++ pkgs.lux-cli.nativeBuildInputs;
+            };
+          cd_x86_64-unknown-linux-gnu = cd;
+          cd_aarch64-apple-darwin = cd;
+          cd_x86_64-unknown-linux-musl =
+            mkCrossBuildShell "x86_64-unknown-linux-musl";
+          cd_aarch64-unknown-linux-gnu =
+            mkCrossBuildShell "aarch64-unknown-linux-gnu";
+          cd_aarch64-unknown-linux-musl =
+            mkCrossBuildShell "aarch64-unknown-linux-musl";
+          cd_x86_64-unknown-freebsd =
+            mkCrossBuildShell "x86_64-unknown-freebsd";
+          cd_x86_64-apple-darwin =
+            mkCrossBuildShell "x86_64-apple-darwin";
         };
 
         checks = rec {
