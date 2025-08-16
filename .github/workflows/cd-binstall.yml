@@ -34,9 +34,9 @@ jobs:
       matrix:
         include:
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-22.04
+            os: ubuntu-22.04-arm
           - target: aarch64-unknown-linux-musl
-            os: ubuntu-22.04
+            os: ubuntu-22.04-arm
           - target: aarch64-apple-darwin
             os: macos-15
           # - target: aarch64-pc-windows-msvc
