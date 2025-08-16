@@ -70,7 +70,7 @@ On the other hand, lux has some features that are not present in luarocks.
 
 The following table provides a brief comparison:
 
-|                                                                       | lux                          | luarocks v3.11.1   |
+|                                                                       | lux                          | luarocks v3.12.2   |
 | ---                                                                   | ---                          | ---                |
 | project format                                                        | TOML / Lua                   | Lua                |
 | add/remove dependencies                                               | :white_check_mark:           | :x:                |
@@ -164,7 +164,7 @@ cargo xtask54 dist-lua
 cargo xtaskjit dist-lua
 ```
 
-This will install `lux-lua` to `target/dist/<lua>/lux.so`
+This will install `lux-lua` to `target/dist/share/lux-lua/<lua>/lux.so`
 and a pkg-config `.pc` file to `target/dist/lib/lux-lua*.pc`.
 
 ## :snowflake: Nix flake
