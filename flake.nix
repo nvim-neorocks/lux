@@ -81,6 +81,18 @@
                 ++ (lib.filter (pkg: !(lib.hasPrefix "lua" pkg.name)) pkgs.lux-cli.buildInputs)
                 ++ pkgs.lux-cli.nativeBuildInputs;
             };
+
+          mkBuildShell = pkgs':
+            pkgs'.mkShell {
+              name = "lux buildShell";
+              buildInputs =
+                (
+                  lib.filter
+                  (pkg: !(lib.hasPrefix "lua" pkg.name))
+                  pkgs'.lux-cli.buildInputs
+                )
+                ++ pkgs'.lux-cli.nativeBuildInputs;
+            };
         in rec {
           default = lua54;
           lua51 = mkDevShell [pkgs.lua5_1];
@@ -88,9 +100,7 @@
           lua53 = mkDevShell [pkgs.lua5_3];
           lua54 = mkDevShell [pkgs.lua5_4];
           luajit = mkDevShell [pkgs.luajit];
-          # NOTE: rustup will be needed for cross-compilation
-          # cd = mkDevShell [pkgs.rustup];
-          cd = mkDevShell [];
+          cd = mkBuildShell pkgs;
         };
 
         checks = rec {
