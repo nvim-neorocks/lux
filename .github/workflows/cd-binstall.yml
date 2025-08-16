@@ -70,6 +70,8 @@ jobs:
       - name: Nix devShell
         uses: nicknovitski/nix-develop@v1.2.1
         if: "!endsWith(matrix.target, 'windows-msvc')"
+        with:
+          arguments: ".#cd"
 
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
