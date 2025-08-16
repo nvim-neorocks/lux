@@ -206,3 +206,57 @@ impl<State: build_project_builder::State + build_project_builder::IsComplete>
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::{
+        config::{ConfigBuilder, LuaVersion},
+        lua_installation::detect_installed_lua_version,
+        project::Project,
+    };
+    use assert_fs::prelude::PathCopy;
+    use std::path::PathBuf;
+
+    #[tokio::test]
+    /// Non-regression for #980
+    async fn builtin_build_autodetect_bin_scripts() {
+        let project_root =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-projects/init/");
+        let temp_dir = assert_fs::TempDir::new().unwrap();
+        temp_dir.copy_from(&project_root, &["**"]).unwrap();
+        let project_root = temp_dir.path();
+        let foo_bin_dir = project_root.join("src").join("bin");
+        tokio::fs::create_dir_all(&foo_bin_dir).await.unwrap();
+        let foo_bin_file = foo_bin_dir.join("foo");
+        tokio::fs::write(&foo_bin_file, "print('hello')")
+            .await
+            .unwrap();
+        let bar_bin_dir = project_root.join("bin");
+        tokio::fs::create_dir_all(&bar_bin_dir).await.unwrap();
+        let bar_bin_file = bar_bin_dir.join("bar");
+        tokio::fs::write(&bar_bin_file, "print('hello')")
+            .await
+            .unwrap();
+        let lua_version = detect_installed_lua_version().or(Some(LuaVersion::Lua51));
+        let config = ConfigBuilder::new()
+            .unwrap()
+            .lua_version(lua_version)
+            .build()
+            .unwrap();
+        let project = Project::from_exact(project_root).unwrap().unwrap();
+        let tree = project.tree(&config).unwrap();
+        let package = BuildProject::new(&project, &config)
+            .no_lock(false)
+            .only_deps(false)
+            .build()
+            .await
+            .unwrap()
+            .unwrap();
+        let layout = tree.installed_rock_layout(&package).unwrap();
+        let bin_dir = layout.bin;
+        assert!(bin_dir.join("foo").is_file());
+        assert!(bin_dir.join("bar").is_file());
+    }
+}
