@@ -42,9 +42,7 @@ async fn luarocks_make() {
     let lua_version = LuaVersion::from(&config).unwrap_or(&LuaVersion::Lua51);
     let progress = MultiProgress::new();
     let bar = Progress::Progress(progress.new_bar());
-    let lua = LuaInstallation::new(lua_version, &config, &bar)
-        .await
-        .unwrap();
+    let lua = LuaInstallation::new(lua_version, &config, &bar).await?;
     luarocks
         .make(&rockspec_path, build_dir.path(), dest_dir.path(), &lua)
         .await
