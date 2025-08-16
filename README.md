@@ -134,6 +134,9 @@ Lux includes the following packages and libraries:
 > See [#663](https://github.com/nvim-neorocks/lux/issues/663).
 > Lux can detect a lux-lua installation using pkg-config
 > or via the `LUX_LIB_DIR` environment variable.
+>
+> Our [pre-built binary release artifacts](https://github.com/nvim-neorocks/lux/releases/latest)
+> are bundled with `lux-lua`.
 
 ## :wrench: Building from source
 
