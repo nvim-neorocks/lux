@@ -209,7 +209,7 @@ jobs:
 
       - name: Upload PKGBUILD to release
         uses: svenstaro/upload-release-action@v2
-        if: startsWith(matrix.os, 'ubuntu') && github.event_name == 'release'
+        if: startsWith(matrix.target, 'x86_64-unknown-linux-gnu') && github.event_name == 'release'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: target/dist/PKGBUILD
@@ -219,7 +219,7 @@ jobs:
 
       - name: Upload tar archive to release
         uses: svenstaro/upload-release-action@v2
-        if: startsWith(matrix.os, 'ubuntu') && github.event_name == 'release'
+        if: startsWith(matrix.target, 'x86_64-unknown-linux-gnu') && github.event_name == 'release'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: target/dist/*.tar.gz
