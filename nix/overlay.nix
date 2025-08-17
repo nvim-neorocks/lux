@@ -19,18 +19,13 @@
       installShellFiles
     ];
 
-    buildInputs =
-      [
-        openssl
-        libgit2
-        gnupg
-        libgpg-error
-        gpgme
-      ]
-      ++ lib.optionals stdenv.isDarwin [
-        darwin.apple_sdk.frameworks.Security
-        darwin.apple_sdk.frameworks.SystemConfiguration
-      ];
+    buildInputs = [
+      openssl
+      libgit2
+      gnupg
+      libgpg-error
+      gpgme
+    ];
 
     env = {
       # disable vendored packages
@@ -45,6 +40,10 @@
       pname = "lux";
       version = "0.1.0";
       src = cleanCargoSrc;
+
+      # perl is needed to build openssl-sys
+      nativeBuildInputs = commonArgs.nativeBuildInputs ++ [final.perl];
+
       buildInputs = commonArgs.buildInputs ++ [final.lua5_4];
     });
 
@@ -76,7 +75,7 @@
       // {
         pname = "lux-lua";
         inherit (luxCargo) version;
-        cargoExtraArgs = "-p lux-lua --no-default-features --features ${luaFeature}";
+        cargoExtraArgs = "-p lux-lua --locked --no-default-features --features ${luaFeature}";
 
         buildInputs = individualCrateArgs.buildInputs ++ [luaPkg];
 
@@ -101,31 +100,61 @@
         '';
       });
 
+  xtask = craneLib.buildPackage (individualCrateArgs
+    // {
+      pname = "xtask";
+      inherit (luxCargo) version;
+
+      buildInputs = individualCrateArgs.buildInputs ++ [final.lua5_4];
+
+      cargoExtraArgs = "-p xtask --locked";
+
+      meta.mainProgram = "xtask";
+    });
+
   # can't seem to override the buildType with override or overrideAttrs :(
   mk-lux-cli = {buildType ? "release"}:
     craneLib.buildPackage (individualCrateArgs
       // {
         pname = "lux-cli";
         inherit (luxCargo) version;
-        inherit buildType;
 
-        buildInputs = individualCrateArgs.buildInputs ++ [final.lua5_4];
+        nativeBuildInputs =
+          individualCrateArgs.nativeBuildInputs
+          ++ [
+            xtask
+          ];
 
-        cargoExtraArgs = "-p lux-cli";
+        buildInputs =
+          individualCrateArgs.buildInputs
+          ++ [
+            final.lua5_4
+          ];
 
-        postBuild = ''
-          cargo xtask dist-man
-          cargo xtask dist-completions
-        '';
+        cargoBuildCommand = "cargo build --profile ${buildType}";
+        cargoExtraArgs = "-p lux-cli --locked";
 
-        postInstall = ''
-          installManPage target/dist/lx.1
-          installShellCompletion target/dist/lx.{bash,fish} --zsh target/dist/_lx
-        '';
+        postBuild =
+          if final.stdenv.isDarwin
+          # For some reason, xtask errors with "permission denied" on darwin
+          then ""
+          else ''
+            xtask dist-man
+            xtask dist-completions
+          '';
+
+        postInstall =
+          if final.stdenv.isDarwin
+          then ""
+          else ''
+            installManPage target/dist/lx.1
+            installShellCompletion target/dist/lx.{bash,fish} --zsh target/dist/_lx
+          '';
 
         meta.mainProgram = "lx";
       });
 in {
+  inherit xtask;
   lux-cli = mk-lux-cli {};
   lux-cli-debug = mk-lux-cli {buildType = "debug";};
   lux-lua51 = mk-lux-lua {
@@ -205,7 +234,7 @@ in {
       pname = "lux-lua";
       version = "0.1.0";
       src = self;
-      cargoExtraArgs = "-p lux-lua --features test";
+      cargoExtraArgs = "-p lux-lua --locked --features test";
       buildInputs = commonArgs.buildInputs;
 
       nativeCheckInputs = with final; [

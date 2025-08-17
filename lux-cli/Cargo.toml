@@ -17,21 +17,21 @@ test = false
 bench = false
 
 [dependencies]
-clap = { version = "4.5.38", features = ["derive"] }
-clap_complete = "4.5.54"
-edit = "0.1.5"
-eyre = "0.6.12"
-inquire = "0.7.5"
-nucleo = "0.5.0"
-octocrab = "0.44.1"
-open = "5.3.2"
-spdx = "0.11.0"
-spinners = "4.1.1"
-termcolor = "1.4.1"
-termtree = "0.5.1"
-text_trees = "0.1.2"
-url = "2.5.4"
-whoami = "1.6.0"
+clap = { version = "4.5", features = ["derive"] }
+clap_complete = "4.5"
+edit = "0.1"
+eyre = "0.6"
+inquire = "0.7"
+nucleo = "0.5"
+octocrab = "0.44"
+open = "5.3"
+spdx = "0.11"
+spinners = "4.1"
+termcolor = "1.4"
+termtree = "0.5"
+text_trees = "0.1"
+url = "2.5"
+whoami = "1.6"
 
 git-url-parse = { workspace = true }
 git2 = { workspace = true }
@@ -51,11 +51,11 @@ toml = { workspace = true }
 tokio = { workspace = true }
 walkdir = { workspace = true }
 which = { workspace = true }
-emmylua_check = { version = "0.11.0", features = [] }
+emmylua_check = { version = "0.11", features = [] }
 
 [dev-dependencies]
-serial_test = { version = "3.2.0" }
-assert_fs = "1.1.3"
+serial_test = { version = "3.2" }
+assert_fs = "1.1"
 
 [dependencies.lux-lib]
 version = "0.21.1"
