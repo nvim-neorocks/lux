@@ -108,13 +108,6 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         if: "startsWith(matrix.os, 'windows')"
 
-      - name: Install Build Dependencies
-        run: |
-          $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\ProgramData\chocolatey\bin"
-          [Environment]::SetEnvironmentVariable("Path", $env:PATH, "Machine")
-          choco install -y --no-progress libgit2
-        if: "startsWith(matrix.os, 'windows')"
-
       - name: Build binary distributions (*nix)
         if: "!startsWith(matrix.os, 'windows')"
         run: |

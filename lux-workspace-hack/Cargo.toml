@@ -33,11 +33,13 @@ futures-channel = { version = "0.3", features = ["sink"] }
 futures-core = { version = "0.3" }
 futures-sink = { version = "0.3" }
 futures-util = { version = "0.3", features = ["channel", "io", "sink"] }
+git2 = { version = "0.20", features = ["vendored-libgit2"] }
 hashbrown = { version = "0.15" }
 hmac = { version = "0.12", default-features = false, features = ["reset"] }
 hyper = { version = "1", features = ["client", "http1", "http2", "server"] }
 hyper-util = { version = "0.1", features = ["client-legacy", "http1", "http2", "server"] }
 indexmap = { version = "1", default-features = false, features = ["std"] }
+libgit2-sys = { version = "0.18", default-features = false, features = ["https", "ssh", "vendored"] }
 lock_api = { version = "0.4", features = ["arc_lock"] }
 log = { version = "0.4", default-features = false, features = ["std"] }
 memchr = { version = "2" }
