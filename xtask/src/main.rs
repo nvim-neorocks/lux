@@ -87,6 +87,7 @@ fn build(opts: BuildOpts) -> Result<(), DynError> {
 
     let mut args = vec![
         "build".into(),
+        "--locked".into(),
         "--target-dir".into(),
         target_dir.to_string_lossy().to_string(),
     ];

@@ -87,6 +87,7 @@ pub fn dist(release: bool, opts: Option<DistOpts>) -> Result<(), DynError> {
 
     let mut args = vec![
         "build".into(),
+        "--locked".into(),
         "--target-dir".into(),
         target_dir.to_string_lossy().to_string(),
         "--no-default-features".into(),
