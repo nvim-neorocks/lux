@@ -61,4 +61,4 @@ jobs:
           CC_ENABLE_DEBUG_OUTPUT: true
           CFLAGS: "/NOLOGO /MT /O2"
         run: |
-          cargo nextest run --test "*" --no-fail-fast --features vendored
+          cargo nextest run --locked --test "*" --no-fail-fast --features vendored

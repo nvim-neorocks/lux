@@ -42,6 +42,7 @@ jobs:
         run: |
           nix develop .#${{ matrix.lua.feature }} \
             --command cargo nextest run \
+            --locked \
             --test "*" \
             --no-fail-fast \
             --features vendored
