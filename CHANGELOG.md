@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `lux-cli` - [0.15.2](https://github.com/nvim-neorocks/lux/compare/v0.15.1...v0.15.2) - 2025-08-17
+
+### Other
+- *(deps)* update ([#991](https://github.com/nvim-neorocks/lux/pull/991))
+- *(readme)* update
+- *(readme)* update
+
+## `lux-lib` - [0.21.2](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.21.1...lux-lib-v0.21.2) - 2025-08-17
+
+### Added
+- enable vendored libgit2 ([#992](https://github.com/nvim-neorocks/lux/pull/992))
+
+### Other
+- *(deps)* update ([#991](https://github.com/nvim-neorocks/lux/pull/991))
+- *(readme)* update
+- *(readme)* update
+
 ## [Unreleased]
 
 ## `lux-cli` - [0.15.1](https://github.com/nvim-neorocks/lux/compare/v0.15.0...v0.15.1) - 2025-08-16
