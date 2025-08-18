@@ -320,6 +320,8 @@ fn dist_package() -> Result<(), DynError> {
         .pacman(
             PacmanConfig::new()
                 .conflicts(["lux-cli-git"])
+                .depends(["glibc", "gcc-libs", "libgpg-error", "gpgme", "bzip2", "xz"])
+                .provides(["lx"])
                 .files(file_mappings),
         )
         .deb(DebianConfig::new().files(file_mappings))
