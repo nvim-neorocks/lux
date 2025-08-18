@@ -3019,7 +3019,7 @@ dependencies = [
  "hmac",
  "hyper",
  "hyper-util",
- "indexmap 1.9.3",
+ "indexmap 2.10.0",
  "libgit2-sys",
  "lock_api",
  "log",
