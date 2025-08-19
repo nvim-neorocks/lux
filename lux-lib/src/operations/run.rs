@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{ops::Deref, path::PathBuf};
 
 use bon::Builder;
 use itertools::Itertools;
@@ -77,6 +77,7 @@ pub enum RunError {
 #[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
 pub struct Run<'a> {
     project: &'a Project,
+    dir: Option<PathBuf>,
     args: &'a [String],
     config: &'a Config,
     disable_loader: Option<bool>,
@@ -107,15 +108,16 @@ where
         let disable_loader = run.disable_loader.unwrap_or(false);
         match &run_spec.command {
             Some(command) => {
-                run_with_command(project, command, disable_loader, &args, config).await
+                run_with_command(project, command, run.dir, disable_loader, &args, config).await
             }
-            None => run_with_local_lua(project, disable_loader, &args, config).await,
+            None => run_with_local_lua(project, run.dir, disable_loader, &args, config).await,
         }
     }
 }
 
 async fn run_with_local_lua(
     project: &Project,
+    root_dir: Option<PathBuf>,
     disable_loader: bool,
     args: &NonEmpty<String>,
     config: &Config,
@@ -126,7 +128,7 @@ async fn run_with_local_lua(
     let args = &args.into_iter().cloned().collect();
 
     RunLua::new()
-        .root(project.root())
+        .root(&root_dir.unwrap_or(project.root().to_path_buf()))
         .tree(&tree)
         .config(config)
         .lua_cmd(LuaBinary::new(version, config))
@@ -141,6 +143,7 @@ async fn run_with_local_lua(
 async fn run_with_command(
     project: &Project,
     command: &RunCommand,
+    root_dir: Option<PathBuf>,
     disable_loader: bool,
     args: &NonEmpty<String>,
     config: &Config,
@@ -162,9 +165,14 @@ async fn run_with_command(
         Some(paths.init())
     };
 
-    match Command::new(command.deref())
+    let mut cmd = Command::new(command.deref());
+    if let Some(dir) = root_dir {
+        cmd.current_dir(dir);
+    } else {
+        cmd.current_dir(project.root());
+    }
+    match cmd
         .args(args.into_iter().cloned().collect_vec())
-        .current_dir(project.root().deref())
         .env("PATH", paths.path_prepended().joined())
         .env("LUA_INIT", lua_init.unwrap_or_default())
         .env("LUA_PATH", paths.package_path().joined())
