@@ -12,6 +12,7 @@ use crate::{
         install_binary_rock::{BinaryRockInstall, InstallBinaryRockError},
         luarocks_installation::{LuaRocksError, LuaRocksInstallError, LuaRocksInstallation},
     },
+    operations::resolve::Resolve,
     package::{PackageName, PackageNameList},
     progress::{MultiProgress, Progress, ProgressBar},
     project::{Project, ProjectTreeError},
@@ -28,9 +29,7 @@ use futures::future::join_all;
 use itertools::Itertools;
 use thiserror::Error;
 
-use super::{
-    resolve::get_all_dependencies, DownloadedRockspec, RemoteRockDownload, SearchAndDownloadError,
-};
+use super::{DownloadedRockspec, RemoteRockDownload, SearchAndDownloadError};
 
 pub mod spec;
 
@@ -180,17 +179,17 @@ async fn install_impl(
     let lockfile = tree.lockfile()?;
     let build_lockfile = tree.build_tree(config)?.lockfile()?;
 
-    get_all_dependencies(
-        dep_tx,
-        build_dep_tx,
-        packages,
-        package_db.clone(),
-        Arc::new(lockfile.clone()),
-        Arc::new(build_lockfile.clone()),
-        config,
-        progress_arc.clone(),
-    )
-    .await?;
+    Resolve::new()
+        .dependencies_tx(dep_tx)
+        .build_dependencies_tx(build_dep_tx)
+        .packages(packages)
+        .package_db(package_db.clone())
+        .lockfile(Arc::new(lockfile.clone()))
+        .build_lockfile(Arc::new(build_lockfile.clone()))
+        .config(config)
+        .progress(progress_arc.clone())
+        .get_all_dependencies()
+        .await?;
 
     let lua = Arc::new(
         LuaInstallation::new_from_config(config, &progress_arc.map(|progress| progress.new_bar()))

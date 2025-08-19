@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use async_recursion::async_recursion;
+use bon::Builder;
 use futures::future::join_all;
 use itertools::Itertools;
 use tokio::sync::mpsc::UnboundedSender;
@@ -29,21 +30,51 @@ pub(crate) struct PackageInstallData {
     pub entry_type: tree::EntryType,
 }
 
-#[async_recursion]
-#[allow(clippy::too_many_arguments)]
-pub(crate) async fn get_all_dependencies<P>(
+#[derive(Builder)]
+#[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
+pub(crate) struct Resolve<'a, P>
+where
+    P: LockfilePermissions + Send + Sync + 'static,
+{
     dependencies_tx: UnboundedSender<PackageInstallData>,
     build_dependencies_tx: UnboundedSender<PackageInstallData>,
     packages: Vec<PackageInstallSpec>,
     package_db: Arc<RemotePackageDB>,
     lockfile: Arc<Lockfile<P>>,
     build_lockfile: Arc<Lockfile<P>>,
-    config: &Config,
+    config: &'a Config,
     progress: Arc<Progress<MultiProgress>>,
-) -> Result<Vec<LocalPackageId>, SearchAndDownloadError>
+}
+
+impl<P, State> ResolveBuilder<'_, P, State>
 where
     P: LockfilePermissions + Send + Sync + 'static,
+    State: resolve_builder::State + resolve_builder::IsComplete,
 {
+    pub(crate) async fn get_all_dependencies(
+        self,
+    ) -> Result<Vec<LocalPackageId>, SearchAndDownloadError> {
+        let args = self._build();
+        do_get_all_dependencies(args).await
+    }
+}
+
+#[async_recursion]
+async fn do_get_all_dependencies<'a, P>(
+    args: Resolve<'a, P>,
+) -> Result<Vec<LocalPackageId>, SearchAndDownloadError>
+where
+    'a: 'async_recursion,
+    P: LockfilePermissions + Send + Sync + 'static,
+{
+    let dependencies_tx = args.dependencies_tx;
+    let build_dependencies_tx = args.build_dependencies_tx;
+    let packages = args.packages;
+    let package_db = args.package_db;
+    let lockfile = args.lockfile;
+    let build_lockfile = args.build_lockfile;
+    let config = args.config;
+    let progress = args.progress;
     join_all(
         packages
             .into_iter()
@@ -118,17 +149,17 @@ where
 
                             // NOTE: We treat transitive regular dependencies of build dependencies
                             // as build dependencies
-                            get_all_dependencies(
-                                build_dependencies_tx.clone(),
-                                build_dependencies_tx.clone(),
-                                build_dependencies,
-                                package_db.clone(),
-                                build_lockfile.clone(),
-                                build_lockfile.clone(),
-                                &config,
-                                build_dep_progress,
-                            )
-                            .await?;
+                            Resolve::new()
+                                .dependencies_tx(build_dependencies_tx.clone())
+                                .build_dependencies_tx(build_dependencies_tx.clone())
+                                .packages(build_dependencies)
+                                .package_db(package_db.clone())
+                                .lockfile(build_lockfile.clone())
+                                .build_lockfile(build_lockfile.clone())
+                                .config(&config)
+                                .progress(build_dep_progress)
+                                .get_all_dependencies()
+                                .await?;
                         }
 
                         let dependencies = rockspec
@@ -158,17 +189,17 @@ where
                             })
                             .collect_vec();
 
-                        let dependencies = get_all_dependencies(
-                            dependencies_tx.clone(),
-                            build_dependencies_tx,
-                            dependencies,
-                            package_db,
-                            lockfile,
-                            build_lockfile,
-                            &config,
-                            progress,
-                        )
-                        .await?;
+                        let dependencies = Resolve::new()
+                            .dependencies_tx(dependencies_tx.clone())
+                            .build_dependencies_tx(build_dependencies_tx)
+                            .packages(dependencies)
+                            .package_db(package_db)
+                            .lockfile(lockfile)
+                            .build_lockfile(build_lockfile)
+                            .config(&config)
+                            .progress(progress)
+                            .get_all_dependencies()
+                            .await?;
 
                         let rockspec = downloaded_rock.rockspec();
                         let local_spec = LocalPackageSpec::new(
