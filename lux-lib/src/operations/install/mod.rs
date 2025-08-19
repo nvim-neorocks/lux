@@ -12,6 +12,7 @@ use crate::{
         install_binary_rock::{BinaryRockInstall, InstallBinaryRockError},
         luarocks_installation::{LuaRocksError, LuaRocksInstallError, LuaRocksInstallation},
     },
+    operations::resolve::{Resolve, ResolveDependenciesError},
     package::{PackageName, PackageNameList},
     progress::{MultiProgress, Progress, ProgressBar},
     project::{Project, ProjectTreeError},
@@ -28,9 +29,7 @@ use futures::future::join_all;
 use itertools::Itertools;
 use thiserror::Error;
 
-use super::{
-    resolve::get_all_dependencies, DownloadedRockspec, RemoteRockDownload, SearchAndDownloadError,
-};
+use super::{DownloadedRockspec, RemoteRockDownload};
 
 pub mod spec;
 
@@ -135,8 +134,8 @@ where
 
 #[derive(Error, Debug)]
 pub enum InstallError {
-    #[error(transparent)]
-    SearchAndDownloadError(#[from] SearchAndDownloadError),
+    #[error("unable to resolve dependencies:\n{0}")]
+    ResolveDependencies(#[from] ResolveDependenciesError),
     #[error(transparent)]
     LuaVersionUnset(#[from] LuaVersionUnset),
     #[error(transparent)]
@@ -145,23 +144,23 @@ pub enum InstallError {
     Io(#[from] io::Error),
     #[error(transparent)]
     Tree(#[from] TreeError),
-    #[error("error instantiating LuaRocks compatibility layer: {0}")]
+    #[error("error instantiating LuaRocks compatibility layer:\n{0}")]
     LuaRocksError(#[from] LuaRocksError),
-    #[error("error installing LuaRocks compatibility layer: {0}")]
+    #[error("error installing LuaRocks compatibility layer:\n{0}")]
     LuaRocksInstallError(#[from] LuaRocksInstallError),
     #[error("failed to build {0}: {1}")]
     BuildError(PackageName, BuildError),
-    #[error("failed to install build depencency {0}: {1}")]
+    #[error("failed to install build depencency {0}:\n{1}")]
     BuildDependencyError(PackageName, BuildError),
-    #[error("error initialising remote package DB: {0}")]
+    #[error("error initialising remote package DB:\n{0}")]
     RemotePackageDB(#[from] RemotePackageDBError),
-    #[error("failed to install pre-built rock {0}: {1}")]
+    #[error("failed to install pre-built rock {0}:\n{1}")]
     InstallBinaryRockError(PackageName, InstallBinaryRockError),
-    #[error("integrity error for package {0}: {1}\n")]
+    #[error("integrity error for package {0}:\n{1}")]
     Integrity(PackageName, RemotePackageDbIntegrityError),
     #[error(transparent)]
     ProjectTreeError(#[from] ProjectTreeError),
-    #[error("cannot install duplicate entrypoints: {0}")]
+    #[error("cannot install duplicate entrypoints:\n{0}")]
     DuplicateEntrypoints(PackageNameList),
 }
 
@@ -180,17 +179,17 @@ async fn install_impl(
     let lockfile = tree.lockfile()?;
     let build_lockfile = tree.build_tree(config)?.lockfile()?;
 
-    get_all_dependencies(
-        dep_tx,
-        build_dep_tx,
-        packages,
-        package_db.clone(),
-        Arc::new(lockfile.clone()),
-        Arc::new(build_lockfile.clone()),
-        config,
-        progress_arc.clone(),
-    )
-    .await?;
+    Resolve::new()
+        .dependencies_tx(dep_tx)
+        .build_dependencies_tx(build_dep_tx)
+        .packages(packages)
+        .package_db(package_db.clone())
+        .lockfile(Arc::new(lockfile.clone()))
+        .build_lockfile(Arc::new(build_lockfile.clone()))
+        .config(config)
+        .progress(progress_arc.clone())
+        .get_all_dependencies()
+        .await?;
 
     let lua = Arc::new(
         LuaInstallation::new_from_config(config, &progress_arc.map(|progress| progress.new_bar()))
