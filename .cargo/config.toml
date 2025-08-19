@@ -14,16 +14,9 @@ dist = "run --package xtask -- dist"
 
 # lux-lua needs this to build in module mode
 [target.aarch64-apple-darwin]
-rustflags = [
-  "-C", "link-arg=-undefined",
-  "-C", "link-arg=dynamic_lookup",
-]
+rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
 
 [target.x86_64-pc-windows-msvc]
-rustflags = [
-  "-C", "target-feature=+crt-static",
-]
+rustflags = ["-C", "target-feature=+crt-static"]
 [target.aarch64-pc-windows-msvc]
-rustflags = [
-  "-C", "target-feature=+crt-static",
-]
+rustflags = ["-C", "target-feature=+crt-static"]

@@ -80,22 +80,18 @@
                 ])
                 ++ self.checks.${system}.git-hooks-check.enabledPackages
                 ++ (lib.filter (pkg: !(lib.hasPrefix "lua" pkg.name)) pkgs.lux-cli.buildInputs)
-                ++ pkgs.lux-cli.nativeBuildInputs;
+                ++ (lib.filter (pkg: !(lib.hasPrefix "xtask" pkg.name)) pkgs.lux-cli.nativeBuildInputs);
             };
 
           mkBuildShell = pkgs':
             pkgs'.mkShell {
               name = "lux buildShell";
               buildInputs =
-                (
-                  lib.filter
-                  (pkg: !(lib.hasPrefix "lua" pkg.name))
-                  pkgs'.lux-cli.buildInputs
-                )
+                (lib.filter (pkg: !(lib.hasPrefix "lua" pkg.name)) pkgs'.lux-cli.buildInputs)
                 ++ pkgs'.lux-cli.nativeBuildInputs;
             };
         in rec {
-          default = lua54;
+          default = lua51;
           lua51 = mkDevShell [pkgs.lua5_1];
           lua52 = mkDevShell [pkgs.lua5_2];
           lua53 = mkDevShell [pkgs.lua5_3];

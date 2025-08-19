@@ -12,7 +12,7 @@ use crate::{
         install_binary_rock::{BinaryRockInstall, InstallBinaryRockError},
         luarocks_installation::{LuaRocksError, LuaRocksInstallError, LuaRocksInstallation},
     },
-    operations::resolve::Resolve,
+    operations::resolve::{Resolve, ResolveDependenciesError},
     package::{PackageName, PackageNameList},
     progress::{MultiProgress, Progress, ProgressBar},
     project::{Project, ProjectTreeError},
@@ -29,7 +29,7 @@ use futures::future::join_all;
 use itertools::Itertools;
 use thiserror::Error;
 
-use super::{DownloadedRockspec, RemoteRockDownload, SearchAndDownloadError};
+use super::{DownloadedRockspec, RemoteRockDownload};
 
 pub mod spec;
 
@@ -134,8 +134,8 @@ where
 
 #[derive(Error, Debug)]
 pub enum InstallError {
-    #[error(transparent)]
-    SearchAndDownloadError(#[from] SearchAndDownloadError),
+    #[error("unable to resolve dependencies:\n{0}")]
+    ResolveDependencies(#[from] ResolveDependenciesError),
     #[error(transparent)]
     LuaVersionUnset(#[from] LuaVersionUnset),
     #[error(transparent)]
@@ -144,23 +144,23 @@ pub enum InstallError {
     Io(#[from] io::Error),
     #[error(transparent)]
     Tree(#[from] TreeError),
-    #[error("error instantiating LuaRocks compatibility layer: {0}")]
+    #[error("error instantiating LuaRocks compatibility layer:\n{0}")]
     LuaRocksError(#[from] LuaRocksError),
-    #[error("error installing LuaRocks compatibility layer: {0}")]
+    #[error("error installing LuaRocks compatibility layer:\n{0}")]
     LuaRocksInstallError(#[from] LuaRocksInstallError),
     #[error("failed to build {0}: {1}")]
     BuildError(PackageName, BuildError),
-    #[error("failed to install build depencency {0}: {1}")]
+    #[error("failed to install build depencency {0}:\n{1}")]
     BuildDependencyError(PackageName, BuildError),
-    #[error("error initialising remote package DB: {0}")]
+    #[error("error initialising remote package DB:\n{0}")]
     RemotePackageDB(#[from] RemotePackageDBError),
-    #[error("failed to install pre-built rock {0}: {1}")]
+    #[error("failed to install pre-built rock {0}:\n{1}")]
     InstallBinaryRockError(PackageName, InstallBinaryRockError),
-    #[error("integrity error for package {0}: {1}\n")]
+    #[error("integrity error for package {0}:\n{1}")]
     Integrity(PackageName, RemotePackageDbIntegrityError),
     #[error(transparent)]
     ProjectTreeError(#[from] ProjectTreeError),
-    #[error("cannot install duplicate entrypoints: {0}")]
+    #[error("cannot install duplicate entrypoints:\n{0}")]
     DuplicateEntrypoints(PackageNameList),
 }
 

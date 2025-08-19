@@ -1,9 +1,10 @@
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
 use async_recursion::async_recursion;
 use bon::Builder;
 use futures::future::join_all;
 use itertools::Itertools;
+use thiserror::Error;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
@@ -12,6 +13,7 @@ use crate::{
     lockfile::{
         LocalPackageId, LocalPackageSpec, Lockfile, LockfilePermissions, OptState, PinnedState,
     },
+    package::PackageName,
     progress::{MultiProgress, Progress},
     remote_package_db::RemotePackageDB,
     rockspec::Rockspec,
@@ -19,6 +21,23 @@ use crate::{
 };
 
 use super::{Download, PackageInstallSpec, RemoteRockDownload, SearchAndDownloadError};
+
+#[derive(Error, Debug)]
+pub enum ResolveDependenciesError {
+    #[error(transparent)]
+    SearchAndDownload(#[from] SearchAndDownloadError),
+    #[error("cyclic dependency detected:\n{0}")]
+    CyclicDependency(DependencyCycle),
+}
+
+#[derive(Debug)]
+pub struct DependencyCycle(Vec<PackageName>);
+
+impl Display for DependencyCycle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.iter().join(" -> ").fmt(f)
+    }
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct PackageInstallData {
@@ -40,6 +59,7 @@ where
     build_dependencies_tx: UnboundedSender<PackageInstallData>,
     packages: Vec<PackageInstallSpec>,
     package_db: Arc<RemotePackageDB>,
+    parent_packages: Option<Arc<Vec<PackageName>>>,
     lockfile: Arc<Lockfile<P>>,
     build_lockfile: Arc<Lockfile<P>>,
     config: &'a Config,
@@ -53,7 +73,7 @@ where
 {
     pub(crate) async fn get_all_dependencies(
         self,
-    ) -> Result<Vec<LocalPackageId>, SearchAndDownloadError> {
+    ) -> Result<Vec<LocalPackageId>, ResolveDependenciesError> {
         let args = self._build();
         do_get_all_dependencies(args).await
     }
@@ -62,7 +82,7 @@ where
 #[async_recursion]
 async fn do_get_all_dependencies<'a, P>(
     args: Resolve<'a, P>,
-) -> Result<Vec<LocalPackageId>, SearchAndDownloadError>
+) -> Result<Vec<LocalPackageId>, ResolveDependenciesError>
 where
     'a: 'async_recursion,
     P: LockfilePermissions + Send + Sync + 'static,
@@ -70,6 +90,7 @@ where
     let dependencies_tx = args.dependencies_tx;
     let build_dependencies_tx = args.build_dependencies_tx;
     let packages = args.packages;
+    let parent_packages = args.parent_packages.unwrap_or_default();
     let package_db = args.package_db;
     let lockfile = args.lockfile;
     let build_lockfile = args.build_lockfile;
@@ -103,6 +124,7 @@ where
                     let config = config.clone();
                     let dependencies_tx = dependencies_tx.clone();
                     let build_dependencies_tx = build_dependencies_tx.clone();
+                    let parent_packages = Arc::clone(&parent_packages);
                     let package_db = Arc::clone(&package_db);
                     let progress = Arc::clone(&progress);
                     let build_dep_progress = Arc::clone(&progress);
@@ -127,6 +149,18 @@ where
                         let constraint = constraint.unwrap_or(package.version_req().clone().into());
 
                         let rockspec = downloaded_rock.rockspec();
+
+                        if parent_packages.contains(rockspec.package()) {
+                            return Err(ResolveDependenciesError::CyclicDependency(
+                                DependencyCycle(
+                                    parent_packages
+                                        .iter()
+                                        .cloned()
+                                        .chain(std::iter::once(rockspec.package().clone()))
+                                        .collect_vec(),
+                                ),
+                            ));
+                        }
 
                         // NOTE: We don't need to install build dependencies to install binary rocks.
                         if !matches!(downloaded_rock, RemoteRockDownload::BinaryRock { .. }) {
@@ -153,6 +187,13 @@ where
                                 .dependencies_tx(build_dependencies_tx.clone())
                                 .build_dependencies_tx(build_dependencies_tx.clone())
                                 .packages(build_dependencies)
+                                .parent_packages(Arc::new(
+                                    parent_packages
+                                        .iter()
+                                        .cloned()
+                                        .chain(std::iter::once(rockspec.package().clone()))
+                                        .collect_vec(),
+                                ))
                                 .package_db(package_db.clone())
                                 .lockfile(build_lockfile.clone())
                                 .build_lockfile(build_lockfile.clone())
@@ -193,6 +234,13 @@ where
                             .dependencies_tx(dependencies_tx.clone())
                             .build_dependencies_tx(build_dependencies_tx)
                             .packages(dependencies)
+                            .parent_packages(Arc::new(
+                                parent_packages
+                                    .iter()
+                                    .cloned()
+                                    .chain(std::iter::once(rockspec.package().clone()))
+                                    .collect_vec(),
+                            ))
                             .package_db(package_db)
                             .lockfile(lockfile)
                             .build_lockfile(build_lockfile)
@@ -223,7 +271,7 @@ where
 
                         dependencies_tx.send(install_spec).unwrap();
 
-                        Ok::<_, SearchAndDownloadError>(local_spec.id())
+                        Ok::<_, ResolveDependenciesError>(local_spec.id())
                     })
                 },
             ),
