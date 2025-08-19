@@ -5,7 +5,7 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use crate::{
-    lockfile::{LocalPackageId, PinnedState},
+    lockfile::{FlushLockfileError, LocalPackageId, PinnedState},
     package::PackageSpec,
     tree::{Tree, TreeError},
 };
@@ -27,13 +27,17 @@ pub enum PinError {
         rock: PackageSpec,
     },
     #[error(transparent)]
-    Io(#[from] io::Error),
+    FlushLockfile(#[from] FlushLockfileError),
     #[error(transparent)]
     Tree(#[from] TreeError),
     #[error("failed to move old package: {0}")]
     MoveItemsFailure(#[from] fs_extra::error::Error),
     #[error("cannot change pin state of {rock}, because it is not an entrypoint")]
     NotAnEntrypoint { rock: PackageSpec },
+    #[error("error reading directory {0}:\n{1}")]
+    ReadDir(String, io::Error),
+    #[error("error creating directory {0}:\n{1}")]
+    CreateDir(String, io::Error),
 }
 
 pub fn set_pinned_state(
@@ -61,7 +65,9 @@ pub fn set_pinned_state(
     }
 
     let old_package = package.clone();
-    let items = std::fs::read_dir(tree.root_for(&package))?
+    let package_root = tree.root_for(&package);
+    let items = std::fs::read_dir(&package_root)
+        .map_err(|err| PinError::ReadDir(package_root.to_string_lossy().to_string(), err))?
         .filter_map(Result::ok)
         .map(|dir| dir.path())
         .collect_vec();
@@ -77,7 +83,8 @@ pub fn set_pinned_state(
 
     let new_root = tree.root_for(&package);
 
-    std::fs::create_dir_all(&new_root)?;
+    std::fs::create_dir_all(&new_root)
+        .map_err(|err| PinError::CreateDir(new_root.to_string_lossy().to_string(), err))?;
 
     fs_extra::move_items(&items, new_root, &CopyOptions::new())?;
 

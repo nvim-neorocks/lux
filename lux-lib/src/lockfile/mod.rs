@@ -865,6 +865,13 @@ pub enum LockfileIntegrityError {
     PackageNotFound(PackageName, PackageVersion, PinnedState, String),
 }
 
+#[derive(Error, Debug)]
+#[error("error flushing the lockfile ({filepath}):\n{cause}")]
+pub struct FlushLockfileError {
+    filepath: String,
+    cause: io::Error,
+}
+
 /// A specification for syncing a list of packages with a lockfile
 #[derive(Debug, Default)]
 pub(crate) struct PackageSyncSpec {
@@ -995,12 +1002,16 @@ impl<P: LockfilePermissions> Lockfile<P> {
         }
     }
 
-    fn flush(&self) -> io::Result<()> {
-        let content = serde_json::to_string_pretty(&self)?;
+    fn flush(&self) -> Result<(), FlushLockfileError> {
+        let content = serde_json::to_string_pretty(&self).map_err(|err| FlushLockfileError {
+            filepath: self.filepath.to_string_lossy().to_string(),
+            cause: io::Error::other(err),
+        })?;
 
-        std::fs::write(&self.filepath, content)?;
-
-        Ok(())
+        std::fs::write(&self.filepath, content).map_err(|err| FlushLockfileError {
+            filepath: self.filepath.to_string_lossy().to_string(),
+            cause: err,
+        })
     }
 }
 
@@ -1133,15 +1144,19 @@ impl Lockfile<ReadOnly> {
 
     /// Converts the current lockfile into a writeable one, executes `cb` and flushes
     /// the lockfile.
-    pub fn map_then_flush<T, F, E>(self, cb: F) -> Result<T, E>
+    pub fn map_then_flush<T, F, E>(self, cb: F) -> Result<T, FlushLockfileError>
     where
         F: FnOnce(&mut Lockfile<ReadWrite>) -> Result<T, E>,
         E: Error,
         E: From<io::Error>,
+        E: Into<Box<dyn Error + Send + Sync>>,
     {
         let mut writeable_lockfile = self.into_temporary();
 
-        let result = cb(&mut writeable_lockfile)?;
+        let result = cb(&mut writeable_lockfile).map_err(|err| FlushLockfileError {
+            filepath: writeable_lockfile.filepath.to_string_lossy().to_string(),
+            cause: io::Error::other(err),
+        })?;
 
         writeable_lockfile.flush()?;
 
