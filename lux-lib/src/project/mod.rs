@@ -50,7 +50,12 @@ const EMMYRC: &str = ".emmyrc.json";
 #[derive(Error, Debug)]
 #[error(transparent)]
 pub enum ProjectError {
-    Io(#[from] io::Error),
+    #[error("cannot get current directory: {0}")]
+    GetCwd(io::Error),
+    #[error("error reading project TOML at {0}:\n{1}")]
+    ReadProjectTOML(String, io::Error),
+    #[error("error creating project root at {0}:\n{1}")]
+    CreateProjectRoot(String, io::Error),
     Lockfile(#[from] LockfileError),
     Project(#[from] LocalProjectTomlValidationError),
     Toml(#[from] toml::de::Error),
@@ -247,7 +252,8 @@ impl UserData for Project {
 
 impl Project {
     pub fn current() -> Result<Option<Self>, ProjectError> {
-        Self::from(&std::env::current_dir()?)
+        let cwd = std::env::current_dir().map_err(ProjectError::GetCwd)?;
+        Self::from(&cwd)
     }
 
     pub fn current_or_err() -> Result<Self, ProjectError> {
@@ -260,7 +266,10 @@ impl Project {
         }
 
         if start.as_ref().join(PROJECT_TOML).exists() {
-            let toml_content = std::fs::read_to_string(start.as_ref().join(PROJECT_TOML))?;
+            let project_toml_path = start.as_ref().join(PROJECT_TOML);
+            let toml_content = std::fs::read_to_string(&project_toml_path).map_err(|err| {
+                ProjectError::ReadProjectTOML(project_toml_path.to_string_lossy().to_string(), err)
+            })?;
             let root = start.as_ref();
 
             let mut project = Project {
@@ -291,7 +300,10 @@ impl Project {
             },
         ) {
             Ok(Some(path)) => {
-                let toml_content = std::fs::read_to_string(&path)?;
+                let toml_content = std::fs::read_to_string(&path).map_err(|err| {
+                    ProjectError::ReadProjectTOML(path.to_string_lossy().to_string(), err)
+                })?;
+
                 let root = path.parent().unwrap();
 
                 let mut project = Project {
@@ -303,7 +315,9 @@ impl Project {
                     project.toml = project.toml.merge(extra_rockspec);
                 }
 
-                std::fs::create_dir_all(root)?;
+                std::fs::create_dir_all(root).map_err(|err| {
+                    ProjectError::CreateProjectRoot(root.to_string_lossy().to_string(), err)
+                })?;
 
                 Ok(Some(project))
             }

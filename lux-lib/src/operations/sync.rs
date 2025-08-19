@@ -3,7 +3,7 @@ use std::{io, sync::Arc};
 use crate::{
     build::BuildBehaviour,
     config::Config,
-    lockfile::{LocalPackage, LocalPackageLockType, LockfileIntegrityError},
+    lockfile::{FlushLockfileError, LocalPackage, LocalPackageLockType, LockfileIntegrityError},
     luarocks::luarocks_installation::LUAROCKS_VERSION,
     operations::{self, GenLuaRcError},
     package::{PackageName, PackageReq},
@@ -109,7 +109,9 @@ pub struct SyncReport {
 #[derive(Error, Debug)]
 pub enum SyncError {
     #[error(transparent)]
-    Io(#[from] io::Error),
+    FlushLockfile(#[from] FlushLockfileError),
+    #[error("failed to create install tree at {0}:\n{1}")]
+    FailedToCreateDirectory(String, io::Error),
     #[error(transparent)]
     Tree(#[from] TreeError),
     #[error(transparent)]
@@ -137,7 +139,9 @@ async fn do_sync(
         LocalPackageLockType::Test => args.project.test_tree(args.config)?,
         LocalPackageLockType::Build => args.project.build_tree(args.config)?,
     };
-    std::fs::create_dir_all(tree.root())?;
+    std::fs::create_dir_all(tree.root()).map_err(|err| {
+        SyncError::FailedToCreateDirectory(tree.root().to_string_lossy().to_string(), err)
+    })?;
 
     let mut project_lockfile = args.project.lockfile()?.write_guard();
     let dest_lockfile = tree.lockfile()?;
@@ -227,11 +231,11 @@ async fn do_sync(
         .await?;
 
     // Read the destination lockfile after installing
-    let dest_lockfile = tree.lockfile()?;
+    let install_tree_lockfile = tree.lockfile()?;
 
     if args.validate_integrity.unwrap_or(true) {
         for (_, package) in &to_add {
-            dest_lockfile
+            install_tree_lockfile
                 .validate_integrity(package)
                 .map_err(|err| SyncError::Integrity(package.name().clone(), err))?;
         }
@@ -250,9 +254,9 @@ async fn do_sync(
         .remove()
         .await?;
 
-    dest_lockfile.map_then_flush(|lockfile| -> Result<(), io::Error> {
+    install_tree_lockfile.map_then_flush(|lockfile| {
         lockfile.sync(project_lockfile.local_pkg_lock(lock_type));
-        Ok(())
+        Ok::<_, io::Error>(())
     })?;
 
     if !package_sync_spec.to_add.is_empty() {

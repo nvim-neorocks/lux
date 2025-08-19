@@ -4,7 +4,8 @@ use crate::{
     build::{Build, BuildBehaviour, BuildError, RemotePackageSourceSpec, SrcRockSource},
     config::{Config, LuaVersionUnset},
     lockfile::{
-        LocalPackage, LocalPackageId, LockConstraint, Lockfile, OptState, PinnedState, ReadWrite,
+        FlushLockfileError, LocalPackage, LocalPackageId, LockConstraint, Lockfile, OptState,
+        PinnedState, ReadWrite,
     },
     lua_installation::{LuaInstallation, LuaInstallationError},
     lua_rockspec::BuildBackendSpec,
@@ -141,7 +142,7 @@ pub enum InstallError {
     #[error(transparent)]
     LuaInstallation(#[from] LuaInstallationError),
     #[error(transparent)]
-    Io(#[from] io::Error),
+    FlushLockfile(#[from] FlushLockfileError),
     #[error(transparent)]
     Tree(#[from] TreeError),
     #[error("error instantiating LuaRocks compatibility layer:\n{0}")]
@@ -341,7 +342,6 @@ async fn install_impl(
             .for_each(|(id, (pkg, is_entrypoint))| {
                 write_dependency(lockfile, id, pkg, *is_entrypoint)
             });
-
         Ok::<_, io::Error>(())
     })?;
 

@@ -42,8 +42,10 @@ pub struct Tree {
 
 #[derive(Debug, Error)]
 pub enum TreeError {
-    #[error(transparent)]
-    Io(#[from] io::Error),
+    #[error("unable to create directory {0}:\n{1}")]
+    CreateDir(String, io::Error),
+    #[error("unable to write to {0}:\n{1}")]
+    WriteFile(String, io::Error),
     #[error(transparent)]
     Lockfile(#[from] LockfileError),
 }
@@ -136,13 +138,21 @@ impl Tree {
         let path_with_version = root.join(version.to_string());
 
         // Ensure that the root and the version directory exist.
-        std::fs::create_dir_all(&path_with_version)?;
+        std::fs::create_dir_all(&path_with_version).map_err(|err| {
+            TreeError::CreateDir(path_with_version.to_string_lossy().to_string(), err)
+        })?;
 
         // In case the tree is in a git repository, we tell git to ignore it.
-        std::fs::write(root.join(".gitignore"), "*")?;
+        let gitignore_file = root.join(".gitignore");
+        std::fs::write(&gitignore_file, "*").map_err(|err| {
+            TreeError::WriteFile(gitignore_file.to_string_lossy().to_string(), err)
+        })?;
 
         // Ensure that the bin directory exists.
-        std::fs::create_dir_all(path_with_version.join("bin"))?;
+        let bin_dir = path_with_version.join("bin");
+        std::fs::create_dir_all(&bin_dir)
+            .map_err(|err| TreeError::CreateDir(bin_dir.to_string_lossy().to_string(), err))?;
+
         let lockfile_path = root.join(LOCKFILE_NAME);
         let rock_layout_config = if lockfile_path.is_file() {
             let lockfile = Lockfile::load(lockfile_path, None)?;
