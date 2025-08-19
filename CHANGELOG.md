@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `lux-cli` - [0.15.3](https://github.com/nvim-neorocks/lux/compare/v0.15.2...v0.15.3) - 2025-08-19
+
+### Other
+- *(deps)* bump spdx from 0.11.1 to 0.12.0 ([#1000](https://github.com/nvim-neorocks/lux/pull/1000))
+
+## `lux-lib` - [0.22.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.21.2...lux-lib-v0.22.0) - 2025-08-19
+
+### Added
+- [**breaking**] more descriptive IO error messages ([#1001](https://github.com/nvim-neorocks/lux/pull/1001))
+- [**breaking**] catch cyclic dependencies ([#996](https://github.com/nvim-neorocks/lux/pull/996))
+
 ## `lux-cli` - [0.15.2](https://github.com/nvim-neorocks/lux/compare/v0.15.1...v0.15.2) - 2025-08-17
 
 ### Other
