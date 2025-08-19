@@ -812,7 +812,7 @@ mod tests {
 
         let rockspec_content = "
         package = 'rocks.nvim'\n
-        version = '3.0.0-1'\n
+        version = '3.0.1-1'\n
         description = {\n
             summary = 'some summary',
             detailed = 'some detailed description',
@@ -1646,7 +1646,7 @@ mod tests {
                 ["wsapi"] = "src/wsapi.lua",
               },
               -- Offending Line
-              install = { bin = { "src/launcher/wsapi.cgi" } }
+              install = { bin = { "src/launcher/wsapi.gi" } }
             }
         "#;
 
@@ -1670,7 +1670,7 @@ mod tests {
                     .local
                     .external_dependencies
                     .current_platform()
-                    .get("OPENSSL")
+                    .get("OPENSS")
                     .unwrap(),
                 &ExternalDependencySpec {
                     library: Some("ssl".into()),
@@ -1693,7 +1693,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn remote_lua_rockspec_from_package_and_source_spec() {
-        let package_req = "foo@1.0.5".parse().unwrap();
+        let package_req = "fo@1.0.5".parse().unwrap();
         let source = GitSource {
             url: "https://hub.com/example-project.git".parse().unwrap(),
             checkout_ref: Some("1.0.5".into()),
