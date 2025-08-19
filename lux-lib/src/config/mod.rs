@@ -225,7 +225,6 @@ pub struct Config {
     lua_dir: Option<PathBuf>,
     lua_version: Option<LuaVersion>,
     user_tree: PathBuf,
-    no_project: bool,
     verbose: bool,
     timeout: Duration,
     variables: HashMap<String, String>,
@@ -308,10 +307,6 @@ impl Config {
     /// If installing packges for a project, use `Project::tree` instead.
     pub fn user_tree(&self, version: LuaVersion) -> Result<Tree, TreeError> {
         Tree::new(self.user_tree.clone(), version, self)
-    }
-
-    pub fn no_project(&self) -> bool {
-        self.no_project
     }
 
     pub fn verbose(&self) -> bool {
@@ -402,7 +397,6 @@ pub struct ConfigBuilder {
     lua_dir: Option<PathBuf>,
     cache_dir: Option<PathBuf>,
     data_dir: Option<PathBuf>,
-    no_project: Option<bool>,
     enable_development_packages: Option<bool>,
     verbose: Option<bool>,
     timeout: Option<Duration>,
@@ -492,13 +486,6 @@ impl ConfigBuilder {
         }
     }
 
-    pub fn no_project(self, no_project: Option<bool>) -> Self {
-        Self {
-            no_project: no_project.or(self.no_project),
-            ..self
-        }
-    }
-
     pub fn variables(self, variables: Option<HashMap<String, String>>) -> Self {
         Self {
             variables: variables.or(self.variables),
@@ -568,7 +555,6 @@ impl ConfigBuilder {
             lua_dir: self.lua_dir,
             lua_version,
             user_tree,
-            no_project: self.no_project.unwrap_or(false),
             verbose: self.verbose.unwrap_or(false),
             timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(30)),
             variables: default_variables()
@@ -595,7 +581,6 @@ impl From<Config> for ConfigBuilder {
             lua_dir: value.lua_dir,
             lua_version: value.lua_version,
             user_tree: Some(value.user_tree),
-            no_project: Some(value.no_project),
             verbose: Some(value.verbose),
             timeout: Some(value.timeout),
             variables: Some(value.variables),
@@ -702,7 +687,6 @@ impl UserData for Config {
         methods.add_method("user_tree", |_, this, lua_version: LuaVersion| {
             this.user_tree(lua_version).into_lua_err()
         });
-        methods.add_method("no_project", |_, this, ()| Ok(this.no_project()));
         methods.add_method("verbose", |_, this, ()| Ok(this.verbose()));
         methods.add_method("timeout", |_, this, ()| Ok(this.timeout().as_secs()));
         methods.add_method("cache_dir", |_, this, ()| Ok(this.cache_dir().clone()));
@@ -755,9 +739,6 @@ impl UserData for ConfigBuilder {
         });
         methods.add_method("user_tree", |_, this, tree: Option<PathBuf>| {
             Ok(this.clone().user_tree(tree))
-        });
-        methods.add_method("no_project", |_, this, no_project: Option<bool>| {
-            Ok(this.clone().no_project(no_project))
         });
         methods.add_method("verbose", |_, this, verbose: Option<bool>| {
             Ok(this.clone().verbose(verbose))

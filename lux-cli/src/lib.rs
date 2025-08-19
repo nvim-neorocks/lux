@@ -114,10 +114,6 @@ pub struct Cli {
     #[arg(long, value_name = "path")]
     pub cache_path: Option<PathBuf>,
 
-    /// Do not use project tree even if running from a project folder.
-    #[arg(long)]
-    pub no_project: bool,
-
     /// Override config variables.{n}
     /// Example: `lx -v "LUA=/path/to/lua" ...`
     #[arg(long, value_name = "variable", visible_short_aliases = ['v'], value_parser = parse_key_val::<String, String>)]
