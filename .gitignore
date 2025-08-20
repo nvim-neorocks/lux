@@ -23,7 +23,6 @@
 # Lux project files
 /.lux/*
 /lux.lock
-/lux.toml
 /spec/
 /.busted
 /*.rock
