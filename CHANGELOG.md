@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `lux-cli` - [0.15.4](https://github.com/nvim-neorocks/lux/compare/v0.15.3...v0.15.4) - 2025-08-20
+
+### Added
+- `--max-jobs` flag to limit parallel builds ([#1013](https://github.com/nvim-neorocks/lux/pull/1013))
+- don't install luarocks build backends that aren't needed
+- *(generate-rockspec)* add `build_dependencies` if necessary
+
+### Other
+- correct typo
+- *(readme)* update building from source section
+
+## `lux-lib` - [0.22.1](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.22.0...lux-lib-v0.22.1) - 2025-08-20
+
+### Added
+- `--max-jobs` flag to limit parallel builds ([#1013](https://github.com/nvim-neorocks/lux/pull/1013))
+- don't install luarocks build backends that aren't needed
+- *(generate-rockspec)* add `build_dependencies` if necessary
+
+### Other
+- upload lux-lua artifacts ([#1012](https://github.com/nvim-neorocks/lux/pull/1012))
+- correct typo
+- *(readme)* update building from source section
+
 ## `lux-cli` - [0.15.3](https://github.com/nvim-neorocks/lux/compare/v0.15.2...v0.15.3) - 2025-08-19
 
 ### Other
