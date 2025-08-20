@@ -26,7 +26,10 @@ use thiserror::Error;
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
-use crate::{package::PackageName, rockspec::lua_dependency::LuaDependencySpec};
+use crate::{
+    package::{PackageName, PackageReq},
+    rockspec::lua_dependency::LuaDependencySpec,
+};
 
 use super::{
     mlua_json_value_to_vec, DisplayAsLuaKV, DisplayAsLuaValue, DisplayLuaKV, DisplayLuaValue,
@@ -171,6 +174,8 @@ impl BuildSpec {
                     .try_collect()?,
                 target_path: internal.target_path.unwrap_or("target".into()),
                 default_features: internal.default_features.unwrap_or(true),
+                features: internal.features.unwrap_or_default(),
+                cargo_extra_args: internal.cargo_extra_args.unwrap_or_default(),
                 include: internal
                     .include
                     .unwrap_or_default()
@@ -180,7 +185,6 @@ impl BuildSpec {
                         LuaTableKey::StringKey(src) => (src.into(), dest),
                     })
                     .collect(),
-                features: internal.features.unwrap_or_default(),
             })),
             BuildType::TreesitterParser => Some(BuildBackendSpec::TreesitterParser(
                 TreesitterParserBuildSpec {
@@ -545,9 +549,10 @@ pub(crate) struct BuildSpecInternal {
     #[serde(default)]
     pub(crate) default_features: Option<bool>,
     #[serde(default)]
-    pub(crate) include: Option<HashMap<LuaTableKey, PathBuf>>,
-    #[serde(default)]
     pub(crate) features: Option<Vec<String>>,
+    pub(crate) cargo_extra_args: Option<Vec<String>>,
+    #[serde(default)]
+    pub(crate) include: Option<HashMap<LuaTableKey, PathBuf>>,
     // treesitter-parser fields
     #[serde(default)]
     pub(crate) lang: Option<String>,
@@ -692,6 +697,7 @@ fn override_build_spec_internal(
         target_path: override_opt(&override_spec.target_path, &base.target_path),
         default_features: override_opt(&override_spec.default_features, &base.default_features),
         features: override_opt(&override_spec.features, &base.features),
+        cargo_extra_args: override_opt(&override_spec.cargo_extra_args, &base.cargo_extra_args),
         include: merge_map_opts(&override_spec.include, &base.include),
         lang: override_opt(&override_spec.lang, &base.lang),
         parser: override_opt(&override_spec.parser, &base.parser),
@@ -994,9 +1000,11 @@ impl BuildType {
             | &BuildType::None
             | &BuildType::LuaRock(_)
             | &BuildType::Source => None,
-            &BuildType::RustMlua => {
-                Some(PackageName::new("luarocks-build-rust-mlua".into()).into())
-            }
+            &BuildType::RustMlua => Some(
+                PackageReq::parse("luarocks-build-rust-mlua >= 0.2.5")
+                    .expect("error parsing luarocks-build-rust-mlua package requirement [This is a bug!]")
+                    .into(),
+            ),
             &BuildType::TreesitterParser => {
                 Some(PackageName::new("luarocks-build-treesitter-parser".into()).into())
             } // IMPORTANT: If adding another luarocks build backend,

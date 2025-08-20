@@ -20,9 +20,29 @@ pub enum RustError {
         stderr: String,
     },
     #[error("failed to run `cargo build`: {0}")]
-    RustBuild(#[from] io::Error),
+    RustBuild(io::Error),
+    #[error("unable to create directory {0}:\n{1}")]
+    CreateDir(String, io::Error),
+    #[error(transparent)]
+    InstallRustLib(#[from] InstallRustLibError),
+    #[error(transparent)]
+    InstallLuaLib(#[from] InstallLuaLibError),
     #[error(transparent)]
     LuaVersionUnset(#[from] LuaVersionUnset),
+}
+
+#[derive(Error, Debug)]
+#[error("error installing rust library {lib}:\n{cause}")]
+pub struct InstallRustLibError {
+    lib: String,
+    cause: io::Error,
+}
+
+#[derive(Error, Debug)]
+#[error("error installing Lua library {lib}:\n{cause}")]
+pub struct InstallLuaLibError {
+    lib: String,
+    cause: io::Error,
 }
 
 impl BuildBackend for RustMluaBuildSpec {
@@ -54,6 +74,8 @@ impl BuildBackend for RustMluaBuildSpec {
         }
         build_args.push("--features");
         build_args.push(&features);
+        build_args.extend(self.cargo_extra_args.iter().map(|arg| arg.as_str()));
+        progress.map(|bar| bar.set_message("🦀 Building (rust-mlua)..."));
         match Command::new("cargo")
             .current_dir(build_dir)
             .args(build_args)
@@ -70,16 +92,20 @@ impl BuildBackend for RustMluaBuildSpec {
             }
             Err(err) => return Err(RustError::RustBuild(err)),
         }
-        fs::create_dir_all(&output_paths.lib)?;
+        fs::create_dir_all(&output_paths.lib).map_err(|err| {
+            RustError::CreateDir(output_paths.lib.to_string_lossy().to_string(), err)
+        })?;
         if let Err(err) =
             install_rust_libs(self.modules, &self.target_path, build_dir, output_paths)
         {
-            cleanup(output_paths, progress).await?;
+            cleanup(output_paths, progress).await;
             return Err(err.into());
         }
-        fs::create_dir_all(&output_paths.src)?;
+        fs::create_dir_all(&output_paths.src).map_err(|err| {
+            RustError::CreateDir(output_paths.src.to_string_lossy().to_string(), err)
+        })?;
         if let Err(err) = install_lua_libs(self.include, build_dir, output_paths) {
-            cleanup(output_paths, progress).await?;
+            cleanup(output_paths, progress).await;
             return Err(err.into());
         }
         Ok(BuildInfo::default())
@@ -91,12 +117,15 @@ fn install_rust_libs(
     target_path: &Path,
     build_dir: &Path,
     output_paths: &RockLayout,
-) -> io::Result<()> {
+) -> Result<(), InstallRustLibError> {
     for (module, rust_lib) in modules {
         let src = build_dir.join(target_path).join("release").join(rust_lib);
         let mut dst: PathBuf = output_paths.lib.join(module);
         dst.set_extension(c_dylib_extension());
-        fs::copy(src, dst)?;
+        fs::copy(&src, &dst).map_err(|err| InstallRustLibError {
+            lib: src.to_string_lossy().to_string(),
+            cause: err,
+        })?;
     }
     Ok(())
 }
@@ -105,16 +134,19 @@ fn install_lua_libs(
     include: HashMap<PathBuf, PathBuf>,
     build_dir: &Path,
     output_paths: &RockLayout,
-) -> io::Result<()> {
+) -> Result<(), InstallLuaLibError> {
     for (from, to) in include {
         let src = build_dir.join(from);
         let dst = output_paths.src.join(to);
-        fs::copy(src, dst)?;
+        fs::copy(&src, &dst).map_err(|err| InstallLuaLibError {
+            lib: src.to_string_lossy().to_string(),
+            cause: err,
+        })?;
     }
     Ok(())
 }
 
-async fn cleanup(output_paths: &RockLayout, progress: &Progress<ProgressBar>) -> io::Result<()> {
+async fn cleanup(output_paths: &RockLayout, progress: &Progress<ProgressBar>) -> () {
     let root_dir = &output_paths.rock_path;
 
     progress.map(|p| p.set_message(format!("🗑️ Cleaning up {}", root_dir.display())));
@@ -126,6 +158,4 @@ async fn cleanup(output_paths: &RockLayout, progress: &Progress<ProgressBar>) ->
                 .map(|p| p.println(format!("Error cleaning up {}: {}", root_dir.display(), err)));
         }
     };
-
-    Ok(())
 }
