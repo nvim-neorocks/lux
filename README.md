@@ -142,19 +142,30 @@ Lux includes the following packages and libraries:
 
 Dependencies:
 
-- `libgit2`
 - `gnupg`, `libgpg-error` and `gpgme` (*nix only)
 
 If building without the `vendored` feature:
 
 - `lua`
+- `libgit2`
 - `openssl`
 
-We recommend building with the `vendored` feature enabled,
-to statically link `lua` and `openssl`.
+If building with the `vendored` feature:
+
+- `perl` and `perl-core`
+- `make`
+
+We usually recommend building with the `vendored` feature enabled,
+to statically link `lua`, `libgit2` and `openssl`:
 
 ```bash
-cargo build --features vendored
+cargo build --locked --profile release --features vendored
+```
+
+Or, to build with dynamically linked libraries:
+
+```bash
+cargo build --locked --profile release
 ```
 
 You can build `lux-lua` for a given Lua version with:
@@ -169,6 +180,25 @@ cargo xtaskjit dist-lua
 
 This will install `lux-lua` to `target/dist/share/lux-lua/<lua>/lux.so`
 and a pkg-config `.pc` file to `target/dist/lib/lux-lua*.pc`.
+
+To build completions:
+
+```bash
+cargo xtask dis-completions
+```
+
+To build man pages:
+
+```bash
+cargo xtask dist-man
+```
+
+To build the binary distributions for your platform,
+bundled with completions, man pages and `lux-lua`:
+
+```bash
+cargo xtask dist-package
+```
 
 ## :snowflake: Nix flake
 
