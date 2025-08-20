@@ -168,6 +168,14 @@ where
                                 .build_dependencies()
                                 .current_platform()
                                 .iter()
+                                .filter(|dep| {
+                                    // Exclude luarocks build backends that we have implemented in lux
+                                    !matches!(
+                                        dep.name().to_string().as_str(),
+                                        "luarocks-build-rust-mlua"
+                                            | "luarocks-build-treesitter-parser"
+                                    )
+                                })
                                 .map(|dep| {
                                     // We always install build dependencies as entrypoints
                                     // with regard to the build tree
