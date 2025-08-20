@@ -60,6 +60,13 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
     let build_dependencies_to_install = build_dependencies
         .iter()
         .filter(|dep| {
+            // Exclude luarocks build backends that we have implemented in lux
+            !matches!(
+                dep.name().to_string().as_str(),
+                "luarocks-build-rust-mlua" | "luarocks-build-treesitter-parser"
+            )
+        })
+        .filter(|dep| {
             tree.match_rocks(dep.package_req())
                 .is_ok_and(|rock_match| rock_match.is_found())
         })
