@@ -184,7 +184,7 @@ and a pkg-config `.pc` file to `target/dist/lib/lux-lua*.pc`.
 To build completions:
 
 ```bash
-cargo xtask dis-completions
+cargo xtask dist-completions
 ```
 
 To build man pages:
