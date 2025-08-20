@@ -5,6 +5,7 @@ use std::{
     process::Command,
 };
 use strum_macros::EnumIter;
+use target_lexicon::Triple;
 
 pub type DynError = Box<dyn std::error::Error>;
 
@@ -116,9 +117,9 @@ pub fn dist(release: bool, opts: Option<DistOpts>) -> Result<(), DynError> {
     }
 
     let dest_dir = target_dir.join(profile);
-    let dir = if release { dist_dir } else { dest_dir.clone() };
+    let output_dir = if release { dist_dir } else { dest_dir.clone() };
 
-    let lib_dir = dir
+    let lib_dir = output_dir
         .join("share")
         .join("lux-lua")
         .join(canonical_lua_version);
@@ -136,16 +137,19 @@ pub fn dist(release: bool, opts: Option<DistOpts>) -> Result<(), DynError> {
         println!("{}", entry.file_name().display());
     }
 
+    let host = Triple::host();
     #[cfg(not(target_env = "msvc"))]
-    let (src_file, dest_file) = (
+    let (src_file, dest_file, dest_arch_file) = (
         target_profile_dir.join(format!("liblux_lua.{DLL_EXTENSION}")),
         lib_dir.join("lux.so"),
+        output_dir.join(format!("lux-{lua_feature_flag}-{host}.so")),
     );
 
     #[cfg(target_env = "msvc")]
-    let (src_file, dest_file) = (
+    let (src_file, dest_file, dest_arch_file) = (
         target_profile_dir.join(format!("lux_lua.{DLL_EXTENSION}")),
         lib_dir.join(format!("lux.{DLL_EXTENSION}")),
+        output_dir.join(format!("lux-{lua_feature_flag}-{host}.{DLL_EXTENSION}")),
     );
 
     if !src_file.is_file() {
@@ -153,7 +157,13 @@ pub fn dist(release: bool, opts: Option<DistOpts>) -> Result<(), DynError> {
     }
 
     println!("copying {} to {}", src_file.display(), dest_file.display());
-    fs::copy(src_file, dest_file)?;
+    fs::copy(&src_file, &dest_file)?;
+    println!(
+        "copying {} to {}",
+        src_file.display(),
+        dest_arch_file.display()
+    );
+    fs::copy(&src_file, &dest_arch_file)?;
 
     let version = {
         let manifest_path = project_root.join("Cargo.toml");
@@ -166,7 +176,7 @@ pub fn dist(release: bool, opts: Option<DistOpts>) -> Result<(), DynError> {
     };
 
     // Create and write the pkg-config file
-    let pkg_config_dir = dir.join("lib").join("pkgconfig");
+    let pkg_config_dir = output_dir.join("lib").join("pkgconfig");
     println!("creating {}", pkg_config_dir.display());
     fs::create_dir_all(&pkg_config_dir)?;
 
