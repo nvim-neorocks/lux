@@ -6,7 +6,7 @@ use crate::lockfile::{FlushLockfileError, LocalPackage, LocalPackageId};
 use crate::progress::{MultiProgress, Progress, ProgressBar};
 use crate::tree::TreeError;
 use crate::{config::Config, tree::Tree};
-use futures::future::join_all;
+use futures::StreamExt;
 use itertools::Itertools;
 use thiserror::Error;
 
@@ -73,7 +73,7 @@ impl<'a> Uninstall<'a> {
         let tree = self
             .config
             .user_tree(LuaVersion::from(self.config)?.clone())?;
-        remove(self.packages, tree, &Arc::clone(&progress)).await
+        remove(self.packages, tree, self.config, &Arc::clone(&progress)).await
     }
 }
 
@@ -81,6 +81,7 @@ impl<'a> Uninstall<'a> {
 async fn remove(
     package_ids: Vec<LocalPackageId>,
     tree: Tree,
+    config: &Config,
     progress: &Progress<MultiProgress>,
 ) -> Result<(), RemoveError> {
     let lockfile = tree.lockfile()?;
@@ -91,12 +92,14 @@ async fn remove(
         .cloned()
         .collect_vec();
 
-    join_all(packages.into_iter().map(|package| {
+    futures::stream::iter(packages.into_iter().map(|package| {
         let bar = progress.map(|p| p.new_bar());
 
         let tree = tree.clone();
         tokio::spawn(remove_package(package, tree, bar))
     }))
+    .buffered(config.max_jobs())
+    .collect::<Vec<_>>()
     .await;
 
     lockfile.map_then_flush(|lockfile| {

@@ -227,6 +227,7 @@ pub struct Config {
     user_tree: PathBuf,
     verbose: bool,
     timeout: Duration,
+    max_jobs: usize,
     variables: HashMap<String, String>,
     external_deps: ExternalDependencySearchConfig,
     /// The rock layout for entrypoints of new install trees.
@@ -317,6 +318,9 @@ impl Config {
         &self.timeout
     }
 
+    pub fn max_jobs(&self) -> usize {
+        self.max_jobs
+    }
     pub fn make_cmd(&self) -> String {
         match self.variables.get("MAKE") {
             Some(make) => make.clone(),
@@ -400,6 +404,7 @@ pub struct ConfigBuilder {
     enable_development_packages: Option<bool>,
     verbose: Option<bool>,
     timeout: Option<Duration>,
+    max_jobs: Option<usize>,
     variables: Option<HashMap<String, String>>,
     #[serde(default)]
     external_deps: ExternalDependencySearchConfig,
@@ -507,6 +512,13 @@ impl ConfigBuilder {
         }
     }
 
+    pub fn max_jobs(self, max_jobs: Option<usize>) -> Self {
+        Self {
+            max_jobs: max_jobs.or(self.max_jobs),
+            ..self
+        }
+    }
+
     pub fn cache_dir(self, cache_dir: Option<PathBuf>) -> Self {
         Self {
             cache_dir: cache_dir.or(self.cache_dir),
@@ -557,6 +569,10 @@ impl ConfigBuilder {
             user_tree,
             verbose: self.verbose.unwrap_or(false),
             timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(30)),
+            max_jobs: match self.max_jobs.unwrap_or(usize::MAX) {
+                0 => usize::MAX,
+                max_jobs => max_jobs,
+            },
             variables: default_variables()
                 .chain(self.variables.unwrap_or_default())
                 .collect(),
@@ -583,6 +599,7 @@ impl From<Config> for ConfigBuilder {
             user_tree: Some(value.user_tree),
             verbose: Some(value.verbose),
             timeout: Some(value.timeout),
+            max_jobs: Some(value.max_jobs),
             variables: Some(value.variables),
             cache_dir: Some(value.cache_dir),
             data_dir: Some(value.data_dir),

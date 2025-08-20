@@ -116,7 +116,7 @@ pub struct Cli {
 
     /// Override config variables.{n}
     /// Example: `lx -v "LUA=/path/to/lua" ...`
-    #[arg(long, value_name = "variable", visible_short_aliases = ['v'], value_parser = parse_key_val::<String, String>)]
+    #[arg(long, value_name = "variable", visible_short_alias = 'v', value_parser = parse_key_val::<String, String>)]
     pub variables: Option<Vec<(String, String)>>,
 
     /// Display verbose output of commands executed.
@@ -131,6 +131,11 @@ pub struct Cli {
     /// 0 means no timeout (wait forever). Default is 30.
     #[arg(long, value_name = "seconds")]
     pub timeout: Option<usize>,
+
+    /// Maximum buffer size for parallel jobs, such as downloading rockspecs and installing rocks.
+    /// 0 means no limit. Default is 0.
+    #[arg(long, visible_short_alias = 'j')]
+    pub max_jobs: Option<usize>,
 
     /// Do not generate or update a `.luarc.json` file when building{n}
     /// a project.

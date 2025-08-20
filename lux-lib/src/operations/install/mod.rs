@@ -26,7 +26,7 @@ pub use crate::operations::install::spec::PackageInstallSpec;
 
 use bon::Builder;
 use bytes::Bytes;
-use futures::future::join_all;
+use futures::StreamExt;
 use itertools::Itertools;
 use thiserror::Error;
 
@@ -232,84 +232,87 @@ async fn install_impl(
         all_packages.insert(dep.spec.id(), dep);
     }
 
-    let installed_packages = join_all(all_packages.clone().into_values().map(|install_spec| {
-        let progress_arc = progress_arc.clone();
-        let downloaded_rock = install_spec.downloaded_rock;
-        let config = config.clone();
-        let tree = tree.clone();
-        let lua = lua.clone();
+    let installed_packages =
+        futures::stream::iter(all_packages.clone().into_values().map(|install_spec| {
+            let progress_arc = progress_arc.clone();
+            let downloaded_rock = install_spec.downloaded_rock;
+            let config = config.clone();
+            let tree = tree.clone();
+            let lua = lua.clone();
 
-        tokio::spawn({
-            async move {
-                let pkg = match downloaded_rock {
-                    RemoteRockDownload::RockspecOnly { rockspec_download } => {
-                        install_rockspec(
-                            rockspec_download,
-                            None,
-                            install_spec.spec.constraint(),
-                            install_spec.build_behaviour,
-                            install_spec.pin,
-                            install_spec.opt,
-                            install_spec.entry_type,
-                            &lua,
-                            &tree,
-                            &config,
-                            progress_arc,
-                        )
-                        .await?
-                    }
-                    RemoteRockDownload::BinaryRock {
-                        rockspec_download,
-                        packed_rock,
-                    } => {
-                        install_binary_rock(
+            tokio::spawn({
+                async move {
+                    let pkg = match downloaded_rock {
+                        RemoteRockDownload::RockspecOnly { rockspec_download } => {
+                            install_rockspec(
+                                rockspec_download,
+                                None,
+                                install_spec.spec.constraint(),
+                                install_spec.build_behaviour,
+                                install_spec.pin,
+                                install_spec.opt,
+                                install_spec.entry_type,
+                                &lua,
+                                &tree,
+                                &config,
+                                progress_arc,
+                            )
+                            .await?
+                        }
+                        RemoteRockDownload::BinaryRock {
                             rockspec_download,
                             packed_rock,
-                            install_spec.spec.constraint(),
-                            install_spec.build_behaviour,
-                            install_spec.pin,
-                            install_spec.opt,
-                            install_spec.entry_type,
-                            &config,
-                            &tree,
-                            progress_arc,
-                        )
-                        .await?
-                    }
-                    RemoteRockDownload::SrcRock {
-                        rockspec_download,
-                        src_rock,
-                        source_url,
-                    } => {
-                        let src_rock_source = SrcRockSource {
-                            bytes: src_rock,
-                            source_url,
-                        };
-                        install_rockspec(
+                        } => {
+                            install_binary_rock(
+                                rockspec_download,
+                                packed_rock,
+                                install_spec.spec.constraint(),
+                                install_spec.build_behaviour,
+                                install_spec.pin,
+                                install_spec.opt,
+                                install_spec.entry_type,
+                                &config,
+                                &tree,
+                                progress_arc,
+                            )
+                            .await?
+                        }
+                        RemoteRockDownload::SrcRock {
                             rockspec_download,
-                            Some(src_rock_source),
-                            install_spec.spec.constraint(),
-                            install_spec.build_behaviour,
-                            install_spec.pin,
-                            install_spec.opt,
-                            install_spec.entry_type,
-                            &lua,
-                            &tree,
-                            &config,
-                            progress_arc,
-                        )
-                        .await?
-                    }
-                };
+                            src_rock,
+                            source_url,
+                        } => {
+                            let src_rock_source = SrcRockSource {
+                                bytes: src_rock,
+                                source_url,
+                            };
+                            install_rockspec(
+                                rockspec_download,
+                                Some(src_rock_source),
+                                install_spec.spec.constraint(),
+                                install_spec.build_behaviour,
+                                install_spec.pin,
+                                install_spec.opt,
+                                install_spec.entry_type,
+                                &lua,
+                                &tree,
+                                &config,
+                                progress_arc,
+                            )
+                            .await?
+                        }
+                    };
 
-                Ok::<_, InstallError>((pkg.id(), (pkg, install_spec.entry_type)))
-            }
-        })
-    }))
-    .await
-    .into_iter()
-    .flatten()
-    .try_collect::<_, HashMap<LocalPackageId, (LocalPackage, tree::EntryType)>, _>()?;
+                    Ok::<_, InstallError>((pkg.id(), (pkg, install_spec.entry_type)))
+                }
+            })
+        }))
+        .buffered(config.max_jobs())
+        .collect::<Vec<_>>()
+        .await
+        .into_iter()
+        .flatten()
+        .try_collect::<_, HashMap<LocalPackageId, (LocalPackage, tree::EntryType)>, _>()?;
 
     let write_dependency = |lockfile: &mut Lockfile<ReadWrite>,
                             id: &LocalPackageId,
