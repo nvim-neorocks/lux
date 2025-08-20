@@ -2,7 +2,7 @@ use std::{fmt::Display, sync::Arc};
 
 use async_recursion::async_recursion;
 use bon::Builder;
-use futures::future::join_all;
+use futures::StreamExt;
 use itertools::Itertools;
 use thiserror::Error;
 use tokio::sync::mpsc::UnboundedSender;
@@ -96,7 +96,7 @@ where
     let build_lockfile = args.build_lockfile;
     let config = args.config;
     let progress = args.progress;
-    join_all(
+    futures::stream::iter(
         packages
             .into_iter()
             // Exclude packages that are already installed
@@ -276,6 +276,8 @@ where
                 },
             ),
     )
+    .buffered(config.max_jobs())
+    .collect::<Vec<_>>()
     .await
     .into_iter()
     .flatten()

@@ -34,6 +34,7 @@ async fn main() -> Result<()> {
             cli.timeout
                 .map(|duration| Duration::from_secs(duration as u64)),
         )
+        .max_jobs(cli.max_jobs)
         .user_tree(cli.tree)
         .variables(
             cli.variables
