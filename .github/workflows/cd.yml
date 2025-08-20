@@ -255,7 +255,7 @@ jobs:
         if: github.event_name == 'release'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/lux-lua51-${{ matrix.target }}.*
+          file: target/dist/lux-lua51-${{ matrix.target }}.*
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
@@ -265,7 +265,7 @@ jobs:
         if: github.event_name == 'release'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/lux-lua52-${{ matrix.target }}.*
+          file: target/dist/lux-lua52-${{ matrix.target }}.*
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
@@ -275,7 +275,7 @@ jobs:
         if: github.event_name == 'release'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/lux-lua53-${{ matrix.target }}.*
+          file: target/dist/lux-lua53-${{ matrix.target }}.*
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
@@ -285,7 +285,7 @@ jobs:
         if: github.event_name == 'release'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/lux-lua54-${{ matrix.target }}.*
+          file: target/dist/lux-lua54-${{ matrix.target }}.*
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
@@ -295,7 +295,7 @@ jobs:
         if: github.event_name == 'release'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/lux-luajit-${{ matrix.target }}.*
+          file: target/dist/lux-luajit-${{ matrix.target }}.*
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
