@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::{
     lua_rockspec::{RockSourceInternal, SourceUrl, SourceUrlError},
-    package::{PackageName, PackageSpec, PackageVersion, PackageVersionParseError},
+    package::{PackageName, PackageSpec, PackageVersion, PackageVersionParseError, SpecRev},
     variables::{self, Environment, GetVariableError, HasVariables, VariableSubstitutionError},
 };
 
@@ -192,22 +192,27 @@ impl PackageVersionTemplate {
     pub(crate) fn try_generate(
         &self,
         project_root: &ProjectRoot,
+        specrev: Option<SpecRev>,
     ) -> Result<PackageVersion, GenerateVersionError> {
+        let specrev = specrev.unwrap_or_default();
         if let Some(version) = &self.0 {
             Ok(version.clone())
         } else {
             let repo = find_git_repo(project_root)?;
-            if let Some(version) = version_from_semver_tag(&repo)? {
+            if let Some(version) = version_from_semver_tag(&repo, &specrev)? {
                 Ok(version)
             } else {
-                Ok(PackageVersion::default_dev_version())
+                Ok(PackageVersion::default_dev_version_with_specrev(specrev))
             }
         }
     }
 }
 
 /// Searches the current HEAD for SemVer tags and returns the first one found.
-fn version_from_semver_tag(repo: &Repository) -> Result<Option<PackageVersion>, git2::Error> {
+fn version_from_semver_tag(
+    repo: &Repository,
+    specrev: &SpecRev,
+) -> Result<Option<PackageVersion>, git2::Error> {
     let head = repo.head()?;
     let current_rev = head
         .target()
@@ -218,8 +223,9 @@ fn version_from_semver_tag(repo: &Repository) -> Result<Option<PackageVersion>, 
             let tag = obj.into_tag().expect("not a tag");
             if tag.target_id() == current_rev {
                 if let Some(tag_name) = tag.name() {
+                    let version_str = format!("{}-{specrev}", tag_name.trim_start_matches("v"));
                     if let Ok(version @ PackageVersion::SemVer(_)) =
-                        PackageVersion::parse(tag_name.trim_start_matches("v"))
+                        PackageVersion::parse(&version_str)
                     {
                         result = Some(version);
                         return false; // stop iteration

@@ -296,7 +296,7 @@ impl PartialProjectToml {
             package: project_toml.package,
             version: project_toml
                 .version_template
-                .try_generate(&self.project_root)
+                .try_generate(&self.project_root, None)
                 .unwrap_or(PackageVersion::default_dev_version()),
             lua: project_toml
                 .lua
@@ -371,7 +371,9 @@ impl PartialProjectToml {
     /// it ready to be serialized into a rockspec.
     /// A source must be provided for the rockspec to be valid.
     pub fn into_remote(&self) -> Result<RemoteProjectToml, RemoteProjectTomlValidationError> {
-        let version = self.version_template.try_generate(&self.project_root)?;
+        let version = self
+            .version_template
+            .try_generate(&self.project_root, None)?;
         let source =
             self.source_template
                 .try_generate(&self.project_root, &self.package, &version)?;
@@ -382,7 +384,8 @@ impl PartialProjectToml {
                 )
             })?,
         );
-        let local = self.into_local()?;
+        let mut local = self.into_local()?;
+        local.version = version;
 
         let validated = RemoteProjectToml { source, local };
 
@@ -397,7 +400,7 @@ impl PartialProjectToml {
 
     /// Returns the current package version, which may be generated from a template
     pub fn version(&self) -> Result<PackageVersion, GenerateVersionError> {
-        self.version_template.try_generate(&self.project_root)
+        self.version_template.try_generate(&self.project_root, None)
     }
 
     /// Merge the `ProjectToml` struct with an unvalidated `LuaRockspec`.
@@ -462,7 +465,7 @@ impl LuaVersionCompatibility for PartialProjectToml {
                 version.clone(),
                 self.package().to_owned(),
                 self.version_template
-                    .try_generate(&self.project_root)
+                    .try_generate(&self.project_root, None)
                     .unwrap_or(PackageVersion::default_dev_version()),
             ))
         }
@@ -482,7 +485,7 @@ impl LuaVersionCompatibility for PartialProjectToml {
                 version,
                 self.package.clone(),
                 self.version_template
-                    .try_generate(&self.project_root)
+                    .try_generate(&self.project_root, None)
                     .unwrap_or(PackageVersion::default_dev_version()),
             ))
         }
@@ -671,7 +674,10 @@ impl Rockspec for LocalProjectToml {
 
     fn to_lua_remote_rockspec_string(&self) -> Result<String, Self::Error> {
         let project_root = &self.internal.project_root;
-        let version = self.internal.version_template.try_generate(project_root)?;
+        let version = self
+            .internal
+            .version_template
+            .try_generate(project_root, None)?;
         let starter = format!(
             r#"
 rockspec_format = "{}"
@@ -849,12 +855,6 @@ impl Rockspec for RemoteProjectToml {
 
     fn to_lua_remote_rockspec_string(&self) -> Result<String, Self::Error> {
         let project_root = &self.local.internal.project_root;
-        let version = self
-            .local
-            .internal
-            .version_template
-            .try_generate(project_root)?;
-
         let starter = format!(
             r#"
 rockspec_format = "{}"
@@ -862,7 +862,7 @@ package = "{}"
 version = "{}""#,
             self.local.rockspec_format.as_ref().unwrap_or(&"3.0".into()),
             self.local.package,
-            &version
+            self.version()
         );
 
         let mut template = Vec::new();
@@ -939,7 +939,7 @@ version = "{}""#,
         let source = self.local.internal.source_template.try_generate(
             project_root,
             &self.local.internal.package,
-            &version,
+            self.version(),
         )?;
         template.push(source.display_lua());
 
