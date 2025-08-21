@@ -77,6 +77,10 @@ impl PackageVersion {
     pub(crate) fn default_dev_version() -> Self {
         Self::DevVer(DevVer::default())
     }
+
+    pub(crate) fn default_dev_version_with_specrev(specrev: SpecRev) -> Self {
+        Self::DevVer(DevVer::default_with_specrev(specrev))
+    }
 }
 
 impl TryFrom<PackageVersionReq> for PackageVersion {
@@ -113,16 +117,18 @@ impl TryFrom<PackageVersionReq> for PackageVersion {
                     Ok(PackageVersion::SemVer(SemVer {
                         version,
                         component_count,
-                        specrev: 1,
+                        specrev: 1.into(),
                     }))
                 }
             }
-            PackageVersionReq::DevVer(modrev) => {
-                Ok(PackageVersion::DevVer(DevVer { modrev, specrev: 1 }))
-            }
-            PackageVersionReq::StringVer(modrev) => {
-                Ok(PackageVersion::StringVer(StringVer { modrev, specrev: 1 }))
-            }
+            PackageVersionReq::DevVer(modrev) => Ok(PackageVersion::DevVer(DevVer {
+                modrev,
+                specrev: 1.into(),
+            })),
+            PackageVersionReq::StringVer(modrev) => Ok(PackageVersion::StringVer(StringVer {
+                modrev,
+                specrev: 1.into(),
+            })),
             PackageVersionReq::Any => Err(VersionReqToVersionError::Any),
         }
     }
@@ -236,12 +242,34 @@ impl FromStr for PackageVersion {
     }
 }
 
+/// The revision of a rov
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub struct SpecRev(u16);
+
+impl From<u16> for SpecRev {
+    fn from(value: u16) -> Self {
+        Self(value)
+    }
+}
+
+impl Display for SpecRev {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Default for SpecRev {
+    fn default() -> Self {
+        Self(1)
+    }
+}
+
 // TODO: Stop deriving Eq here
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct SemVer {
     version: Version,
     component_count: usize,
-    specrev: u16,
+    specrev: SpecRev,
 }
 
 impl HasModRev for SemVer {
@@ -325,24 +353,24 @@ impl IntoLua for DevVersion {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Default)]
 pub struct DevVer {
     modrev: DevVersion,
-    specrev: u16,
+    specrev: SpecRev,
+}
+
+impl DevVer {
+    fn default_with_specrev(specrev: SpecRev) -> Self {
+        Self {
+            modrev: DevVersion::default(),
+            specrev,
+        }
+    }
 }
 
 impl HasModRev for DevVer {
     fn to_modrev_string(&self) -> String {
         self.modrev.to_string().to_lowercase()
-    }
-}
-
-impl Default for DevVer {
-    fn default() -> Self {
-        Self {
-            modrev: Default::default(),
-            specrev: 1,
-        }
     }
 }
 
@@ -382,7 +410,7 @@ impl PartialOrd for DevVer {
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct StringVer {
     modrev: String,
-    specrev: u16,
+    specrev: SpecRev,
 }
 
 impl HasModRev for StringVer {
@@ -584,7 +612,7 @@ pub enum SpecrevParseError {
     InvalidVersion(String),
 }
 
-fn split_specrev(version_str: &str) -> Result<(&str, u16), SpecrevParseError> {
+fn split_specrev(version_str: &str) -> Result<(&str, SpecRev), SpecrevParseError> {
     if let Some(pos) = version_str.rfind('-') {
         if let Some(specrev_str) = version_str.get(pos + 1..) {
             if specrev_str.chars().all(|c| c.is_ascii_digit()) {
@@ -595,7 +623,7 @@ fn split_specrev(version_str: &str) -> Result<(&str, u16), SpecrevParseError> {
                             specrev: specrev_str.into(),
                             full_version: version_str.into(),
                         })?;
-                Ok((&version_str[..pos], specrev))
+                Ok((&version_str[..pos], specrev.into()))
             } else {
                 Err(SpecrevParseError::InvalidSpecrev {
                     specrev: specrev_str.into(),
@@ -607,7 +635,7 @@ fn split_specrev(version_str: &str) -> Result<(&str, u16), SpecrevParseError> {
         }
     } else {
         // We assume a specrev of 1 if none can be found.
-        Ok((version_str, 1))
+        Ok((version_str, 1.into()))
     }
 }
 
@@ -714,7 +742,7 @@ mod tests {
             PackageVersion::SemVer(SemVer {
                 version: "1.0.0".parse().unwrap(),
                 component_count: 1,
-                specrev: 1,
+                specrev: 1.into(),
             })
         );
         assert_eq!(
@@ -722,7 +750,7 @@ mod tests {
             PackageVersion::SemVer(SemVer {
                 version: "1.0.0".parse().unwrap(),
                 component_count: 2,
-                specrev: 1,
+                specrev: 1.into(),
             })
         );
         assert_eq!(
@@ -730,7 +758,7 @@ mod tests {
             PackageVersion::SemVer(SemVer {
                 version: "1.0.0".parse().unwrap(),
                 component_count: 3,
-                specrev: 1
+                specrev: 1.into()
             })
         );
         assert_eq!(
@@ -738,7 +766,7 @@ mod tests {
             PackageVersion::SemVer(SemVer {
                 version: "1.0.0".parse().unwrap(),
                 component_count: 3,
-                specrev: 1
+                specrev: 1.into()
             })
         );
         assert_eq!(
@@ -746,7 +774,7 @@ mod tests {
             PackageVersion::SemVer(SemVer {
                 version: "1.0.0-10".parse().unwrap(),
                 component_count: 3,
-                specrev: 1
+                specrev: 1.into()
             })
         );
         assert_eq!(
@@ -754,7 +782,7 @@ mod tests {
             PackageVersion::SemVer(SemVer {
                 version: "1.0.0-10".parse().unwrap(),
                 component_count: 3,
-                specrev: 1
+                specrev: 1.into()
             })
         );
         assert_eq!(
@@ -762,7 +790,7 @@ mod tests {
             PackageVersion::SemVer(SemVer {
                 version: "1.0.0-10.0".parse().unwrap(),
                 component_count: 3,
-                specrev: 1
+                specrev: 1.into()
             })
         );
     }
@@ -773,28 +801,28 @@ mod tests {
             PackageVersion::parse("dev-1").unwrap(),
             PackageVersion::DevVer(DevVer {
                 modrev: DevVersion::Dev,
-                specrev: 1
+                specrev: 1.into()
             })
         );
         assert_eq!(
             PackageVersion::parse("scm-1").unwrap(),
             PackageVersion::DevVer(DevVer {
                 modrev: DevVersion::Scm,
-                specrev: 1
+                specrev: 1.into()
             })
         );
         assert_eq!(
             PackageVersion::parse("git-1").unwrap(),
             PackageVersion::StringVer(StringVer {
                 modrev: "git".into(),
-                specrev: 1
+                specrev: 1.into()
             })
         );
         assert_eq!(
             PackageVersion::parse("scm-1").unwrap(),
             PackageVersion::DevVer(DevVer {
                 modrev: DevVersion::Scm,
-                specrev: 1
+                specrev: 1.into()
             })
         );
     }

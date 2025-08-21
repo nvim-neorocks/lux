@@ -9,7 +9,7 @@ mod version;
 
 pub use outdated::*;
 pub use version::{
-    PackageVersion, PackageVersionParseError, PackageVersionReq, PackageVersionReqError,
+    PackageVersion, PackageVersionParseError, PackageVersionReq, PackageVersionReqError, SpecRev,
     VersionReqToVersionError,
 };
 
