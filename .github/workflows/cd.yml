@@ -4,6 +4,7 @@ permissions:
   contents: write
 
 on:
+  pull_request: # TODO: remove
   release:
     types: [published]
   workflow_dispatch:
@@ -113,6 +114,7 @@ jobs:
         run: |
           cargo xtask dist-package
         env:
+          SYSTEM_DEPS_LINK: static
           LUX_SIGN_PRIVATE_KEY: ${{ secrets.LUX_SIGN_PRIVATE_KEY }}
           LUX_SIGN_PRIVATE_KEY_PASS: ${{ secrets.LUX_SIGN_PRIVATE_KEY_PASS }}
 
@@ -121,6 +123,7 @@ jobs:
         run: |
           cargo xtask dist-package
         env:
+          SYSTEM_DEPS_LINK: static
           LUX_SIGN_PRIVATE_KEY: ${{ secrets.LUX_SIGN_PRIVATE_KEY }}
           LUX_SIGN_PRIVATE_KEY_PASS: ${{ secrets.LUX_SIGN_PRIVATE_KEY_PASS }}
 
