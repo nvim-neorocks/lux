@@ -1,11 +1,15 @@
-use std::env;
+use std::{env, io};
 
-use crate::package::PackageVersion;
+use crate::operations::SearchAndDownloadError;
+use crate::package::SpecRevIterator;
+use crate::progress::{Progress, ProgressBar};
 use crate::project::project_toml::RemoteProjectTomlValidationError;
+use crate::remote_package_db::RemotePackageDB;
 use crate::rockspec::Rockspec;
 use crate::TOOL_VERSION;
 use crate::{config::Config, project::Project};
 
+use bon::Builder;
 use reqwest::StatusCode;
 use reqwest::{
     multipart::{Form, Part},
@@ -23,44 +27,26 @@ use std::io::Read;
 
 /// A rocks package uploader, providing fine-grained control
 /// over how a package should be uploaded.
+#[derive(Builder)]
+#[builder(start_fn = new, finish_fn(name = _build, vis = ""))]
 pub struct ProjectUpload<'a> {
     project: Project,
     api_key: Option<ApiKey>,
+    #[cfg(feature = "gpgme")]
     sign_protocol: SignatureProtocol,
     config: &'a Config,
+    progress: &'a Progress<ProgressBar>,
+    package_db: &'a RemotePackageDB,
 }
 
-impl<'a> ProjectUpload<'a> {
-    /// Construct a new package uploader.
-    pub fn new(project: Project, config: &'a Config) -> Self {
-        Self {
-            project,
-            api_key: None,
-            sign_protocol: SignatureProtocol::default(),
-            config,
-        }
-    }
-
-    /// Set the luarocks API key.
-    pub fn api_key(self, api_key: ApiKey) -> Self {
-        Self {
-            api_key: Some(api_key),
-            ..self
-        }
-    }
-
-    /// Set the signature protocol.
-    pub fn sign_protocol(self, sign_protocol: SignatureProtocol) -> Self {
-        Self {
-            sign_protocol,
-            ..self
-        }
-    }
-
+impl<State> ProjectUploadBuilder<'_, State>
+where
+    State: project_upload_builder::State + project_upload_builder::IsComplete,
+{
     /// Upload a package to a luarocks server.
     pub async fn upload_to_luarocks(self) -> Result<(), UploadError> {
-        let api_key = self.api_key.unwrap_or(ApiKey::new()?);
-        upload_from_project(&self.project, &api_key, self.sign_protocol, self.config).await
+        let args = self._build();
+        upload_from_project(args).await
     }
 }
 
@@ -112,7 +98,7 @@ pub enum UploadError {
     #[error("client error when requesting {0}\nStatus code: {1}")]
     Client(Url, StatusCode),
     RockCheck(#[from] RockCheckError),
-    #[error("rock already exists on server: {0}")]
+    #[error("a package with the same rockspec content already exists on the server: {0}")]
     RockExists(Url),
     #[error("unable to read rockspec: {0}")]
     RockspecRead(#[from] std::io::Error),
@@ -129,6 +115,12 @@ pub enum UploadError {
     UnsupportedVersion(String),
     #[error("{0}")] // We don't know the concrete error type
     Rockspec(String),
+    #[error("the maximum supported number of rockspec revisions per version has been exceeded")]
+    MaxSpecRevsExceeded,
+    #[error("rock already exists on server. Error downloading existing rockspec:\n{0}")]
+    SearchAndDownload(#[from] SearchAndDownloadError),
+    #[error("error computing rockspec hash:\n{0}")]
+    Hash(io::Error),
 }
 
 pub struct ApiKey(String);
@@ -225,39 +217,23 @@ impl From<SignatureProtocol> for gpgme::Protocol {
     }
 }
 
-async fn upload_from_project(
-    project: &Project,
-    api_key: &ApiKey,
-    #[cfg(not(feature = "gpgme"))] _protocol: SignatureProtocol,
-    #[cfg(feature = "gpgme")] protocol: SignatureProtocol,
-    config: &Config,
-) -> Result<(), UploadError> {
+async fn upload_from_project(args: ProjectUpload<'_>) -> Result<(), UploadError> {
+    let project = args.project;
+    let api_key = args.api_key.unwrap_or(ApiKey::new()?);
+    #[cfg(feature = "gpgme")]
+    let protocol = args.sign_protocol;
+    let config = args.config;
+    let progress = args.progress;
+    let package_db = args.package_db;
+
     let client = Client::builder().https_only(true).build()?;
 
-    let rockspec = project.toml().into_remote()?;
-
-    if let PackageVersion::StringVer(ver) = rockspec.version() {
-        return Err(UploadError::UnsupportedVersion(ver.to_string()));
-    }
-
     helpers::ensure_tool_version(&client, config.server()).await?;
-    helpers::ensure_user_exists(&client, api_key, config.server()).await?;
+    helpers::ensure_user_exists(&client, &api_key, config.server()).await?;
 
-    if helpers::rock_exists(
-        &client,
-        api_key,
-        rockspec.package(),
-        rockspec.version(),
-        config.server(),
-    )
-    .await?
-    {
-        return Err(UploadError::RockExists(config.server().clone()));
-    }
-
-    let rockspec_content = rockspec
-        .to_lua_remote_rockspec_string()
-        .map_err(|err| UploadError::Rockspec(err.to_string()))?;
+    let (rockspec, rockspec_content) =
+        helpers::generate_rockspec(&project, &client, &api_key, config, progress, package_db)
+            .await?;
 
     #[cfg(not(feature = "gpgme"))]
     let signed: Option<String> = None;
@@ -299,7 +275,7 @@ async fn upload_from_project(
     };
 
     let response = client
-        .post(unsafe { helpers::url_for_method(config.server(), api_key, "upload")? })
+        .post(unsafe { helpers::url_for_method(config.server(), &api_key, "upload")? })
         .multipart(multipart)
         .send()
         .await?;
@@ -316,10 +292,14 @@ async fn upload_from_project(
 
 mod helpers {
     use super::*;
-    use crate::package::{PackageName, PackageVersion};
+    use crate::hash::HasIntegrity;
+    use crate::operations::Download;
+    use crate::package::{PackageName, PackageSpec, PackageVersion};
+    use crate::project::project_toml::RemoteProjectToml;
     use crate::upload::RockCheckError;
     use crate::upload::{ToolCheckError, UserCheckError};
     use reqwest::Client;
+    use ssri::Integrity;
     use url::Url;
 
     /// WARNING: This function is unsafe,
@@ -378,6 +358,55 @@ mod helpers {
         } else {
             Ok(())
         }
+    }
+
+    pub(crate) async fn generate_rockspec(
+        project: &Project,
+        client: &Client,
+        api_key: &ApiKey,
+        config: &Config,
+        progress: &Progress<ProgressBar>,
+        package_db: &RemotePackageDB,
+    ) -> Result<(RemoteProjectToml, String), UploadError> {
+        for specrev in SpecRevIterator::new() {
+            let rockspec = project.toml().into_remote(Some(specrev))?;
+
+            let rockspec_content = rockspec
+                .to_lua_remote_rockspec_string()
+                .map_err(|err| UploadError::Rockspec(err.to_string()))?;
+
+            if let PackageVersion::StringVer(ver) = rockspec.version() {
+                return Err(UploadError::UnsupportedVersion(ver.to_string()));
+            }
+            if helpers::rock_exists(
+                client,
+                api_key,
+                rockspec.package(),
+                rockspec.version(),
+                config.server(),
+            )
+            .await?
+            {
+                let package =
+                    PackageSpec::new(rockspec.package().clone(), rockspec.version().clone());
+                let existing_rockspec = Download::new(&package.into(), config, progress)
+                    .package_db(package_db)
+                    .download_rockspec()
+                    .await?
+                    .rockspec;
+                let existing_rockspec_hash = existing_rockspec.hash().map_err(UploadError::Hash)?;
+                let rockspec_content_hash = Integrity::from(&rockspec_content);
+                if existing_rockspec_hash
+                    .matches(&rockspec_content_hash)
+                    .is_some()
+                {
+                    return Err(UploadError::RockExists(config.server().clone()));
+                }
+            } else {
+                return Ok((rockspec, rockspec_content));
+            }
+        }
+        Err(UploadError::MaxSpecRevsExceeded)
     }
 
     pub(crate) async fn rock_exists(

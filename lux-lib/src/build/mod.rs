@@ -536,7 +536,7 @@ mod tests {
             .await
             .unwrap();
         let project = Project::from(&project_root).unwrap().unwrap();
-        let rockspec = project.toml().into_remote().unwrap();
+        let rockspec = project.toml().into_remote(None).unwrap();
         let progress = Progress::Progress(MultiProgress::new());
         run_build(
             &rockspec,

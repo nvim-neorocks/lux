@@ -24,6 +24,7 @@ use crate::{
         LocalLuaRockspec, LuaRockspecError, LuaVersionError, PartialLuaRockspec,
         PartialRockspecError, RemoteLuaRockspec,
     },
+    package::SpecRev,
     progress::Progress,
     remote_package_db::RemotePackageDB,
     rockspec::{
@@ -170,8 +171,8 @@ impl UserData for Project {
         methods.add_method("local_rockspec", |_, this, ()| {
             this.local_rockspec().into_lua_err()
         });
-        methods.add_method("remote_rockspec", |_, this, ()| {
-            this.remote_rockspec().into_lua_err()
+        methods.add_method("remote_rockspec", |_, this, specrev: Option<SpecRev>| {
+            this.remote_rockspec(specrev).into_lua_err()
         });
         methods.add_method("tree", |_, this, config: Config| {
             this.tree(&config).into_lua_err()
@@ -385,8 +386,11 @@ impl Project {
         Ok(self.toml().into_local()?.to_lua_rockspec()?)
     }
 
-    pub fn remote_rockspec(&self) -> Result<RemoteLuaRockspec, IntoRemoteRockspecError> {
-        Ok(self.toml().into_remote()?.to_lua_rockspec()?)
+    pub fn remote_rockspec(
+        &self,
+        specrev: Option<SpecRev>,
+    ) -> Result<RemoteLuaRockspec, IntoRemoteRockspecError> {
+        Ok(self.toml().into_remote(specrev)?.to_lua_rockspec()?)
     }
 
     pub fn extra_rockspec(&self) -> Result<Option<PartialLuaRockspec>, PartialRockspecError> {
@@ -857,7 +861,7 @@ mod tests {
         // Reparse the lux.toml (not usually necessary, but we want to test that the file was
         // written correctly)
         let project = Project::from(&project_root).unwrap().unwrap();
-        let validated_toml = project.toml().into_remote().unwrap();
+        let validated_toml = project.toml().into_remote(None).unwrap();
 
         assert_eq!(
             validated_toml.dependencies().current_platform(),
@@ -925,7 +929,7 @@ mod tests {
 
         assert!(extra_rockspec.is_some());
 
-        let rocks = project.toml().into_remote().unwrap();
+        let rocks = project.toml().into_remote(None).unwrap();
 
         assert_eq!(rocks.package().to_string(), "custom-package");
     }
