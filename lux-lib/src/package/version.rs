@@ -264,6 +264,51 @@ impl Default for SpecRev {
     }
 }
 
+impl FromLua for SpecRev {
+    fn from_lua(value: mlua::Value, _lua: &mlua::Lua) -> mlua::Result<Self> {
+        match value {
+            mlua::Value::Integer(value) => {
+                let value = u16::try_from(value).map_err(|err| {
+                    mlua::Error::DeserializeError(format!(
+                        "Error deserializing specrev {value}:\n{err}"
+                    ))
+                })?;
+                Ok(Self(value))
+            }
+            value => Err(mlua::Error::DeserializeError(format!(
+                "Expected specrev to be an integer, but got {}",
+                value.type_name()
+            ))),
+        }
+    }
+}
+
+/// Iterates `SpecRev`s upwards, starting from `1`.
+pub(crate) struct SpecRevIterator {
+    current: u16,
+}
+
+impl SpecRevIterator {
+    pub fn new() -> Self {
+        SpecRevIterator {
+            current: SpecRev::default().0,
+        }
+    }
+}
+
+impl Iterator for SpecRevIterator {
+    type Item = SpecRev;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.current += 1;
+        if self.current == 0 {
+            None // overflow
+        } else {
+            Some(SpecRev(self.current))
+        }
+    }
+}
+
 // TODO: Stop deriving Eq here
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct SemVer {

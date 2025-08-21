@@ -153,7 +153,7 @@ pub async fn pack(args: Pack, config: Config) -> Result<()> {
             // so we add a guard that it can be created here.
             project
                 .toml()
-                .into_remote()?
+                .into_remote(None)?
                 .to_lua_remote_rockspec_string()?;
             let package = build::build(build::Build::default(), config.clone())
                 .await?

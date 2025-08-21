@@ -13,6 +13,8 @@ pub use version::{
     VersionReqToVersionError,
 };
 
+pub(crate) use version::SpecRevIterator;
+
 use crate::{
     lockfile::RemotePackageSourceUrl,
     lua_rockspec::{DisplayAsLuaKV, DisplayLuaKV, DisplayLuaValue},

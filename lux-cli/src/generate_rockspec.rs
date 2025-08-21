@@ -8,7 +8,7 @@ pub struct GenerateRockspec {}
 pub fn generate_rockspec(_data: GenerateRockspec) -> Result<()> {
     let project = Project::current_or_err()?;
 
-    let toml = project.toml().into_remote()?;
+    let toml = project.toml().into_remote(None)?;
     let rockspec = toml.to_lua_remote_rockspec_string()?;
 
     let path = project

@@ -14,6 +14,7 @@ use crate::lua_rockspec::RemoteLuaRockspec;
 use crate::lua_rockspec::RockSourceSpec;
 use crate::operations::RunCommand;
 use crate::package::PackageNameList;
+use crate::package::SpecRev;
 use crate::rockspec::lua_dependency::LuaDependencySpec;
 use std::io;
 use std::{collections::HashMap, path::PathBuf};
@@ -220,8 +221,8 @@ impl UserData for PartialProjectToml {
         methods.add_method("to_local", |_, this, _: ()| {
             this.into_local().into_lua_err()
         });
-        methods.add_method("to_remote", |_, this, _: ()| {
-            this.into_remote().into_lua_err()
+        methods.add_method("to_remote", |_, this, specrev: Option<SpecRev>| {
+            this.into_remote(specrev).into_lua_err()
         });
         //TODO:
         //methods.add_method("merge", |_, this, other: PartialLuaRockspec| {
@@ -370,10 +371,13 @@ impl PartialProjectToml {
     /// Convert the `PartialProjectToml` struct into a `RemoteProjectToml` struct, making
     /// it ready to be serialized into a rockspec.
     /// A source must be provided for the rockspec to be valid.
-    pub fn into_remote(&self) -> Result<RemoteProjectToml, RemoteProjectTomlValidationError> {
+    pub fn into_remote(
+        &self,
+        specrev: Option<SpecRev>,
+    ) -> Result<RemoteProjectToml, RemoteProjectTomlValidationError> {
         let version = self
             .version_template
-            .try_generate(&self.project_root, None)?;
+            .try_generate(&self.project_root, specrev)?;
         let source =
             self.source_template
                 .try_generate(&self.project_root, &self.package, &version)?;
@@ -1091,7 +1095,7 @@ mod tests {
         "#;
 
         let project = PartialProjectToml::new(project_toml, ProjectRoot::default()).unwrap();
-        let _ = project.into_remote().unwrap();
+        let _ = project.into_remote(None).unwrap();
 
         let project_toml = r#"
         package = "my-package"
@@ -1147,7 +1151,7 @@ mod tests {
         "#;
 
         let project = PartialProjectToml::new(project_toml, ProjectRoot::default()).unwrap();
-        let _ = project.into_remote().unwrap();
+        let _ = project.into_remote(None).unwrap();
     }
 
     #[test]
@@ -1305,7 +1309,7 @@ mod tests {
 
         let project_toml = PartialProjectToml::new(project_toml, ProjectRoot::default()).unwrap();
         let rockspec = project_toml
-            .into_remote()
+            .into_remote(None)
             .unwrap()
             .to_lua_rockspec()
             .unwrap();
@@ -1466,7 +1470,10 @@ mod tests {
         let partial_rockspec = PartialLuaRockspec::new(mergable_rockspec_content).unwrap();
         let expected_rockspec = RemoteLuaRockspec::new(&remote_rockspec_content).unwrap();
 
-        let merged = project_toml.merge(partial_rockspec).into_remote().unwrap();
+        let merged = project_toml
+            .merge(partial_rockspec)
+            .into_remote(None)
+            .unwrap();
 
         let sorted_package_reqs = |v: &PerPlatform<Vec<LuaDependencySpec>>| {
             let mut v = v.current_platform().clone();
@@ -1562,7 +1569,7 @@ mod tests {
 
         PartialProjectToml::new(rockspec_content, ProjectRoot::default())
             .unwrap()
-            .into_remote()
+            .into_remote(None)
             .unwrap_err();
     }
 
@@ -1583,7 +1590,7 @@ mod tests {
 
         PartialProjectToml::new(rockspec_content, ProjectRoot::default())
             .unwrap()
-            .into_remote()
+            .into_remote(None)
             .unwrap();
     }
 
@@ -1620,7 +1627,7 @@ mod tests {
         let project_root = assert_fs::TempDir::new().unwrap();
         init_sample_project_repo(&project_root);
         let project = Project::from(&project_root).unwrap().unwrap();
-        let remote_project_toml = project.toml().into_remote().unwrap();
+        let remote_project_toml = project.toml().into_remote(None).unwrap();
         let source = remote_project_toml.source.current_platform();
         let source_spec = &source.source_spec;
         assert!(matches!(source_spec, &RockSourceSpec::Git { .. }));
@@ -1639,7 +1646,7 @@ mod tests {
         let tag_name = "bla";
         create_tag(&repo, tag_name);
         let project = Project::from(&project_root).unwrap().unwrap();
-        let remote_project_toml = project.toml().into_remote().unwrap();
+        let remote_project_toml = project.toml().into_remote(None).unwrap();
         let source = remote_project_toml.source.current_platform();
         let source_spec = &source.source_spec;
         assert!(matches!(source_spec, &RockSourceSpec::Git { .. }));
@@ -1659,7 +1666,7 @@ mod tests {
         create_tag(&repo, "bla");
         create_tag(&repo, tag_name);
         let project = Project::from(&project_root).unwrap().unwrap();
-        let remote_project_toml = project.toml().into_remote().unwrap();
+        let remote_project_toml = project.toml().into_remote(None).unwrap();
         let source = remote_project_toml.source.current_platform();
         let source_spec = &source.source_spec;
         assert!(matches!(source_spec, &RockSourceSpec::Url { .. }));
@@ -1681,7 +1688,7 @@ mod tests {
         let tag_name = "1.0.0";
         create_tag(&repo, tag_name);
         let project = Project::from(&project_root).unwrap().unwrap();
-        let remote_project_toml = project.toml().into_remote().unwrap();
+        let remote_project_toml = project.toml().into_remote(None).unwrap();
         let source = remote_project_toml.source.current_platform();
         let source_spec = &source.source_spec;
         assert!(matches!(source_spec, &RockSourceSpec::Url { .. }));
@@ -1721,7 +1728,7 @@ mod tests {
         let tag_name = "1.0.0";
         create_tag(&repo, tag_name);
         let project = Project::from(&project_dir).unwrap().unwrap();
-        let remote_project_toml = project.toml().into_remote().unwrap();
+        let remote_project_toml = project.toml().into_remote(None).unwrap();
         let source = remote_project_toml.source.current_platform();
         let source_spec = &source.source_spec;
         assert!(matches!(source_spec, &RockSourceSpec::Url { .. }));
