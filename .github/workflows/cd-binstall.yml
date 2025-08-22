@@ -56,27 +56,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@main
-        if: "!endsWith(matrix.target, 'windows-msvc')"
-
-      - name: Setup cachix
-        uses: cachix/cachix-action@v16
-        if: "!endsWith(matrix.target, 'windows-msvc')"
-        with:
-          name: neorocks
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-
-      - name: Nix devShell
-        uses: nicknovitski/nix-develop@v1.2.1
-        if: "!endsWith(matrix.target, 'windows-msvc')"
-        with:
-          arguments: ".#cd"
-
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: ${{ matrix.target }}
         if: startsWith(matrix.os, 'ubuntu') && !contains(matrix.target, '-musl')
+
+      - name: Install build dependencies (Linux)
+        if: "startsWith(matrix.os, 'ubuntu')"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgpgme11-dev \
+            libgpg-error-dev \
+
+      - name: Install build dependencies (macOS)
+        if: "startsWith(matrix.os, 'macos')"
+        run: brew install gpgme
 
       - name: Install Rust Toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
