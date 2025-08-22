@@ -4,6 +4,7 @@ permissions:
   contents: write
 
 on:
+  pull_request: # TODO: remove
   release:
     types: [published]
   workflow_dispatch:
@@ -54,26 +55,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@main
-        if: "!startsWith(matrix.os, 'windows')"
-
-      - name: Setup cachix
-        uses: cachix/cachix-action@v16
-        with:
-          name: neorocks
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-        if: "!startsWith(matrix.os, 'windows')"
-
-      - name: Nix devShell
-        uses: nicknovitski/nix-develop@v1.2.1
-        with:
-          arguments: ".#cd"
-        if: "!startsWith(matrix.os, 'windows')"
-
       - name: Install Rust Toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
-        if: startsWith(matrix.os, 'windows')
 
       # NOTE: We cannot cross-compile yet because of dynamically linked dependencies:
       # - gpgme -> lgpg-error, lgpgme
@@ -107,6 +90,18 @@ jobs:
       - name: Install MSVC Compiler Toolchain
         uses: ilammy/msvc-dev-cmd@v1
         if: "startsWith(matrix.os, 'windows')"
+
+      - name: Install build dependencies (Linux)
+        if: "startsWith(matrix.os, 'ubuntu')"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgpgme11-dev \
+            libgpg-error-dev \
+
+      - name: Install build dependencies (macOS)
+        if: "startsWith(matrix.os, 'macos')"
+        run: brew install gpgme
 
       - name: Build binary distributions (*nix)
         if: "!startsWith(matrix.os, 'windows')"
