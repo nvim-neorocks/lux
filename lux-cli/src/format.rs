@@ -3,13 +3,23 @@ use std::path::PathBuf;
 use clap::Args;
 use eyre::{OptionExt, Result};
 use lux_lib::project::Project;
+use path_slash::PathExt;
 use stylua_lib::Config;
 use walkdir::WalkDir;
 
 #[derive(Args)]
 pub struct Fmt {
-    /// Optional path to a workspace or Lua file to format
+    /// Optional path to a workspace or Lua file to format.
     workspace_or_file: Option<PathBuf>,
+
+    #[clap(default_value = "stylua")]
+    backend: FmtBackend,
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+enum FmtBackend {
+    Stylua,
+    EmmyluaCodestyle,
 }
 
 // TODO: Add `PathBuf` parameter that describes what directory or file to format here.
@@ -40,12 +50,23 @@ pub fn format(args: Fmt) -> Result<()> {
                 .extension()
                 .is_some_and(|ext| ext == "lua")
             {
-                let formatted_code = stylua_lib::format_code(
-                    &std::fs::read_to_string(file.path())?,
-                    config,
-                    None,
-                    stylua_lib::OutputVerification::Full,
-                )?;
+                let unformatted_code = std::fs::read_to_string(file.path())?;
+                let formatted_code = match args.backend {
+                    FmtBackend::Stylua => stylua_lib::format_code(
+                        &unformatted_code,
+                        config,
+                        None,
+                        stylua_lib::OutputVerification::Full,
+                    )?,
+                    FmtBackend::EmmyluaCodestyle => {
+                        let uri = file.path().to_slash_lossy().to_string();
+                        emmylua_codestyle::reformat_code(
+                            &unformatted_code,
+                            &uri,
+                            emmylua_codestyle::FormattingOptions::default(),
+                        )
+                    }
+                };
 
                 std::fs::write(file.into_path(), formatted_code)?;
             };
@@ -57,12 +78,23 @@ pub fn format(args: Fmt) -> Result<()> {
     let rockspec = project.root().join("extra.rockspec");
 
     if rockspec.exists() {
-        let formatted_code = stylua_lib::format_code(
-            &std::fs::read_to_string(&rockspec)?,
-            config,
-            None,
-            stylua_lib::OutputVerification::Full,
-        )?;
+        let unformatted_code = std::fs::read_to_string(&rockspec)?;
+        let formatted_code = match args.backend {
+            FmtBackend::Stylua => stylua_lib::format_code(
+                &unformatted_code,
+                config,
+                None,
+                stylua_lib::OutputVerification::Full,
+            )?,
+            FmtBackend::EmmyluaCodestyle => {
+                let uri = rockspec.to_slash_lossy().to_string();
+                emmylua_codestyle::reformat_code(
+                    &unformatted_code,
+                    &uri,
+                    emmylua_codestyle::FormattingOptions::default(),
+                )
+            }
+        };
 
         std::fs::write(rockspec, formatted_code)?;
     }
