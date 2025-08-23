@@ -136,9 +136,9 @@ pub(crate) async fn compile_c_files(
     let mut build = cc::Build::new();
     let intermediate_dir = tempdir::TempDir::new(target_module.as_str())?;
     let build = build
-        .cargo_output(false)
-        .cargo_metadata(false)
-        .cargo_warnings(false)
+        .cargo_output(config.verbose())
+        .cargo_metadata(config.verbose())
+        .cargo_warnings(config.verbose())
         .warnings(config.verbose())
         .files(files)
         .host(std::env::consts::OS)
@@ -345,9 +345,9 @@ pub(crate) async fn compile_c_modules(
 
     let intermediate_dir = tempdir::TempDir::new(target_module.as_str())?;
     let build = build
-        .cargo_output(false)
-        .cargo_metadata(false)
-        .cargo_warnings(false)
+        .cargo_output(config.verbose())
+        .cargo_metadata(config.verbose())
+        .cargo_warnings(config.verbose())
         .warnings(config.verbose())
         .files(source_files)
         .host(std::env::consts::OS)
