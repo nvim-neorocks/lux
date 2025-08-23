@@ -10,17 +10,18 @@ use super::utils::project::current_project_or_user_tree;
 
 #[derive(Args)]
 pub struct Shell {
-    /// Add test dependencies to the shell's paths
+    /// Add test dependencies to the shell's paths,{n}
+    /// in addition to the regular dependencies.
     #[arg(long)]
     test: bool,
 
-    /// Add build dependencies to the shell's paths
-    #[arg(long)]
+    /// Add *only* build dependencies to the shell's paths.
+    #[arg(long, conflicts_with = "test")]
     build: bool,
 
-    /// Disable the Lux loader.
-    /// If a rock has conflicting transitive dependencies,
-    /// disabling the Lux loader may result in the wrong modules being loaded.
+    /// Disable the Lux loader.{n}
+    /// If a rock has conflicting transitive dependencies,{n}
+    /// disabling the Lux loader may result in the wrong modules being loaded.{n}
     #[arg(long)]
     no_loader: bool,
 }
@@ -32,7 +33,18 @@ pub async fn shell(data: Shell, config: Config) -> Result<()> {
 
     let tree = current_project_or_user_tree(&config).unwrap();
 
-    let mut path = Paths::new(&tree)?;
+    let path = if data.build {
+        let build_tree_path = tree.build_tree(&config)?;
+        Paths::new(&build_tree_path)?
+    } else {
+        let mut path = Paths::new(&tree)?;
+        if data.test {
+            let test_tree_path = tree.test_tree(&config)?;
+            let test_path = Paths::new(&test_tree_path)?;
+            path.prepend(&test_path);
+        }
+        path
+    };
 
     let shell: PathBuf = match env::var("SHELL") {
         Ok(val) => PathBuf::from(val),
@@ -49,18 +61,6 @@ pub async fn shell(data: Shell, config: Config) -> Result<()> {
             fallback
         }
     };
-
-    if data.test {
-        let test_tree_path = tree.test_tree(&config)?;
-        let test_path = Paths::new(&test_tree_path)?;
-        path.prepend(&test_path);
-    }
-
-    if data.build {
-        let build_tree_path = tree.build_tree(&config)?;
-        let build_path = Paths::new(&build_tree_path)?;
-        path.prepend(&build_path);
-    }
 
     let lua_path = path.package_path_prepended();
     let lua_cpath = path.package_cpath_prepended();
