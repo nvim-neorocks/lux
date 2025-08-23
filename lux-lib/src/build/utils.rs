@@ -141,7 +141,8 @@ pub(crate) async fn compile_c_files(
         .cargo_warnings(config.verbose())
         .warnings(config.verbose())
         .files(files)
-        .host(std::env::consts::OS)
+        .host(&host.to_string())
+        .target(&host.to_string())
         .includes(lua.includes())
         .includes(
             external_dependencies
@@ -149,8 +150,7 @@ pub(crate) async fn compile_c_files(
                 .filter_map(|(_, dep)| dep.include_dir.as_ref()),
         )
         .opt_level(3)
-        .out_dir(intermediate_dir)
-        .target(&host.to_string());
+        .out_dir(intermediate_dir);
 
     let compiler = build.try_get_compiler()?;
     // Suppress all warnings
@@ -350,7 +350,8 @@ pub(crate) async fn compile_c_modules(
         .cargo_warnings(config.verbose())
         .warnings(config.verbose())
         .files(source_files)
-        .host(std::env::consts::OS)
+        .host(&host.to_string())
+        .target(&host.to_string())
         .includes(&include_dirs)
         .includes(lua.includes())
         .includes(
@@ -359,8 +360,7 @@ pub(crate) async fn compile_c_modules(
                 .filter_map(|(_, dep)| dep.include_dir.as_ref()),
         )
         .opt_level(3)
-        .out_dir(intermediate_dir)
-        .target(&host.to_string());
+        .out_dir(intermediate_dir);
 
     let compiler = build.try_get_compiler()?;
     let is_msvc = compiler.is_like_msvc();
