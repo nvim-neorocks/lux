@@ -1,10 +1,7 @@
 use clap::Args;
 use eyre::Result;
 use lux_lib::{
-    config::Config,
-    operations::Download,
-    package::PackageReq,
-    progress::{MultiProgress, Progress},
+    config::Config, operations::Download, package::PackageReq, progress::MultiProgress,
     rockspec::Rockspec,
 };
 
@@ -18,8 +15,8 @@ pub struct Info {
 pub async fn info(data: Info, config: Config) -> Result<()> {
     let tree = current_project_or_user_tree(&config)?;
 
-    let progress = MultiProgress::new();
-    let bar = Progress::Progress(progress.new_bar());
+    let progress = MultiProgress::new(&config);
+    let bar = progress.map(MultiProgress::new_bar);
 
     let rockspec = Download::new(&data.package, &config, &bar)
         .download_rockspec()

@@ -97,7 +97,7 @@ where
         let install_built = self._build();
         let progress = match install_built.progress {
             Some(p) => p,
-            None => MultiProgress::new_arc(),
+            None => MultiProgress::new_arc(install_built.config),
         };
         let package_db = match install_built.package_db {
             Some(db) => db,

@@ -412,7 +412,7 @@ mod tests {
     use httptest::{matchers::request, responders::status_code, Expectation, Server};
     use serial_test::serial;
 
-    use crate::{config::ConfigBuilder, package::PackageReq};
+    use crate::{config::ConfigBuilder, package::PackageReq, progress::MultiProgress};
 
     use super::*;
 
@@ -451,15 +451,14 @@ mod tests {
             .unwrap()
             .cache_dir(Some(cache_dir))
             .lua_version(Some(crate::config::LuaVersion::LuaJIT))
+            .no_progress(Some(true))
             .build()
             .unwrap();
-        manifest_from_cache_or_server(
-            &Url::parse(&url_str).unwrap(),
-            &config,
-            &Progress::NoProgress,
-        )
-        .await
-        .unwrap();
+        let progress = MultiProgress::new(&config);
+        let bar = progress.map(MultiProgress::new_bar);
+        manifest_from_cache_or_server(&Url::parse(&url_str).unwrap(), &config, &bar)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -474,16 +473,15 @@ mod tests {
             .unwrap()
             .cache_dir(Some(cache_dir))
             .lua_version(Some(crate::config::LuaVersion::Lua51))
+            .no_progress(Some(true))
             .build()
             .unwrap();
+        let progress = MultiProgress::new(&config);
+        let bar = progress.map(MultiProgress::new_bar);
 
-        manifest_from_cache_or_server(
-            &Url::parse(&url_str).unwrap(),
-            &config,
-            &Progress::NoProgress,
-        )
-        .await
-        .unwrap();
+        manifest_from_cache_or_server(&Url::parse(&url_str).unwrap(), &config, &bar)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -504,15 +502,14 @@ mod tests {
             .unwrap()
             .cache_dir(Some(cache_dir.to_path_buf()))
             .lua_version(Some(crate::config::LuaVersion::Lua51))
+            .no_progress(Some(true))
             .build()
             .unwrap();
-        let result = manifest_from_cache_or_server(
-            &Url::parse(&url_str).unwrap(),
-            &config,
-            &Progress::NoProgress,
-        )
-        .await
-        .unwrap();
+        let progress = MultiProgress::new(&config);
+        let bar = progress.map(MultiProgress::new_bar);
+        let result = manifest_from_cache_or_server(&Url::parse(&url_str).unwrap(), &config, &bar)
+            .await
+            .unwrap();
         assert_eq!(result, manifest_content);
     }
 

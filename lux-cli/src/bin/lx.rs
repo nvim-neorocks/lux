@@ -40,7 +40,8 @@ async fn main() -> Result<()> {
             cli.variables
                 .map(|variables| variables.into_iter().collect()),
         )
-        .verbose(Some(cli.verbose));
+        .verbose(Some(cli.verbose))
+        .no_progress(Some(cli.no_progress));
 
     if cli.nvim {
         config_builder = config_builder.entrypoint_layout(RockLayoutConfig::new_nvim_layout());
@@ -59,7 +60,7 @@ async fn main() -> Result<()> {
         Commands::Download(download_data) => download::download(download_data, config).await?,
         Commands::Debug(debug) => match debug {
             Debug::FetchRemote(unpack_data) => fetch::fetch_remote(unpack_data, config).await?,
-            Debug::Unpack(unpack_data) => unpack::unpack(unpack_data).await?,
+            Debug::Unpack(unpack_data) => unpack::unpack(unpack_data, config).await?,
             Debug::UnpackRemote(unpack_data) => unpack::unpack_remote(unpack_data, config).await?,
             Debug::Project(debug_project) => project::debug_project(debug_project)?,
         },

@@ -8,7 +8,7 @@ use text_trees::{FormatCharacters, StringTreeNode, TreeFormatting};
 use lux_lib::{
     config::Config,
     package::{PackageName, PackageReq, PackageVersion},
-    progress::{MultiProgress, Progress},
+    progress::MultiProgress,
     remote_package_db::RemotePackageDB,
 };
 
@@ -22,8 +22,8 @@ pub struct Search {
 }
 
 pub async fn search(data: Search, config: Config) -> Result<()> {
-    let progress = MultiProgress::new();
-    let bar = Progress::Progress(progress.new_bar());
+    let progress = MultiProgress::new(&config);
+    let bar = progress.map(MultiProgress::new_bar);
     let formatting = TreeFormatting::dir_tree(FormatCharacters::box_chars());
 
     let package_db = RemotePackageDB::from_config(&config, &bar).await?;

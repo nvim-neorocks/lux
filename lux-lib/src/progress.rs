@@ -1,5 +1,7 @@
 use std::{borrow::Cow, sync::Arc, time::Duration};
 
+use crate::config::Config;
+
 mod private {
     pub trait HasProgress {}
 }
@@ -12,7 +14,10 @@ pub trait HasProgress: private::HasProgress {}
 impl<P: private::HasProgress> HasProgress for P {}
 
 #[derive(Clone)]
-pub enum Progress<T: HasProgress> {
+pub struct Progress<T: HasProgress>(ProgressImpl<T>);
+
+#[derive(Clone)]
+enum ProgressImpl<T: HasProgress> {
     NoProgress,
     Progress(T),
 }
@@ -21,16 +26,28 @@ impl<T> Progress<T>
 where
     T: HasProgress,
 {
+    pub fn new(progress: T, config: &Config) -> Progress<T> {
+        Progress(if config.no_progress() {
+            ProgressImpl::NoProgress
+        } else {
+            ProgressImpl::Progress(progress)
+        })
+    }
+
+    pub fn no_progress() -> Progress<T> {
+        Progress(ProgressImpl::NoProgress)
+    }
+
     pub fn map<F, R>(&self, callback: F) -> Progress<R>
     where
         F: FnOnce(&T) -> R,
         R: HasProgress,
     {
-        if let Progress::Progress(progress) = self {
-            Progress::Progress(callback(progress))
+        Progress(if let ProgressImpl::Progress(progress) = &self.0 {
+            ProgressImpl::Progress(callback(progress))
         } else {
-            Progress::NoProgress
-        }
+            ProgressImpl::NoProgress
+        })
     }
 }
 
@@ -39,12 +56,12 @@ pub struct MultiProgress(indicatif::MultiProgress);
 pub struct ProgressBar(indicatif::ProgressBar);
 
 impl MultiProgress {
-    pub fn new() -> Self {
-        Self(indicatif::MultiProgress::new())
+    pub fn new(config: &Config) -> Progress<Self> {
+        Progress::new(Self(indicatif::MultiProgress::new()), config)
     }
 
-    pub fn new_arc() -> Arc<Progress<MultiProgress>> {
-        Arc::new(Progress::Progress(MultiProgress::new()))
+    pub fn new_arc(config: &Config) -> Arc<Progress<MultiProgress>> {
+        Arc::new(MultiProgress::new(config))
     }
 
     pub fn add(&self, bar: ProgressBar) -> ProgressBar {
@@ -60,12 +77,6 @@ impl MultiProgress {
         F: FnOnce() -> R,
     {
         self.0.suspend(callback)
-    }
-}
-
-impl Default for MultiProgress {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

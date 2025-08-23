@@ -4,7 +4,7 @@ use assert_fs::assert::PathAssert;
 use assert_fs::prelude::{PathChild, PathCopy};
 use assert_fs::TempDir;
 use lux_lib::lua_installation::detect_installed_lua_version;
-use lux_lib::progress::{MultiProgress, Progress, ProgressBar};
+use lux_lib::progress::{MultiProgress, ProgressBar};
 use lux_lib::{
     config::{ConfigBuilder, LuaVersion},
     lua_installation::LuaInstallation,
@@ -26,7 +26,7 @@ async fn luarocks_make() {
         .unwrap();
     let tree = config.user_tree(lua_version.unwrap()).unwrap();
     let luarocks = LuaRocksInstallation::new(&config, tree).unwrap();
-    let progress = Progress::Progress(MultiProgress::new());
+    let progress = MultiProgress::new(&config);
     let bar = progress.map(|p| p.add(ProgressBar::from("Installing luarocks".to_string())));
     let lua =
         LuaInstallation::new_from_config(&config, &progress.map(|progress| progress.new_bar()))
@@ -40,8 +40,8 @@ async fn luarocks_make() {
     build_dir.copy_from(&project_root, &["**"]).unwrap();
     let dest_dir = TempDir::new().unwrap();
     let lua_version = LuaVersion::from(&config).unwrap_or(&LuaVersion::Lua51);
-    let progress = MultiProgress::new();
-    let bar = Progress::Progress(progress.new_bar());
+    let progress = MultiProgress::new(&config);
+    let bar = progress.map(MultiProgress::new_bar);
     let lua = LuaInstallation::new(lua_version, &config, &bar)
         .await
         .unwrap();

@@ -197,7 +197,7 @@ impl UserData for Project {
                 // `Runtime::enter()`. During testing in `lux-lua`, this seems to be working just fine.
                 let _guard = lua_runtime().enter();
 
-                let package_db = RemotePackageDB::from_config(&config, &Progress::NoProgress)
+                let package_db = RemotePackageDB::from_config(&config, &Progress::no_progress())
                     .await
                     .into_lua_err()?;
                 this.add(deps, &package_db).await.into_lua_err()

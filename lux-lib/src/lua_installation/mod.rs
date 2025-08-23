@@ -496,8 +496,8 @@ mod test {
         }
         let config = ConfigBuilder::new().unwrap().build().unwrap();
         let lua_version = config.lua_version().unwrap();
-        let progress = MultiProgress::new();
-        let bar = Progress::Progress(progress.new_bar());
+        let progress = MultiProgress::new(&config);
+        let bar = progress.map(MultiProgress::new_bar);
         let lua_installation = LuaInstallation::new(lua_version, &config, &bar)
             .await
             .unwrap();

@@ -5,7 +5,7 @@ use eyre::Result;
 use itertools::Itertools;
 use lux_lib::{
     config::{Config, LuaVersion},
-    progress::{MultiProgress, Progress},
+    progress::MultiProgress,
     project::Project,
     remote_package_db::RemotePackageDB,
 };
@@ -22,13 +22,13 @@ pub struct Outdated {
 /// List rocks that are outdated
 /// If in a project, this lists rocks in the project tree
 pub async fn outdated(outdated_data: Outdated, config: Config) -> Result<()> {
-    let progress = MultiProgress::new();
-    let bar = Progress::Progress(progress.new_bar());
+    let progress = MultiProgress::new(&config);
+    let bar = progress.map(MultiProgress::new_bar);
     let project = Project::current()?;
     let tree = match &project {
         Some(project) => {
             // Make sure dependencies are synced if in a project
-            sync_dependencies_if_locked(project, MultiProgress::new_arc(), &config).await?;
+            sync_dependencies_if_locked(project, MultiProgress::new_arc(&config), &config).await?;
             project.tree(&config)?
         }
         None => {

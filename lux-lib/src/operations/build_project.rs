@@ -59,8 +59,7 @@ pub struct BuildProject<'a> {
     /// Build only the dependencies
     only_deps: bool,
 
-    #[builder(default = MultiProgress::new_arc())]
-    progress: Arc<Progress<MultiProgress>>,
+    progress: Option<Arc<Progress<MultiProgress>>>,
 }
 
 impl<State: build_project_builder::State + build_project_builder::IsComplete>
@@ -71,7 +70,9 @@ impl<State: build_project_builder::State + build_project_builder::IsComplete>
         let args = self._build();
         let project = args.project;
         let config = args.config;
-        let progress_arc = args.progress;
+        let progress_arc = args
+            .progress
+            .unwrap_or_else(|| MultiProgress::new_arc(config));
         let progress = Arc::clone(&progress_arc);
 
         let project_toml = project.toml().into_local()?;

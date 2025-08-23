@@ -39,7 +39,7 @@ pub async fn install_rockspec(data: InstallRockspec, config: Config) -> Result<(
         return Err(eyre!("Provided path is not a valid rockspec!"));
     }
 
-    let progress_arc = MultiProgress::new_arc();
+    let progress_arc = MultiProgress::new_arc(&config);
     let progress = Arc::clone(&progress_arc);
 
     let content = std::fs::read_to_string(path)?;

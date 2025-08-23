@@ -31,7 +31,7 @@ async fn search(
     query: String,
     config: &Config,
 ) -> mlua::Result<HashMap<PackageName, Vec<PackageVersion>>> {
-    let remote_db = RemotePackageDB::from_config(config, &Progress::NoProgress)
+    let remote_db = RemotePackageDB::from_config(config, &Progress::no_progress())
         .await
         .into_lua_err()?;
 

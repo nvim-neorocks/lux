@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use assert_fs::prelude::PathCopy;
 use assert_fs::TempDir;
+use lux_lib::progress::MultiProgress;
 use lux_lib::rockspec::Rockspec;
 use lux_lib::{
     build::{Build, BuildBehaviour::Force},
@@ -32,10 +33,12 @@ async fn builtin_build() {
         .unwrap()
         .user_tree(Some(dir.to_path_buf()))
         .lua_version(lua_version)
+        .no_progress(Some(true))
         .build()
         .unwrap();
 
-    let bar = Progress::NoProgress;
+    let progress = MultiProgress::new(&config);
+    let bar = progress.map(MultiProgress::new_bar);
 
     let lua = LuaInstallation::new_from_config(&config, &bar)
         .await
@@ -75,7 +78,7 @@ async fn make_build() {
         .build()
         .unwrap();
 
-    let bar = Progress::NoProgress;
+    let bar = Progress::no_progress();
 
     let lua = LuaInstallation::new_from_config(&config, &bar)
         .await
@@ -129,7 +132,7 @@ async fn test_build_rockspec(rockspec_path: PathBuf) {
         .build()
         .unwrap();
 
-    let bar = Progress::NoProgress;
+    let bar = Progress::no_progress();
 
     let lua = LuaInstallation::new_from_config(&config, &bar)
         .await
@@ -174,7 +177,7 @@ async fn treesitter_parser_build() {
         .build()
         .unwrap();
 
-    let bar = Progress::NoProgress;
+    let bar = Progress::no_progress();
 
     let lua = LuaInstallation::new_from_config(&config, &bar)
         .await
@@ -215,7 +218,7 @@ async fn test_build_local_project_no_source() {
         .unwrap();
 
     let tree = project.tree(&config).unwrap();
-    let bar = Progress::NoProgress;
+    let bar = Progress::no_progress();
 
     let lua = LuaInstallation::new_from_config(&config, &bar)
         .await
@@ -259,7 +262,7 @@ async fn test_build_local_project_only_src() {
         .unwrap();
 
     let tree = project.tree(&config).unwrap();
-    let bar = Progress::NoProgress;
+    let bar = Progress::no_progress();
 
     let lua = LuaInstallation::new_from_config(&config, &bar)
         .await
@@ -320,7 +323,7 @@ fn test_build_multiple_treesitter_parsers() {
         let rockspec = rockspec.clone();
 
         handles.push(runtime.spawn(async move {
-            let bar = Progress::NoProgress;
+            let bar = Progress::no_progress();
             let lua = LuaInstallation::new_from_config(&config, &bar)
                 .await
                 .unwrap();
@@ -360,7 +363,7 @@ async fn build_project_with_git_dependency() {
         .unwrap();
 
     let tree = project.tree(&config).unwrap();
-    let bar = Progress::NoProgress;
+    let bar = Progress::no_progress();
 
     let lua = LuaInstallation::new_from_config(&config, &bar)
         .await
@@ -397,7 +400,7 @@ async fn test_multiline_command_build() {
         .unwrap();
 
     let tree = project.tree(&config).unwrap();
-    let bar = Progress::NoProgress;
+    let bar = Progress::no_progress();
 
     let lua = LuaInstallation::new_from_config(&config, &bar)
         .await
@@ -437,7 +440,7 @@ async fn builtin_build_install_include() {
         .build()
         .unwrap();
 
-    let bar = Progress::NoProgress;
+    let bar = Progress::no_progress();
 
     let lua = LuaInstallation::new_from_config(&config, &bar)
         .await

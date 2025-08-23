@@ -687,7 +687,7 @@ mod tests {
     use crate::{
         config::{ConfigBuilder, LuaVersion},
         lua_installation::detect_installed_lua_version,
-        progress::{MultiProgress, Progress},
+        progress::MultiProgress,
     };
 
     use super::*;
@@ -701,8 +701,8 @@ mod tests {
             .build()
             .unwrap();
         let lua_version = config.lua_version().unwrap();
-        let progress = MultiProgress::new();
-        let bar = Progress::Progress(progress.new_bar());
+        let progress = MultiProgress::new(&config);
+        let bar = progress.map(MultiProgress::new_bar);
         let lua = LuaInstallation::new(lua_version, &config, &bar)
             .await
             .unwrap();
@@ -728,8 +728,8 @@ mod tests {
             .build()
             .unwrap();
         let lua_version = config.lua_version().unwrap();
-        let progress = MultiProgress::new();
-        let bar = Progress::Progress(progress.new_bar());
+        let progress = MultiProgress::new(&config);
+        let bar = progress.map(MultiProgress::new_bar);
         let lua = LuaInstallation::new(lua_version, &config, &bar)
             .await
             .unwrap();

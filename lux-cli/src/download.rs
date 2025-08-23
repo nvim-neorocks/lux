@@ -1,11 +1,6 @@
 use clap::Args;
 use eyre::Result;
-use lux_lib::{
-    config::Config,
-    operations,
-    package::PackageReq,
-    progress::{MultiProgress, Progress},
-};
+use lux_lib::{config::Config, operations, package::PackageReq, progress::MultiProgress};
 
 #[derive(Args)]
 pub struct Download {
@@ -13,8 +8,8 @@ pub struct Download {
 }
 
 pub async fn download(dl_data: Download, config: Config) -> Result<()> {
-    let progress = MultiProgress::new();
-    let bar = Progress::Progress(progress.new_bar());
+    let progress = MultiProgress::new(&config);
+    let bar = progress.map(MultiProgress::new_bar);
 
     let rock = operations::Download::new(&dl_data.package_req, &config, &bar)
         .download_src_rock_to_file(None)

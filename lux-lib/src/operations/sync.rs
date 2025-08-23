@@ -146,7 +146,7 @@ async fn do_sync(
     let mut project_lockfile = args.project.lockfile()?.write_guard();
     let dest_lockfile = tree.lockfile()?;
 
-    let progress = args.progress.unwrap_or(MultiProgress::new_arc());
+    let progress = args.progress.unwrap_or(MultiProgress::new_arc(args.config));
 
     let packages = match lock_type {
         LocalPackageLockType::Regular => args

@@ -88,7 +88,7 @@ Cannot uninstall dependencies:
         .cloned()
         .partition(|pkg_id| lockfile.is_dependency(pkg_id));
 
-    let progress = MultiProgress::new_arc();
+    let progress = MultiProgress::new_arc(&config);
 
     if dependencies.is_empty() {
         operations::Uninstall::new(&config)

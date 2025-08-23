@@ -70,8 +70,7 @@ pub struct Update<'a> {
 
     package_db: Option<RemotePackageDB>,
 
-    #[builder(default = MultiProgress::new_arc())]
-    progress: Arc<Progress<MultiProgress>>,
+    progress: Option<Arc<Progress<MultiProgress>>>,
 }
 
 impl<State: update_builder::State> UpdateBuilder<'_, State> {
@@ -97,10 +96,15 @@ impl<State: update_builder::State> UpdateBuilder<'_, State> {
     {
         let args = self._update();
 
+        let progress = args
+            .progress
+            .clone()
+            .unwrap_or_else(|| MultiProgress::new_arc(args.config));
+
         let package_db = match &args.package_db {
             Some(db) => db.clone(),
             None => {
-                let bar = args.progress.map(|p| p.new_bar());
+                let bar = progress.map(|p| p.new_bar());
                 let db = RemotePackageDB::from_config(args.config, &bar).await?;
                 bar.map(|b| b.finish_and_clear());
                 db
@@ -108,8 +112,8 @@ impl<State: update_builder::State> UpdateBuilder<'_, State> {
         };
 
         match Project::current()? {
-            Some(project) => update_project(project, args, package_db).await,
-            None => update_install_tree(args, package_db).await,
+            Some(project) => update_project(project, args, package_db, progress).await,
+            None => update_install_tree(args, package_db, progress).await,
         }
     }
 }
@@ -118,6 +122,7 @@ async fn update_project(
     project: Project,
     args: Update<'_>,
     package_db: RemotePackageDB,
+    progress: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, UpdateError> {
     let mut project_lockfile = project.lockfile()?.write_guard();
     let tree = project.tree(args.config)?;
@@ -133,7 +138,7 @@ async fn update_project(
         LocalPackageLockType::Regular,
         package_db.clone(),
         args.config,
-        args.progress.clone(),
+        progress.clone(),
         &args.packages,
     )
     .await?
@@ -152,7 +157,7 @@ async fn update_project(
         LocalPackageLockType::Test,
         package_db.clone(),
         args.config,
-        args.progress.clone(),
+        progress.clone(),
         &args.test_dependencies,
     )
     .await?
@@ -172,7 +177,7 @@ async fn update_project(
         LocalPackageLockType::Build,
         package_db.clone(),
         args.config,
-        args.progress.clone(),
+        progress.clone(),
         &args.build_dependencies,
     )
     .await?
@@ -225,6 +230,7 @@ fn is_included(
 async fn update_install_tree(
     args: Update<'_>,
     package_db: RemotePackageDB,
+    progress: Arc<Progress<MultiProgress>>,
 ) -> Result<Vec<LocalPackage>, UpdateError> {
     let tree = args
         .config
@@ -234,15 +240,7 @@ async fn update_install_tree(
         .into_iter()
         .filter(|pkg| is_included(pkg, &args.packages))
         .collect_vec();
-    update(
-        packages,
-        package_db,
-        tree,
-        &lockfile,
-        args.config,
-        args.progress,
-    )
-    .await
+    update(packages, package_db, tree, &lockfile, args.config, progress).await
 }
 
 async fn update(

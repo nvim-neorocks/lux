@@ -275,8 +275,8 @@ mod test {
             .user_tree(Some(install_root.to_path_buf()))
             .build()
             .unwrap();
-        let progress = MultiProgress::new();
-        let bar = progress.new_bar();
+        let progress = MultiProgress::new(&config);
+        let bar = progress.map(MultiProgress::new_bar);
         let tree = config
             .user_tree(config.lua_version().unwrap().clone())
             .unwrap();
@@ -287,7 +287,7 @@ mod test {
             tree::EntryType::Entrypoint,
             &config,
             &tree,
-            &Progress::Progress(bar),
+            &bar,
         )
         .install()
         .await
@@ -337,8 +337,8 @@ mod test {
             .user_tree(Some(install_root.to_path_buf()))
             .build()
             .unwrap();
-        let progress = MultiProgress::new();
-        let bar = progress.new_bar();
+        let progress = MultiProgress::new(&config);
+        let bar = progress.map(MultiProgress::new_bar);
         let tree = config
             .user_tree(config.lua_version().unwrap().clone())
             .unwrap();
@@ -349,7 +349,7 @@ mod test {
             tree::EntryType::Entrypoint,
             &config,
             &tree,
-            &Progress::Progress(bar),
+            &bar,
         )
         .install()
         .await
@@ -402,7 +402,6 @@ mod test {
             url: "https://test.org".parse().unwrap(),
         };
         let rockspec = unpack_rockspec(&rock).await.unwrap();
-        let bar = progress.new_bar();
         let local_package = BinaryRockInstall::new(
             &rockspec,
             RemotePackageSource::Test,
@@ -410,7 +409,7 @@ mod test {
             tree::EntryType::Entrypoint,
             &config,
             &tree,
-            &Progress::Progress(bar),
+            &bar,
         )
         .install()
         .await
