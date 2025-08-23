@@ -81,8 +81,7 @@ walkdir = { workspace = true }
 which = { workspace = true }
 
 
-[target.'cfg(not(target_env = "msvc"))'.dependencies]
-gpgme = "0.11"
+gpgme = { version = "0.11", optional = true }
 
 [dev-dependencies]
 httptest = { version = "0.16" }
@@ -102,6 +101,7 @@ lua52 = ["mlua/lua52"]
 lua53 = ["mlua/lua53"]
 lua54 = ["mlua/lua54"]
 luajit = ["mlua/luajit"]
+gpgme = ["dep:gpgme"]
 vendored = ["mlua/vendored", "openssl/vendored", "git2/vendored-libgit2"]
 vendored-openssl = ["openssl/vendored"]
 vendored-libgit2 = ["git2/vendored-libgit2"]
