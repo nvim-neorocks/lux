@@ -26,6 +26,8 @@ use thiserror::Error;
 
 use serde::{de, de::IntoDeserializer, Deserialize, Deserializer};
 
+use crate::{package::PackageName, rockspec::lua_dependency::LuaDependencySpec};
+
 use super::{
     mlua_json_value_to_vec, DisplayAsLuaKV, DisplayAsLuaValue, DisplayLuaKV, DisplayLuaValue,
     LuaTableKey, PartialOverride, PerPlatform, PlatformIdentifier,
@@ -980,6 +982,27 @@ pub(crate) enum BuildType {
     #[serde(rename = "treesitter-parser")]
     TreesitterParser,
     Source,
+}
+
+impl BuildType {
+    pub(crate) fn luarocks_build_backend(&self) -> Option<LuaDependencySpec> {
+        match self {
+            &BuildType::Builtin
+            | &BuildType::Make
+            | &BuildType::CMake
+            | &BuildType::Command
+            | &BuildType::None
+            | &BuildType::LuaRock(_)
+            | &BuildType::Source => None,
+            &BuildType::RustMlua => {
+                Some(PackageName::new("luarocks-build-rust-mlua".into()).into())
+            }
+            &BuildType::TreesitterParser => {
+                Some(PackageName::new("luarocks-build-treesitter-parser".into()).into())
+            } // IMPORTANT: If adding another luarocks build backend,
+              // make sure to also add it to the filters in `operations::resolve::do_get_all_dependencies`.
+        }
+    }
 }
 
 // Special Deserialize case for BuildType:

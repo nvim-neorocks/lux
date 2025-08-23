@@ -5,7 +5,6 @@ use crate::git::GitSource;
 use crate::hash::HasIntegrity;
 use crate::lockfile::OptState;
 use crate::lockfile::PinnedState;
-use crate::lua_rockspec::BuildType;
 use crate::lua_rockspec::DeploySpec;
 use crate::lua_rockspec::LocalLuaRockspec;
 use crate::lua_rockspec::LocalRockSource;
@@ -900,23 +899,13 @@ version = "{}""#,
             .cloned()
             .unwrap_or_default();
 
-        let build_backend_dependency: Option<LuaDependencySpec> =
-            match &self.local.internal.build.build_type {
-                &Some(BuildType::Builtin)
-                | &Some(BuildType::Make)
-                | &Some(BuildType::CMake)
-                | &Some(BuildType::Command)
-                | &Some(BuildType::None)
-                | &Some(BuildType::LuaRock(_))
-                | &Some(BuildType::Source)
-                | None => None,
-                &Some(BuildType::RustMlua) => {
-                    Some(PackageName::new("luarocks-build-rust-mlua".into()).into())
-                }
-                &Some(BuildType::TreesitterParser) => {
-                    Some(PackageName::new("luarocks-build-treesitter-parser".into()).into())
-                }
-            };
+        let build_backend_dependency = self
+            .local
+            .internal
+            .build
+            .build_type
+            .as_ref()
+            .and_then(|build_type| build_type.luarocks_build_backend());
 
         if let Some(build_backend_dependency) = build_backend_dependency {
             build_dependencies.push(build_backend_dependency);
