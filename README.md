@@ -168,6 +168,12 @@ Or, to build with dynamically linked libraries:
 cargo build --locked --profile release
 ```
 
+On Windows/MSVC, you must disable the `gpgme` feature:
+
+```bash
+cargo build --locked --profile release --no-default-features --features lua54,vendored
+```
+
 You can build `lux-lua` for a given Lua version with:
 
 ```bash
