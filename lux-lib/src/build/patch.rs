@@ -137,6 +137,8 @@ pub(crate) fn do_apply(args: Patch<'_>) -> Result<(), PatchError> {
 
 #[cfg(test)]
 mod test {
+    use crate::{config::ConfigBuilder, progress::MultiProgress};
+
     use super::*;
     use assert_fs::TempDir;
     use std::{fs, path::PathBuf};
@@ -172,7 +174,14 @@ index 959c7ed..9c6a9a1 100644
         .into_iter()
         .collect();
 
-        Patch::new(&temp_dir.join(""), &patches, &Progress::NoProgress)
+        let config = ConfigBuilder::new()
+            .unwrap()
+            .no_progress(Some(true))
+            .build()
+            .unwrap();
+        let progress = MultiProgress::new(&config);
+        let bar = progress.map(MultiProgress::new_bar);
+        Patch::new(&temp_dir.join(""), &patches, &bar)
             .apply()
             .unwrap();
 
@@ -198,7 +207,14 @@ index 0000000..1cbadfb
         )]
         .into_iter()
         .collect();
-        Patch::new(&temp_dir.join(""), &patches, &Progress::NoProgress)
+        let config = ConfigBuilder::new()
+            .unwrap()
+            .no_progress(Some(true))
+            .build()
+            .unwrap();
+        let progress = MultiProgress::new(&config);
+        let bar = progress.map(MultiProgress::new_bar);
+        Patch::new(&temp_dir.join(""), &patches, &bar)
             .apply()
             .unwrap();
         let patch_file = temp_dir.join("foo/README.md");
@@ -226,7 +242,16 @@ index 1cbadfb..0000000
         )]
         .into_iter()
         .collect();
-        Patch::new(&temp_dir.join(""), &patches, &Progress::NoProgress)
+
+        let config = ConfigBuilder::new()
+            .unwrap()
+            .no_progress(Some(true))
+            .build()
+            .unwrap();
+        let progress = MultiProgress::new(&config);
+        let bar = progress.map(MultiProgress::new_bar);
+
+        Patch::new(&temp_dir.join(""), &patches, &bar)
             .apply()
             .unwrap();
         assert!(!test_file.exists());

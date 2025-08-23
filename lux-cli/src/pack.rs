@@ -66,7 +66,7 @@ pub struct Pack {
 pub async fn pack(args: Pack, config: Config) -> Result<()> {
     let lua_version = LuaVersion::from(&config)?.clone();
     let dest_dir = std::env::current_dir()?;
-    let progress = MultiProgress::new_arc();
+    let progress = MultiProgress::new_arc(&config);
     let result: Result<PathBuf> = match args.package_or_rockspec {
         Some(PackageOrRockspec::Package(package_req)) => {
             let user_tree = config.user_tree(lua_version.clone())?;

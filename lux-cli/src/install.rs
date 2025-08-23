@@ -36,7 +36,7 @@ pub async fn install(data: Install, config: Config) -> Result<()> {
     operations::Install::new(&config)
         .packages(packages)
         .tree(tree)
-        .progress(MultiProgress::new_arc())
+        .progress(MultiProgress::new_arc(&config))
         .install()
         .await?;
 

@@ -27,7 +27,7 @@ pub struct Remove {
 
 pub async fn remove(data: Remove, config: Config) -> Result<()> {
     let mut project = Project::current()?.ok_or_eyre("No project found")?;
-    let progress = MultiProgress::new_arc();
+    let progress = MultiProgress::new_arc(&config);
 
     if !data.package.is_empty() {
         project

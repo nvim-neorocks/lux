@@ -1,10 +1,7 @@
 use clap::Args;
 use eyre::Result;
 use lux_lib::{
-    config::Config,
-    progress::{MultiProgress, Progress},
-    project::Project,
-    remote_package_db::RemotePackageDB,
+    config::Config, progress::MultiProgress, project::Project, remote_package_db::RemotePackageDB,
     upload::ProjectUpload,
 };
 
@@ -23,8 +20,8 @@ pub struct Upload {
 pub async fn upload(data: Upload, config: Config) -> Result<()> {
     let project = Project::current()?.unwrap();
 
-    let progress = MultiProgress::new();
-    let bar = Progress::Progress(progress.new_bar());
+    let progress = MultiProgress::new(&config);
+    let bar = progress.map(MultiProgress::new_bar);
     let package_db = RemotePackageDB::from_config(&config, &bar).await?;
     ProjectUpload::new()
         .project(project)
@@ -41,8 +38,8 @@ pub async fn upload(data: Upload, config: Config) -> Result<()> {
 #[cfg(not(feature = "gpgme"))]
 pub async fn upload(_data: Upload, config: Config) -> Result<()> {
     let project = Project::current()?.unwrap();
-    let progress = MultiProgress::new();
-    let bar = Progress::Progress(progress.new_bar());
+    let progress = MultiProgress::new(&config);
+    let bar = progress.map(MultiProgress::new_bar);
     let package_db = RemotePackageDB::from_config(&config, &bar).await?;
 
     ProjectUpload::new()

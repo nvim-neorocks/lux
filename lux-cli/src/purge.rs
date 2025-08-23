@@ -17,10 +17,13 @@ pub async fn purge(config: Config) -> Result<()> {
     {
         let root_dir = tree.root();
 
-        let _spinner = MultiProgress::new().add(ProgressBar::from(format!(
-            "🗑️ Purging {}",
-            root_dir.display()
-        )));
+        let progress = MultiProgress::new(&config);
+        let _spinner = progress.map(|progress| {
+            progress.add(ProgressBar::from(format!(
+                "🗑️ Purging {}",
+                root_dir.display()
+            )))
+        });
         std::fs::remove_dir_all(tree.root())?;
     }
 

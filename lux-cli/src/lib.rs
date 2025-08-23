@@ -123,6 +123,10 @@ pub struct Cli {
     #[arg(long)]
     pub verbose: bool,
 
+    /// Don't print any progress bars or spinners.
+    #[arg(long)]
+    pub no_progress: bool,
+
     /// Configure lux for installing Neovim packages.
     #[arg(long)]
     pub nvim: bool,

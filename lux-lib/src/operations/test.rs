@@ -42,8 +42,7 @@ pub struct Test<'a> {
 
     #[builder(default)]
     env: TestEnv,
-    #[builder(default = MultiProgress::new_arc())]
-    progress: Arc<Progress<MultiProgress>>,
+    progress: Option<Arc<Progress<MultiProgress>>>,
 }
 
 impl<State: test_builder::State> TestBuilder<'_, State> {
@@ -123,11 +122,15 @@ async fn run_tests(test: Test<'_>) -> Result<(), RunTestsError> {
 
     let no_lock = test.no_lock.unwrap_or(false);
 
+    let progress = test
+        .progress
+        .unwrap_or_else(|| MultiProgress::new_arc(test.config));
+
     if no_lock {
-        ensure_test_dependencies(&test.project, &rocks, &config, test.progress).await?;
+        ensure_test_dependencies(&test.project, &rocks, &config, progress).await?;
     } else {
         Sync::new(&test.project, &config)
-            .progress(test.progress.clone())
+            .progress(progress.clone())
             .sync_test_dependencies()
             .await?;
     }

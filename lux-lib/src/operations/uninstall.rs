@@ -68,7 +68,7 @@ impl<'a> Uninstall<'a> {
     pub async fn remove(self) -> Result<(), RemoveError> {
         let progress = match self.progress {
             Some(p) => p,
-            None => MultiProgress::new_arc(),
+            None => MultiProgress::new_arc(self.config),
         };
         let tree = self
             .config

@@ -2,7 +2,7 @@ use eyre::{OptionExt, Result};
 use itertools::{Either, Itertools};
 use lux_lib::{
     config::Config,
-    progress::{MultiProgress, Progress, ProgressBar},
+    progress::MultiProgress,
     project::Project,
     remote_package_db::RemotePackageDB,
     rockspec::lua_dependency::{self},
@@ -43,9 +43,11 @@ pub struct Add {
 pub async fn add(data: Add, config: Config) -> Result<()> {
     let mut project = Project::current()?.ok_or_eyre("No project found")?;
 
-    let db = RemotePackageDB::from_config(&config, &Progress::Progress(ProgressBar::new())).await?;
+    let progress = MultiProgress::new(&config);
+    let bar = progress.map(MultiProgress::new_bar);
+    let db = RemotePackageDB::from_config(&config, &bar).await?;
 
-    let progress = MultiProgress::new_arc();
+    let progress = MultiProgress::new_arc(&config);
 
     let (dependencies, git_dependencies): (Vec<_>, Vec<_>) =
         data.package_req.iter().partition_map(|req| match req {

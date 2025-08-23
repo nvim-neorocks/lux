@@ -33,7 +33,7 @@ pub struct ChangePin {
 pub async fn set_pinned_state(data: ChangePin, config: Config, pin: PinnedState) -> Result<()> {
     match Project::current()? {
         Some(mut project) => {
-            let progress = MultiProgress::new_arc();
+            let progress = MultiProgress::new_arc(&config);
             if data.package.iter().any(|pkg| !pkg.version_req().is_any()) {
                 return Err(eyre!(
                     "Cannot pin project dependencies using version constraints."

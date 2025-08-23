@@ -226,6 +226,8 @@ pub struct Config {
     lua_version: Option<LuaVersion>,
     user_tree: PathBuf,
     verbose: bool,
+    /// Don't display progress bars
+    no_progress: bool,
     timeout: Duration,
     max_jobs: usize,
     variables: HashMap<String, String>,
@@ -312,6 +314,10 @@ impl Config {
 
     pub fn verbose(&self) -> bool {
         self.verbose
+    }
+
+    pub fn no_progress(&self) -> bool {
+        self.no_progress
     }
 
     pub fn timeout(&self) -> &Duration {
@@ -403,6 +409,7 @@ pub struct ConfigBuilder {
     data_dir: Option<PathBuf>,
     enable_development_packages: Option<bool>,
     verbose: Option<bool>,
+    no_progress: Option<bool>,
     timeout: Option<Duration>,
     max_jobs: Option<usize>,
     variables: Option<HashMap<String, String>>,
@@ -505,6 +512,13 @@ impl ConfigBuilder {
         }
     }
 
+    pub fn no_progress(self, no_progress: Option<bool>) -> Self {
+        Self {
+            no_progress: no_progress.or(self.no_progress),
+            ..self
+        }
+    }
+
     pub fn timeout(self, timeout: Option<Duration>) -> Self {
         Self {
             timeout: timeout.or(self.timeout),
@@ -568,6 +582,7 @@ impl ConfigBuilder {
             lua_version,
             user_tree,
             verbose: self.verbose.unwrap_or(false),
+            no_progress: self.no_progress.unwrap_or(false),
             timeout: self.timeout.unwrap_or_else(|| Duration::from_secs(30)),
             max_jobs: match self.max_jobs.unwrap_or(usize::MAX) {
                 0 => usize::MAX,
@@ -598,6 +613,7 @@ impl From<Config> for ConfigBuilder {
             lua_version: value.lua_version,
             user_tree: Some(value.user_tree),
             verbose: Some(value.verbose),
+            no_progress: Some(value.no_progress),
             timeout: Some(value.timeout),
             max_jobs: Some(value.max_jobs),
             variables: Some(value.variables),
@@ -707,6 +723,7 @@ impl UserData for Config {
             this.user_tree(lua_version).into_lua_err()
         });
         methods.add_method("verbose", |_, this, ()| Ok(this.verbose()));
+        methods.add_method("no_progress", |_, this, ()| Ok(this.no_progress()));
         methods.add_method("timeout", |_, this, ()| Ok(this.timeout().as_secs()));
         methods.add_method("cache_dir", |_, this, ()| Ok(this.cache_dir().clone()));
         methods.add_method("data_dir", |_, this, ()| Ok(this.data_dir().clone()));
@@ -761,6 +778,9 @@ impl UserData for ConfigBuilder {
         });
         methods.add_method("verbose", |_, this, verbose: Option<bool>| {
             Ok(this.clone().verbose(verbose))
+        });
+        methods.add_method("no_progress", |_, this, no_progress: Option<bool>| {
+            Ok(this.clone().no_progress(no_progress))
         });
         methods.add_method("timeout", |_, this, timeout: Option<u64>| {
             Ok(this.clone().timeout(timeout.map(Duration::from_secs)))

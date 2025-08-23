@@ -1,19 +1,14 @@
 use std::path::PathBuf;
 
 use eyre::Result;
-use lux_lib::{
-    config::Config,
-    operations::Download,
-    progress::{MultiProgress, Progress},
-    rockspec::Rockspec,
-};
+use lux_lib::{config::Config, operations::Download, progress::MultiProgress, rockspec::Rockspec};
 
 use crate::unpack::UnpackRemote;
 
 pub async fn fetch_remote(data: UnpackRemote, config: Config) -> Result<()> {
     let package_req = data.package_req;
-    let progress = MultiProgress::new();
-    let bar = Progress::Progress(progress.new_bar());
+    let progress = MultiProgress::new(&config);
+    let bar = progress.map(MultiProgress::new_bar);
 
     let rockspec = Download::new(&package_req, &config, &bar)
         .download_rockspec()

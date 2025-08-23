@@ -154,7 +154,7 @@ impl RemotePackageDB {
         package_req: &PackageReq,
         filter: Option<RemotePackageTypeFilterSpec>,
     ) -> Option<PackageSpec> {
-        match self.find(package_req, filter, &Progress::NoProgress) {
+        match self.find(package_req, filter, &Progress::no_progress()) {
             Ok(result) => Some(result.package),
             Err(_) => None,
         }

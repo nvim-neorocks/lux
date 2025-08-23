@@ -530,14 +530,14 @@ mod tests {
             doc: dest_dir.join("doc"),
         };
         let lua_version = config.lua_version().unwrap_or(&LuaVersion::Lua51);
-        let progress = MultiProgress::new();
-        let bar = Progress::Progress(progress.new_bar());
+        let progress = MultiProgress::new(&config);
+        let bar = progress.map(MultiProgress::new_bar);
         let lua = LuaInstallation::new(lua_version, &config, &bar)
             .await
             .unwrap();
         let project = Project::from(&project_root).unwrap().unwrap();
         let rockspec = project.toml().into_remote(None).unwrap();
-        let progress = Progress::Progress(MultiProgress::new());
+        let progress = MultiProgress::new(&config);
         run_build(
             &rockspec,
             RunBuildArgs::new()

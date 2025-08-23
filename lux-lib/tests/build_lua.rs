@@ -2,13 +2,12 @@ use assert_fs::{assert::PathAssert, prelude::PathChild};
 use lux_lib::{
     config::{ConfigBuilder, LuaVersion},
     operations::BuildLua,
-    progress::{MultiProgress, Progress},
+    progress::MultiProgress,
 };
 use predicates::prelude::predicate;
 
 #[tokio::test]
 async fn test_build_lua() {
-    let progress = MultiProgress::new();
     for lua_version in [
         LuaVersion::Lua51,
         LuaVersion::Lua52,
@@ -24,7 +23,8 @@ async fn test_build_lua() {
             .lua_version(Some(lua_version.clone()))
             .build()
             .unwrap();
-        let bar = Progress::Progress(progress.new_bar());
+        let progress = MultiProgress::new(&config);
+        let bar = progress.map(MultiProgress::new_bar);
         BuildLua::new()
             .lua_version(&lua_version)
             .progress(&bar)
@@ -65,7 +65,6 @@ async fn test_build_lua() {
 
 #[tokio::test]
 async fn test_build_luajit() {
-    let progress = MultiProgress::new();
     for lua_version in [LuaVersion::LuaJIT, LuaVersion::LuaJIT52] {
         let target_dir = assert_fs::TempDir::new().unwrap();
         let target_path = target_dir.to_path_buf();
@@ -76,7 +75,8 @@ async fn test_build_luajit() {
             .lua_version(Some(lua_version.clone()))
             .build()
             .unwrap();
-        let bar = Progress::Progress(progress.new_bar());
+        let progress = MultiProgress::new(&config);
+        let bar = progress.map(MultiProgress::new_bar);
         BuildLua::new()
             .lua_version(&lua_version)
             .progress(&bar)

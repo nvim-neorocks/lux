@@ -33,7 +33,7 @@ pub async fn lint(lint_args: Lint, config: Config) -> Result<()> {
     Install::new(&config)
         .package(luacheck)
         .project(&project)?
-        .progress(MultiProgress::new_arc())
+        .progress(MultiProgress::new_arc(&config))
         .install()
         .await?;
 

@@ -46,7 +46,7 @@ impl From<OutputFormat> for emmylua_check::OutputFormat {
 pub async fn check(args: Check, config: Config) -> Result<()> {
     let project = Project::current_or_err()?;
 
-    let progress = MultiProgress::new_arc();
+    let progress = MultiProgress::new_arc(&config);
     sync_dependencies_if_locked(&project, progress.clone(), &config).await?;
     sync_test_dependencies_if_locked(&project, progress, &config).await?;
 
