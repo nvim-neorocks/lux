@@ -127,7 +127,7 @@ async fn do_build_luajit_unix(args: BuildLua<'_>, build_dir: &Path) -> Result<()
         .cargo_warnings(false)
         .warnings(config.verbose())
         .opt_level(3)
-        .host(std::env::consts::OS)
+        .host(&host.to_string())
         .target(&host.to_string());
     let compiler = cc.try_get_compiler()?;
     let compiler_path = compiler.path().to_str().unwrap();
@@ -428,7 +428,7 @@ async fn do_build_lua_msvc(
         .cargo_warnings(false)
         .warnings(config.verbose())
         .opt_level(3)
-        .host(std::env::consts::OS)
+        .host(&host.to_string())
         .target(&host.to_string());
 
     cc.define("LUA_USE_WINDOWS", None);
