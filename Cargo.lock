@@ -2874,6 +2874,7 @@ dependencies = [
  "clap_complete",
  "edit",
  "emmylua_check",
+ "emmylua_codestyle",
  "eyre",
  "git-url-parse",
  "git2",
