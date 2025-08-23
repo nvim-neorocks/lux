@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `lux-cli` - [0.16.0](https://github.com/nvim-neorocks/lux/compare/v0.15.4...v0.16.0) - 2025-08-23
+
+### Added
+- *(upload)* [**breaking**] auto-increment specrev if rock exists
+- [**breaking**] drop gpgme signing support on macos
+
+## `lux-lib` - [0.23.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.22.1...lux-lib-v0.23.0) - 2025-08-23
+
+### Added
+- *(upload)* [**breaking**] auto-increment specrev if rock exists
+- [**breaking**] drop gpgme signing support on macos
+
+### Other
+- introduce `SpecRev`, simplify generating lua rockspec
+- *(deps)* bump zip from 4.3.0 to 4.5.0 ([#1016](https://github.com/nvim-neorocks/lux/pull/1016))
+
 ## `lux-cli` - [0.15.4](https://github.com/nvim-neorocks/lux/compare/v0.15.3...v0.15.4) - 2025-08-20
 
 ### Added
