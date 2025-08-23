@@ -612,12 +612,14 @@ impl From<Config> for ConfigBuilder {
 
 fn default_variables() -> impl Iterator<Item = (String, String)> {
     let cflags = env::var("CFLAGS").unwrap_or(utils::default_cflags().into());
+    let ldflags = env::var("LDFLAGS").unwrap_or("".into());
     vec![
         ("MAKE".into(), "make".into()),
         ("CMAKE".into(), "cmake".into()),
         ("LIB_EXTENSION".into(), utils::c_dylib_extension().into()),
         ("OBJ_EXTENSION".into(), utils::c_obj_extension().into()),
         ("CFLAGS".into(), cflags),
+        ("LDFLAGS".into(), ldflags),
         ("LIBFLAG".into(), utils::default_libflag().into()),
     ]
     .into_iter()
