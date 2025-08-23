@@ -90,6 +90,9 @@ fn build(opts: BuildOpts) -> Result<(), DynError> {
         "--locked".into(),
         "--target-dir".into(),
         target_dir.to_string_lossy().to_string(),
+        "--no-default-features".into(),
+        "--features".into(),
+        "lua54".into(),
     ];
 
     if opts.vendored {
