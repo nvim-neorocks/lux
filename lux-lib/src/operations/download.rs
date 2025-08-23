@@ -239,7 +239,9 @@ async fn download_remote_rock(
         RemotePackageSource::LuarocksRockspec(url) => {
             let package = &remote_package.package;
             let rockspec_name = format!("{}-{}.rockspec", package.name(), package.version());
-            let bytes = reqwest::get(format!("{}/{}", &url, rockspec_name))
+            let bytes = reqwest::Client::new()
+                .get(format!("{}/{}", &url, rockspec_name))
+                .send()
                 .await
                 .map_err(DownloadRockspecError::Request)?
                 .error_for_status()
@@ -454,7 +456,7 @@ where
         });
         let full_rock_name = mk_packed_rock_name(package.name(), package.version(), ext);
         let url = server_url.join(&full_rock_name)?;
-        let response = reqwest::get(url.clone()).await?;
+        let response = reqwest::Client::new().get(url.clone()).send().await?;
         let bytes = if response.status().is_success() {
             response.bytes().await
         } else {
@@ -463,7 +465,9 @@ where
                     let full_rock_name =
                         mk_packed_rock_name(package.name(), package.version(), ext);
                     let url = server_url.join(&full_rock_name)?;
-                    reqwest::get(url.clone())
+                    reqwest::Client::new()
+                        .get(url.clone())
+                        .send()
                         .await?
                         .error_for_status()?
                         .bytes()

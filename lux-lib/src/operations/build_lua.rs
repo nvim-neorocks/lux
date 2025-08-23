@@ -302,7 +302,9 @@ async fn do_build_lua(args: BuildLua<'_>) -> Result<(), BuildLuaError> {
 
     progress.map(|p| p.set_message(format!("📥 Downloading {}", &source_url)));
 
-    let response = reqwest::get(source_url)
+    let response = reqwest::Client::new()
+        .get(source_url)
+        .send()
         .await?
         .error_for_status()?
         .bytes()
