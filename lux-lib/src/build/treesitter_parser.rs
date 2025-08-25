@@ -53,7 +53,7 @@ impl BuildBackend for TreesitterParserBuildSpec {
                 None,
             )?;
         }
-        progress.map(|b| b.set_message("🌳 Building tree-sitter parser..."));
+        progress.map(|b| b.set_message("🌳 Building (tree-sitter parser)..."));
         if self.parser {
             let parser_dir = output_paths.etc.join("parser");
             tokio::fs::create_dir_all(&parser_dir)

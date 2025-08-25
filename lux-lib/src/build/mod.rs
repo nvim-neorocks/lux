@@ -236,7 +236,7 @@ async fn install<R: Rockspec + HasIntegrity>(
     progress.map(|p| p.set_position(total_len as u64));
 
     if lua_len > 0 {
-        progress.map(|p| p.set_message("Copying Lua modules..."));
+        progress.map(|p| p.set_message("📋 Copying Lua modules..."));
     }
     for (target, source) in &install_spec.lua {
         let absolute_source = build_dir.join(source);
@@ -244,7 +244,7 @@ async fn install<R: Rockspec + HasIntegrity>(
         progress.map(|p| p.set_position(p.position() + 1));
     }
     if lib_len > 0 {
-        progress.map(|p| p.set_message("Compiling C libraries..."));
+        progress.map(|p| p.set_message("📋 Compiling C libraries..."));
     }
     for (target, source) in &install_spec.lib {
         let absolute_source = build_dir.join(source);
@@ -254,7 +254,7 @@ async fn install<R: Rockspec + HasIntegrity>(
     }
     if entry_type.is_entrypoint() {
         if bin_len > 0 {
-            progress.map(|p| p.set_message("Installing binaries..."));
+            progress.map(|p| p.set_message("💻 Installing binaries..."));
         }
         let deploy_spec = rockspec.deploy().current_platform();
         for (target, source) in &install_spec.bin {
@@ -272,7 +272,7 @@ async fn install<R: Rockspec + HasIntegrity>(
         }
     }
     if conf_len > 0 {
-        progress.map(|p| p.set_message("Copying configuration files..."));
+        progress.map(|p| p.set_message("📋 Copying configuration files..."));
         for (target, source) in &install_spec.conf {
             let absolute_source = build_dir.join(source);
             let target = output_paths.conf.join(target);
