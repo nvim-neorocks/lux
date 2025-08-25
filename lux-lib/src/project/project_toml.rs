@@ -714,11 +714,26 @@ version = "{}""#,
             template.push(Dependencies(&dependencies).display_lua());
         }
 
-        match self.internal.build_dependencies {
-            Some(ref build_dependencies) if !build_dependencies.is_empty() => {
-                template.push(BuildDependencies(build_dependencies).display_lua());
-            }
-            _ => {}
+        let mut build_dependencies = self
+            .internal
+            .build_dependencies
+            .as_ref()
+            .cloned()
+            .unwrap_or_default();
+
+        let build_backend_dependency = self
+            .internal
+            .build
+            .build_type
+            .as_ref()
+            .and_then(|build_type| build_type.luarocks_build_backend());
+
+        if let Some(build_backend_dependency) = build_backend_dependency {
+            build_dependencies.push(build_backend_dependency);
+        }
+
+        if !build_dependencies.is_empty() {
+            template.push(BuildDependencies(&build_dependencies).display_lua());
         }
 
         match self.internal.external_dependencies {
@@ -747,9 +762,19 @@ version = "{}""#,
 
         template.push(self.internal.build.display_lua());
 
-        Ok(std::iter::once(starter)
+        let unformatted_code = std::iter::once(starter)
             .chain(template.into_iter().map(|kv| kv.to_string()))
-            .join("\n\n"))
+            .join("\n\n");
+        let result = match stylua_lib::format_code(
+            &unformatted_code,
+            stylua_lib::Config::default(),
+            None,
+            stylua_lib::OutputVerification::Full,
+        ) {
+            Ok(formatted_code) => formatted_code,
+            Err(_) => unformatted_code,
+        };
+        Ok(result)
     }
 }
 
