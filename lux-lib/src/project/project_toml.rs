@@ -762,9 +762,19 @@ version = "{}""#,
 
         template.push(self.internal.build.display_lua());
 
-        Ok(std::iter::once(starter)
+        let unformatted_code = std::iter::once(starter)
             .chain(template.into_iter().map(|kv| kv.to_string()))
-            .join("\n\n"))
+            .join("\n\n");
+        let result = match stylua_lib::format_code(
+            &unformatted_code,
+            stylua_lib::Config::default(),
+            None,
+            stylua_lib::OutputVerification::Full,
+        ) {
+            Ok(formatted_code) => formatted_code,
+            Err(_) => unformatted_code,
+        };
+        Ok(result)
     }
 }
 
