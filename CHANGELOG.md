@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `lux-cli` - [0.17.0](https://github.com/nvim-neorocks/lux/compare/v0.16.1...v0.17.0) - 2025-08-27
+
+### Added
+- [**breaking**] `no_progress` option ([#1031](https://github.com/nvim-neorocks/lux/pull/1031))
+- *(cli/fmt)* emmylua_codestyle formatting backend ([#1035](https://github.com/nvim-neorocks/lux/pull/1035))
+- *(cli/shell)* `--build`  flag adds only build dependencies ([#1030](https://github.com/nvim-neorocks/lux/pull/1030))
+
+### Other
+- *(deps)* bump emmylua_check from 0.11.0 to 0.12.0 ([#1040](https://github.com/nvim-neorocks/lux/pull/1040))
+
+## `lux-lib` - [0.24.0](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.23.1...lux-lib-v0.24.0) - 2025-08-27
+
+### Added
+- improvements to generated local rockspecs ([#1041](https://github.com/nvim-neorocks/lux/pull/1041))
+- [**breaking**] `no_progress` option ([#1031](https://github.com/nvim-neorocks/lux/pull/1031))
+
+### Fixed
+- *(git-dependencies)* handle git tags with specrevs ([#1027](https://github.com/nvim-neorocks/lux/pull/1027))
+
+### Other
+- *(rust-mlua)* support luarocks build backend v0.2.5 ([#1009](https://github.com/nvim-neorocks/lux/pull/1009))
+- run rustfmt
+- remove redundant clone
+- use `reqwest::Client`
+- follow-up on build backend lua rockspec generation
+
 ## `lux-cli` - [0.16.1](https://github.com/nvim-neorocks/lux/compare/v0.16.0...v0.16.1) - 2025-08-23
 
 ### Other
