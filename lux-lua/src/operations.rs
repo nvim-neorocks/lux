@@ -18,12 +18,25 @@ pub fn operations(lua: &Lua) -> mlua::Result<LuaTable> {
     table.set(
         "search",
         lua.create_async_function(|_, (query, config)| async move {
-            let _runtime = lua_runtime().enter();
+            let _guard = lua_runtime().enter();
 
             search(query, &config).await
         })?,
     )?;
 
+    table.set(
+        "search_sync",
+        lua.create_function(|_, (query, config)| {
+            let runtime = lua_runtime();
+            let _guard = runtime.enter();
+
+            let handle = tokio::spawn(async move { search(query, &config).await });
+
+            runtime
+                .block_on(handle)
+                .map_err(|err| mlua::Error::RuntimeError(err.to_string()))?
+        })?,
+    )?;
     Ok(table)
 }
 

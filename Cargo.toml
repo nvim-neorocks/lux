@@ -26,6 +26,7 @@ mlua = { version = "0.10", features = [
   "error-send",
   "async",
 ] }
+mlua-extras = "0.0.5"
 path-absolutize = "3.1"
 path-slash = "0.2"
 pathdiff = "0.2"

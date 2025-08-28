@@ -10,7 +10,9 @@ crate-type = ["cdylib"]
 [dependencies]
 lux-workspace-hack = { workspace = true }
 mlua = { workspace = true }
+mlua-extras = { workspace = true }
 path-absolutize = { workspace = true }
+tokio = { workspace = true }
 
 [dependencies.lux-lib]
 version = "0.24.0"
@@ -22,11 +24,11 @@ assert_fs = "1.1"
 
 [features]
 default = ["lua51"]
-lua51 = ["mlua/module", "mlua/lua51", "lux-lib/lua51"]
-lua52 = ["mlua/module", "mlua/lua52", "lux-lib/lua52"]
-lua53 = ["mlua/module", "mlua/lua53", "lux-lib/lua53"]
-lua54 = ["mlua/module", "mlua/lua54", "lux-lib/lua54"]
-luajit = ["mlua/module", "mlua/luajit", "lux-lib/luajit"]
+lua51 = ["mlua/module", "mlua/lua51", "mlua/async", "lux-lib/lua51"]
+lua52 = ["mlua/module", "mlua/lua52", "mlua/async", "lux-lib/lua52"]
+lua53 = ["mlua/module", "mlua/lua53", "mlua/async", "lux-lib/lua53"]
+lua54 = ["mlua/module", "mlua/lua54", "mlua/async", "lux-lib/lua54"]
+luajit = ["mlua/module", "mlua/luajit", "mlua/async", "lux-lib/luajit"]
 vendored = ["lux-lib/vendored-openssl", "lux-lib/vendored-libgit2"]
 # Run tests without module mode so we can link against Lua and run the tests.
 test = ["mlua/vendored", "lux-lib/lua51"]

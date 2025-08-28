@@ -2993,7 +2993,9 @@ dependencies = [
  "lux-lib",
  "lux-workspace-hack",
  "mlua",
+ "mlua-extras",
  "path-absolutize",
+ "tokio",
 ]
 
 [[package]]
@@ -3218,6 +3220,15 @@ dependencies = [
  "rustversion",
  "serde",
  "serde-value",
+]
+
+[[package]]
+name = "mlua-extras"
+version = "0.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "290b97ce3ffafa7df9535d6fe4532895310ef2b92a7196d2dd00ef7ea951773d"
+dependencies = [
+ "strum 0.26.3",
 ]
 
 [[package]]
