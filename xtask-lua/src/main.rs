@@ -14,6 +14,7 @@ fn try_main() -> Result<(), DynError> {
 
     match task.as_deref() {
         Some("dist") => dist(true, None)?,
+        Some("dist-debug") => dist(false, None)?,
         _ => print_help(),
     }
 
@@ -24,7 +25,8 @@ fn print_help() {
     eprintln!(
         "Tasks:
 
-dist    builds the lua libraries for a given lua version (must specify via features)
+dist          builds the lua libraries for a given lua version (must specify via features)
+dist-debug    like dist, but builds debug artifacts
 "
     )
 }
