@@ -21,6 +21,7 @@ default-features = false
 assert_fs = "1.1"
 
 [features]
+default = ["lua51"]
 lua51 = ["mlua/module", "mlua/lua51", "lux-lib/lua51"]
 lua52 = ["mlua/module", "mlua/lua52", "lux-lib/lua52"]
 lua53 = ["mlua/module", "mlua/lua53", "lux-lib/lua53"]
