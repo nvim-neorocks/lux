@@ -108,11 +108,11 @@ The following table provides a brief comparison:
 ## :package: Packages
 
 <a href="https://repology.org/project/lux-cli/versions">
-    <img src="https://repology.org/badge/vertical-allrepos/lux-cli.svg?header=lux-cli" alt="lux-cli packaging status" align="right">
+    <img src="https://repology.org/badge/vertical-allrepos/lux-cli.svg?header=lux-cli&exclude_unsupported=1" alt="lux-cli packaging status" align="right">
 </a>
 
 <a href="https://repology.org/project/lux-lua-unclassified/versions">
-    <img src="https://repology.org/badge/vertical-allrepos/lux-lua-unclassified.svg?header=lux-lua" alt="lux-lua packaging status" align="right">
+    <img src="https://repology.org/badge/vertical-allrepos/lux-lua-unclassified.svg?header=lux-lua&exclude_unsupported=1" alt="lux-lua packaging status" align="right">
 </a>
 
 Lux includes the following packages and libraries:
