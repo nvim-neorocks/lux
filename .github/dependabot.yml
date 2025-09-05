@@ -6,7 +6,11 @@
 version: 2
 updates:
   - package-ecosystem: "cargo"
-    directory: "/"
+    directories:
+      - "/"
+      - "/lux-cli"
+      - "/lux-lib"
+      - "/lux-lua"
     schedule:
       interval: "daily"
     ignore:
