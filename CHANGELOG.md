@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `lux-cli` - [0.17.1](https://github.com/nvim-neorocks/lux/compare/v0.17.0...v0.17.1) - 2025-09-05
+
+### Other
+- *(readme)* exclude unsupported repos in packaging status badge
+
+## `lux-lib` - [0.24.1](https://github.com/nvim-neorocks/lux/compare/lux-lib-v0.24.0...lux-lib-v0.24.1) - 2025-09-05
+
+### Other
+- *(deps)* bump zip from 4.5.0 to 4.6.0 ([#1048](https://github.com/nvim-neorocks/lux/pull/1048))
+- *(readme)* exclude unsupported repos in packaging status badge
+
 ## `lux-cli` - [0.17.0](https://github.com/nvim-neorocks/lux/compare/v0.16.1...v0.17.0) - 2025-08-27
 
 ### Added
