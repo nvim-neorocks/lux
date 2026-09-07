@@ -207,7 +207,7 @@ where
     let (dep_tx, mut dep_rx) = tokio::sync::mpsc::unbounded_channel();
     let (build_dep_tx, build_dep_rx) = tokio::sync::mpsc::unbounded_channel();
     let (build_dep_install_done_tx, mut build_dep_install_done_rx) =
-        tokio::sync::mpsc::unbounded_channel::<PackageName>();
+        tokio::sync::mpsc::unbounded_channel::<(LocalPackage, PackageInstallData)>();
 
     let lockfile = tree.lockfile()?;
     let build_lockfile = tree.build_tree(config)?.lockfile()?;
@@ -235,7 +235,8 @@ where
     let mut scheduled_packages: HashSet<LocalPackageId> = HashSet::new();
     let mut installed_packages: HashMap<LocalPackageId, (LocalPackage, tree::EntryType)> =
         HashMap::new();
-    let mut installed_build_deps: HashSet<PackageName> = HashSet::new();
+    let mut installed_build_deps: HashMap<LocalPackageId, (LocalPackage, PackageInstallData)> =
+        HashMap::new();
     let mut ongoing_installs: FuturesUnordered<
         tracing::instrument::Instrumented<tokio::task::JoinHandle<InstallWorkerOutput>>,
     > = FuturesUnordered::new();
@@ -265,9 +266,9 @@ where
                 }
                 build_deps_done = true;
             }
-            name = build_dep_install_done_rx.recv(), if !build_dep_rx_drained => {
-                if let Some(name) = name {
-                    installed_build_deps.insert(name);
+            build_dep = build_dep_install_done_rx.recv(), if !build_dep_rx_drained => {
+                if let Some((build_dep, install_data)) = build_dep {
+                    installed_build_deps.insert(build_dep.spec.id(), (build_dep, install_data));
                 } else {
                     build_dep_rx_drained = true;
                 }
@@ -285,7 +286,10 @@ where
             &all_packages,
             &scheduled_packages,
             &build_lockfile,
-            &installed_build_deps,
+            &installed_build_deps
+                .values()
+                .map(|(pkg, _)| pkg.name().clone())
+                .collect(),
         ) {
             if max_jobs > 0 && ongoing_installs.len() >= max_jobs {
                 if let Err(err) =
@@ -317,6 +321,12 @@ where
                         *is_entrypoint,
                         &all_packages,
                         &installed_packages,
+                    )?;
+                    lockfile.add_build_dependencies(
+                        package_id,
+                        package,
+                        &all_packages,
+                        &installed_build_deps,
                     )?;
                 }
                 Ok::<_, io::Error>(())
@@ -373,7 +383,7 @@ fn spawn_build_deps_worker<T>(
     tree: &T,
     lua: Arc<LuaInstallation>,
     mut build_dep_rx: UnboundedReceiver<PackageInstallData>,
-    build_dep_install_done_tx: UnboundedSender<PackageName>,
+    build_dep_install_done_tx: UnboundedSender<(LocalPackage, PackageInstallData)>,
 ) -> tracing::instrument::Instrumented<JoinHandle<Result<(), InstallError>>>
 where
     T: InstallTree + Clone + Send + Sync + 'static,
@@ -391,7 +401,7 @@ where
                     package = package.to_string(),
                     version = rockspec.version().to_string()
                 );
-                async {
+                let pkg = async {
                     let build_tree = tree.build_tree(&config)?;
                     let mut build_lockfile = build_tree.lockfile()?.write_guard();
                     let pkg = Build::new()
@@ -404,13 +414,13 @@ where
                         .behaviour(build_dep_spec.build_behaviour)
                         .build()
                         .await
-                        .map_err(|err| InstallError::BuildDependency(package.clone(), err))?;
+                        .map_err(|err| InstallError::BuildDependency(package, err))?;
                     build_lockfile.add_entrypoint(&pkg);
-                    Ok::<_, InstallError>(())
+                    Ok::<_, InstallError>(pkg)
                 }
                 .instrument(span)
                 .await?;
-                let _ = build_dep_install_done_tx.send(package);
+                let _ = build_dep_install_done_tx.send((pkg, build_dep_spec));
             }
             Ok::<(), InstallError>(())
         }
@@ -569,6 +579,14 @@ trait LockfileExt {
         all_packages: &HashMap<LocalPackageId, PackageInstallData>,
         installed_packages: &HashMap<LocalPackageId, (LocalPackage, tree::EntryType)>,
     ) -> io::Result<()>;
+
+    fn add_build_dependencies(
+        self,
+        id: &LocalPackageId,
+        pkg: &LocalPackage,
+        all_packages: &HashMap<LocalPackageId, PackageInstallData>,
+        build_dependencies: &HashMap<LocalPackageId, (LocalPackage, PackageInstallData)>,
+    ) -> io::Result<()>;
 }
 
 impl LockfileExt for &mut Lockfile<ReadWrite> {
@@ -599,6 +617,38 @@ impl LockfileExt for &mut Lockfile<ReadWrite> {
                         r#"
 error writing dependencies to the lockfile.
 A required dependency was not installed correctly.
+This is likely because an install thread panicked and was interrupted unexpectedly.
+
+[THIS IS A BUG!]
+"#,
+                    ))?,
+            );
+        }
+        Ok(())
+    }
+
+    fn add_build_dependencies(
+        self,
+        id: &LocalPackageId,
+        pkg: &LocalPackage,
+        all_packages: &HashMap<LocalPackageId, PackageInstallData>,
+        build_dependencies: &HashMap<LocalPackageId, (LocalPackage, PackageInstallData)>,
+    ) -> io::Result<()> {
+        for dependency_id in all_packages
+            .get(id)
+            .map(|pkg| pkg.spec.build_dependencies())
+            .unwrap_or_default()
+            .into_iter()
+        {
+            self.add_build_dependency(
+                pkg,
+                build_dependencies
+                    .get(dependency_id)
+                    .map(|(pkg, _)| pkg)
+                    .ok_or(io::Error::other(
+                        r#"
+error writing build dependencies to the lockfile.
+A required build dependency was not installed correctly.
 This is likely because an install thread panicked and was interrupted unexpectedly.
 
 [THIS IS A BUG!]

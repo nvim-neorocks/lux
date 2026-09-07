@@ -31,13 +31,13 @@ async fn vendor_dependencies() {
         .await
         .unwrap();
 
-    let busted_rockspec = vendor_dir.child("busted-2.2.0-1.rockspec");
+    let busted_rockspec = vendor_dir.child("busted-2.3.0-1.rockspec");
     busted_rockspec.assert(predicate::path::is_file());
-    let busted_dir = vendor_dir.child("busted@2.2.0-1");
+    let busted_dir = vendor_dir.child("busted@2.3.0-1");
     busted_dir.assert(predicate::path::is_dir());
-    let luasystem_rockspec = vendor_dir.child("luasystem-0.6.2-1.rockspec");
+    let luasystem_rockspec = vendor_dir.child("luasystem-0.7.1-1.rockspec");
     luasystem_rockspec.assert(predicate::path::is_file());
-    let luasystem_dir = vendor_dir.child("luasystem@0.6.2-1");
+    let luasystem_dir = vendor_dir.child("luasystem@0.7.1-1");
     luasystem_dir.assert(predicate::path::is_dir());
     let say_rockspec = vendor_dir.child("say-1.4.1-3.rockspec");
     say_rockspec.assert(predicate::path::is_file());

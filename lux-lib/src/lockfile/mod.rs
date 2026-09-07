@@ -64,6 +64,10 @@ impl PinnedState {
             Self::Pinned => true,
         }
     }
+
+    fn is_default(&self) -> bool {
+        &Self::default() == self
+    }
 }
 
 impl Serialize for PinnedState {
@@ -102,6 +106,10 @@ impl OptState {
             Self::Required => false,
             Self::Optional => true,
         }
+    }
+
+    fn is_default(&self) -> bool {
+        &Self::default() == self
     }
 }
 
@@ -152,6 +160,7 @@ pub(crate) struct LocalPackageSpec {
     pub pinned: PinnedState,
     pub opt: OptState,
     pub dependencies: Vec<LocalPackageId>,
+    pub build_dependencies: Vec<LocalPackageId>,
     // TODO: Deserialize this directly into a `LuaPackageReq`
     pub constraint: Option<String>,
     pub binaries: RockBinaries,
@@ -214,11 +223,13 @@ impl Display for LocalPackageId {
 }
 
 impl LocalPackageSpec {
-    pub fn new(
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new(
         name: &PackageName,
         version: &PackageVersion,
         constraint: LockConstraint,
         dependencies: Vec<LocalPackageId>,
+        build_dependencies: Vec<LocalPackageId>,
         pinned: &PinnedState,
         opt: &OptState,
         binaries: RockBinaries,
@@ -229,6 +240,7 @@ impl LocalPackageSpec {
             pinned: *pinned,
             opt: *opt,
             dependencies,
+            build_dependencies,
             constraint: match constraint {
                 LockConstraint::Unconstrained => None,
                 LockConstraint::Constrained(version_req) => Some(version_req.to_string()),
@@ -275,6 +287,10 @@ impl LocalPackageSpec {
         self.dependencies.iter().collect()
     }
 
+    pub fn build_dependencies(&self) -> Vec<&LocalPackageId> {
+        self.build_dependencies.iter().collect()
+    }
+
     pub fn binaries(&self) -> Vec<&PathBuf> {
         self.binaries.iter().collect()
     }
@@ -284,7 +300,23 @@ impl LocalPackageSpec {
     }
 
     pub fn into_package_req(self) -> PackageReq {
-        PackageSpec::new(self.name, self.version).into_package_req()
+        match self.constraint() {
+            LockConstraint::Unconstrained => self.name.into(),
+            LockConstraint::Constrained(version_req) => PackageReq {
+                name: self.name,
+                version_req,
+            },
+        }
+    }
+
+    pub(crate) fn as_package_req(&self) -> PackageReq {
+        match self.constraint() {
+            LockConstraint::Unconstrained => self.name.clone().into(),
+            LockConstraint::Constrained(version_req) => PackageReq {
+                name: self.name.clone(),
+                version_req: version_req.clone(),
+            },
+        }
     }
 }
 
@@ -346,12 +378,20 @@ impl LocalPackage {
 struct LocalPackageIntermediate {
     name: PackageName,
     version: PackageVersion,
+    #[serde(default, skip_serializing_if = "PinnedState::is_default")]
     pinned: PinnedState,
+    #[serde(default, skip_serializing_if = "OptState::is_default")]
     opt: OptState,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     dependencies: Vec<LocalPackageId>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    build_dependencies: Vec<LocalPackageId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     constraint: Option<String>,
+    #[serde(default, skip_serializing_if = "RockBinaries::is_default")]
     binaries: RockBinaries,
     source: RemotePackageSource,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     source_url: Option<RemotePackageSourceUrl>,
     hashes: LocalPackageHashes,
 }
@@ -367,6 +407,7 @@ impl TryFrom<LocalPackageIntermediate> for LocalPackage {
                 &value.version,
                 constraint,
                 value.dependencies,
+                value.build_dependencies,
                 &value.pinned,
                 &value.opt,
                 value.binaries,
@@ -386,6 +427,7 @@ impl From<&LocalPackage> for LocalPackageIntermediate {
             pinned: value.spec.pinned,
             opt: value.spec.opt,
             dependencies: value.spec.dependencies.clone(),
+            build_dependencies: value.spec.build_dependencies.clone(),
             constraint: value.spec.constraint.clone(),
             binaries: value.spec.binaries.clone(),
             source: value.source.clone(),
@@ -429,6 +471,7 @@ impl LocalPackage {
                 package.version(),
                 constraint,
                 Vec::default(),
+                Vec::default(),
                 &PinnedState::Unpinned,
                 &OptState::Required,
                 binaries,
@@ -465,6 +508,10 @@ impl LocalPackage {
 
     pub fn dependencies(&self) -> Vec<&LocalPackageId> {
         self.spec.dependencies()
+    }
+
+    pub fn build_dependencies(&self) -> Vec<&LocalPackageId> {
+        self.spec.build_dependencies()
     }
 
     pub fn constraint(&self) -> LockConstraint {
@@ -1287,6 +1334,31 @@ impl Lockfile<ReadWrite> {
                 target
             });
         self.add(dependency);
+    }
+
+    /// Add a build dependency for a package.
+    pub(crate) fn add_build_dependency(
+        &mut self,
+        target: &LocalPackage,
+        dependency: &LocalPackage,
+    ) {
+        self.lock
+            .rocks
+            .entry(target.id())
+            .and_modify(|rock| {
+                let id = dependency.id();
+                if !rock.spec.build_dependencies.contains(&id) {
+                    rock.spec.build_dependencies.push(id);
+                }
+            })
+            .or_insert_with(|| {
+                let id = dependency.id();
+                let mut target = target.clone();
+                if !target.spec.build_dependencies.contains(&id) {
+                    target.spec.build_dependencies.push(id);
+                }
+                target
+            });
     }
 
     pub(crate) fn remove(&mut self, target: &LocalPackage) {

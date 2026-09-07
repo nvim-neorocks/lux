@@ -60,18 +60,54 @@ where
     State: sync_builder::State + sync_builder::IsComplete,
 {
     pub async fn sync(self) -> Result<SyncReport, SyncError> {
-        let args = self._build();
+        let mut args = self._build();
         let test_report = if args.test.unwrap_or(false) {
             Some(do_sync(&args, &LocalPackageLockType::Test).await?)
         } else {
             None
         };
-        let build_report = do_sync(&args, &LocalPackageLockType::Build).await?;
         let mut report = do_sync(&args, &LocalPackageLockType::Regular).await?;
+
+        // `do_sync` removes dependencies that aren't listed in the workspace lockfile
+        // or in `args.extra_packages`.
+        // To prevent loss of transitive build dependencies, we resolve them, and
+        // add them to `args.extra_packages` before syncing the workspace's build dependencies.
+        let lockfile = args.workspace.tree(args.config)?.lockfile()?;
+        let test_tree = args.workspace.test_tree(args.config)?;
+        let test_build_lockfile = test_tree.build_tree(args.config)?.lockfile()?;
+        let build_lockfile = args.workspace.build_tree(args.config)?.lockfile()?;
+        let transitive_build_dependencies = lockfile
+            .local_pkg_lock()
+            .rocks()
+            .values()
+            .flat_map(|rock| rock.build_dependencies())
+            .filter_map(|dep_id| build_lockfile.get(dep_id))
+            .chain(
+                test_tree
+                    .lockfile()?
+                    .local_pkg_lock()
+                    .rocks()
+                    .values()
+                    .flat_map(|rock| rock.build_dependencies())
+                    .filter_map(|dep_id| test_build_lockfile.get(dep_id)),
+            )
+            .map(|pkg| pkg.spec.as_package_req())
+            .collect_vec();
+        args.extra_packages.extend(transitive_build_dependencies);
+
+        let build_report = do_sync(&args, &LocalPackageLockType::Build).await?;
+
+        operations::GenLuaRc::new()
+            .config(args.config)
+            .workspace(args.workspace)
+            .generate_luarc()
+            .await?;
+
         report.merge(build_report);
         if let Some(test_report) = test_report {
             report.merge(test_report);
         }
+
         Ok(report)
     }
 }
@@ -223,7 +259,7 @@ async fn do_sync(
 
     let packages = packages
         .into_iter()
-        .chain(extra_packages.into_iter().map_into())
+        .chain(extra_packages.into_iter().unique().map_into())
         .collect_vec();
 
     let strategy = if args.fast.unwrap_or(false) {
@@ -340,19 +376,7 @@ async fn do_sync(
         // Sync the newly added packages back to the workspace lockfile
         let dest_lockfile = tree.lockfile()?;
         workspace_lockfile.sync(dest_lockfile.local_pkg_lock(), lock_type);
-        if lock_type != &LocalPackageLockType::Build {
-            // ...including transitive build dependencies
-            let tree = args.workspace.build_tree(args.config)?;
-            let dest_lockfile = tree.lockfile()?;
-            workspace_lockfile.sync(dest_lockfile.local_pkg_lock(), &LocalPackageLockType::Build);
-        }
     }
-
-    operations::GenLuaRc::new()
-        .config(args.config)
-        .workspace(args.workspace)
-        .generate_luarc()
-        .await?;
 
     Ok(report)
 }

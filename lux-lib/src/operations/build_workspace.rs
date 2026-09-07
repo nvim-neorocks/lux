@@ -193,10 +193,16 @@ async fn build_project(
         })
         .cloned()
         .collect_vec();
+
+    let build_lockfile = workspace.build_tree(config)?.lockfile()?;
+
     let mut lockfile = lockfile.write_guard();
     lockfile.add_entrypoint(&package);
     for dep in dependencies {
         lockfile.add_dependency(&package, &dep);
+    }
+    for dep in build_lockfile.rocks().values() {
+        lockfile.add_build_dependency(&package, dep);
     }
     Ok(package)
 }

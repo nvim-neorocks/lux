@@ -225,8 +225,11 @@ where
                             }
 
                             // NOTE: We don't need to install build dependencies to install binary rocks.
-                            if !matches!(downloaded_rock, RemoteRockDownload::BinaryRock { .. }) {
-                                let build_dependencies = build_dependencies_to_install(rockspec)
+                            let build_dependencies = if !matches!(
+                                downloaded_rock,
+                                RemoteRockDownload::BinaryRock { .. }
+                            ) {
+                                let packages = build_dependencies_to_install(rockspec)
                                     .into_iter()
                                     .filter_map(|name| {
                                         rockspec
@@ -269,7 +272,7 @@ where
                                 Resolve::new()
                                     .dependencies_tx(build_dependencies_tx.clone())
                                     .build_dependencies_tx(build_dependencies_tx.clone())
-                                    .packages(build_dependencies)
+                                    .packages(packages)
                                     .parent_packages(Arc::new(
                                         parent_packages
                                             .iter()
@@ -282,8 +285,10 @@ where
                                     .maybe_build_lockfile(build_lockfile.clone())
                                     .config(&config)
                                     .get_all_dependencies()
-                                    .await?;
-                            }
+                                    .await?
+                            } else {
+                                Vec::new()
+                            };
 
                             let dependencies = rockspec
                                 .dependencies()
@@ -338,6 +343,7 @@ where
                                 rockspec.version(),
                                 constraint,
                                 dependencies,
+                                build_dependencies,
                                 &pin,
                                 &opt,
                                 rockspec.binaries(),
