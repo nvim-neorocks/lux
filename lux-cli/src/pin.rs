@@ -88,12 +88,6 @@ pub async fn set_pinned_state(data: ChangePin, config: Config, pin: PinnedState)
                     .await
                     .wrap_err("syncing dependencies with the project lockfile failed.")?;
             }
-            if !build_packages.is_empty() {
-                operations::Sync::new(&workspace, &config)
-                    .sync_build_dependencies()
-                    .await
-                    .wrap_err("syncing build dependencies with the project lockfile failed.")?;
-            }
             if !test_packages.is_empty() {
                 operations::Sync::new(&workspace, &config)
                     .sync_test_dependencies()

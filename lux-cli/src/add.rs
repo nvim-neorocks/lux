@@ -10,8 +10,7 @@ use lux_lib::{
 use miette::Result;
 
 use crate::workspace::{
-    sync_build_dependencies_if_locked, sync_dependencies_if_locked,
-    sync_test_dependencies_if_locked, PackageReqOrGitShorthand,
+    sync_dependencies_if_locked, sync_test_dependencies_if_locked, PackageReqOrGitShorthand,
 };
 
 #[derive(clap::Args)]
@@ -113,11 +112,8 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
             .await?;
     }
 
-    if !data.package_req.is_empty() {
+    if !data.package_req.is_empty() || !build_packages.is_empty() {
         sync_dependencies_if_locked(&workspace, &config).await?;
-    }
-    if !build_packages.is_empty() {
-        sync_build_dependencies_if_locked(&workspace, &config).await?;
     }
     if !test_packages.is_empty() {
         sync_test_dependencies_if_locked(&workspace, &config).await?;

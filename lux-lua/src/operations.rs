@@ -222,19 +222,11 @@ impl TypedUserData for OperationsModule {
                     .sync_dependencies()
                     .await
                     .into_lua_err()?;
-                let build = Sync::new(&workspace.0, &config.0)
-                    .sync_build_dependencies()
-                    .await
-                    .into_lua_err()?;
                 let test = Sync::new(&workspace.0, &config.0)
                     .sync_test_dependencies()
                     .await
                     .into_lua_err()?;
-                Ok((
-                    SyncReportLua(deps),
-                    SyncReportLua(build),
-                    SyncReportLua(test),
-                ))
+                Ok((SyncReportLua(deps), SyncReportLua(test)))
             },
         );
 
@@ -247,21 +239,6 @@ impl TypedUserData for OperationsModule {
                 let _runtime = lua_runtime().enter();
                 Sync::new(&workspace.0, &config.0)
                     .sync_dependencies()
-                    .await
-                    .into_lua_err()
-                    .map(SyncReportLua)
-            },
-        );
-
-        methods.document("Sync workspace build dependencies");
-        methods.param("workspace", "Workspace to sync");
-        methods.param("config", "Lux config");
-        methods.add_async_function(
-            "sync_build_dependencies",
-            |_, (workspace, config): (WorkspaceLua, ConfigLua)| async move {
-                let _runtime = lua_runtime().enter();
-                Sync::new(&workspace.0, &config.0)
-                    .sync_build_dependencies()
                     .await
                     .into_lua_err()
                     .map(SyncReportLua)

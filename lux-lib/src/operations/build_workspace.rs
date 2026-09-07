@@ -102,11 +102,6 @@ async fn do_build(args: BuildWorkspace<'_>) -> Result<Vec<LocalPackage>, BuildWo
             .sync_dependencies()
             .await
             .map_err(BuildWorkspaceError::SyncDependencies)?;
-
-        Sync::new(workspace, config)
-            .sync_build_dependencies()
-            .await
-            .map_err(BuildWorkspaceError::SyncBuildDependencies)?;
     } else {
         let luarocks = LuaRocksInstallation::new(config, build_tree.clone())?;
         let mut dependencies_to_install = Vec::new();

@@ -19,11 +19,6 @@ pub async fn sync(args: SyncProject, config: Config) -> Result<()> {
         .sync_dependencies()
         .await?;
 
-    let build_report = Sync::new(&workspace, &config)
-        .validate_integrity(false)
-        .sync_build_dependencies()
-        .await?;
-
     let test_report = Sync::new(&workspace, &config)
         .validate_integrity(false)
         .sync_test_dependencies()
@@ -32,14 +27,12 @@ pub async fn sync(args: SyncProject, config: Config) -> Result<()> {
     let added: Vec<&LocalPackage> = dep_report
         .added()
         .iter()
-        .chain(build_report.added().iter())
         .chain(test_report.added().iter())
         .collect();
 
     let removed: Vec<&LocalPackage> = dep_report
         .removed()
         .iter()
-        .chain(build_report.removed().iter())
         .chain(test_report.removed().iter())
         .collect();
 

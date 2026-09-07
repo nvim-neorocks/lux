@@ -6,10 +6,7 @@ use lux_lib::{
 
 use miette::{IntoDiagnostic, Result};
 
-use crate::workspace::{
-    sync_build_dependencies_if_locked, sync_dependencies_if_locked,
-    sync_test_dependencies_if_locked,
-};
+use crate::workspace::{sync_dependencies_if_locked, sync_test_dependencies_if_locked};
 
 #[derive(Args)]
 pub struct Remove {
@@ -61,11 +58,8 @@ pub async fn remove(data: Remove, config: Config) -> Result<()> {
             .await?;
     }
 
-    if !data.depencencies.is_empty() {
+    if !data.depencencies.is_empty() || !build_packages.is_empty() {
         sync_dependencies_if_locked(&workspace, &config).await?;
-    }
-    if !build_packages.is_empty() {
-        sync_build_dependencies_if_locked(&workspace, &config).await?;
     }
     if !test_packages.is_empty() {
         sync_test_dependencies_if_locked(&workspace, &config).await?;

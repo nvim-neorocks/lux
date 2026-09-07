@@ -86,17 +86,6 @@ pub async fn sync_dependencies_if_locked(workspace: &Workspace, config: &Config)
     Ok(())
 }
 
-pub async fn sync_build_dependencies_if_locked(
-    workspace: &Workspace,
-    config: &Config,
-) -> Result<()> {
-    Sync::new(workspace, config)
-        .sync_build_dependencies()
-        .await
-        .wrap_err("syncing build dependencies with the project lockfile failed.")?;
-    Ok(())
-}
-
 pub async fn sync_test_dependencies_if_locked(
     workspace: &Workspace,
     config: &Config,

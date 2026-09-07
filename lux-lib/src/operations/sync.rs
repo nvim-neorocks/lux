@@ -55,47 +55,17 @@ impl<State> SyncBuilder<'_, State>
 where
     State: sync_builder::State + sync_builder::IsComplete,
 {
+    // Syncs build dependencies & regular dependencies.
     pub async fn sync_dependencies(self) -> Result<SyncReport, SyncError> {
-        do_sync(self._build(), &LocalPackageLockType::Regular).await
+        let args = self._build();
+        let build_report = do_sync(&args, &LocalPackageLockType::Build).await?;
+        let mut report = do_sync(&args, &LocalPackageLockType::Regular).await?;
+        report.merge(build_report);
+        Ok(report)
     }
 
-    pub async fn sync_test_dependencies(mut self) -> Result<SyncReport, SyncError> {
-        for project in self.workspace.members() {
-            let toml = project.toml().into_local()?;
-            for test_dep in toml
-                .test()
-                .current_platform()
-                .test_dependencies(project)
-                .iter()
-                .filter(|test_dep| {
-                    !toml
-                        .test_dependencies()
-                        .current_platform()
-                        .iter()
-                        .any(|dep| dep.name() == test_dep.name())
-                })
-                .cloned()
-            {
-                self.extra_packages.push(test_dep);
-            }
-        }
-        do_sync(self._build(), &LocalPackageLockType::Test).await
-    }
-
-    pub async fn sync_build_dependencies(mut self) -> Result<SyncReport, SyncError> {
-        for project in self.workspace.members() {
-            let toml = project.toml().into_local()?;
-            if let Some(backend) = operations::resolve::luarocks_build_backend_name(&toml) {
-                self = self.add_package(backend.into());
-                if cfg!(target_family = "unix") {
-                    let luarocks = unsafe {
-                        PackageReq::new_unchecked("luarocks".into(), Some(LUAROCKS_VERSION.into()))
-                    };
-                    self = self.add_package(luarocks);
-                }
-            }
-        }
-        do_sync(self._build(), &LocalPackageLockType::Build).await
+    pub async fn sync_test_dependencies(self) -> Result<SyncReport, SyncError> {
+        do_sync(&self._build(), &LocalPackageLockType::Test).await
     }
 }
 
@@ -111,6 +81,11 @@ impl SyncReport {
     }
     pub fn removed(&self) -> &[LocalPackage] {
         &self.removed
+    }
+
+    fn merge(&mut self, other: SyncReport) {
+        self.added.extend(other.added);
+        self.removed.extend(other.removed);
     }
 }
 
@@ -156,7 +131,7 @@ pub enum SyncError {
 
 #[tracing::instrument(name = "Syncing dependencies", skip_all)]
 async fn do_sync(
-    args: Sync<'_>,
+    args: &Sync<'_>,
     lock_type: &LocalPackageLockType,
 ) -> Result<SyncReport, SyncError> {
     // NOTE(vhyrro): tools like cc and pkg-config leak cargo:rerun-if-env-changed
@@ -202,9 +177,46 @@ async fn do_sync(
             ),
         }
     }
+
+    let mut extra_packages = args.extra_packages.iter().cloned().collect_vec();
+    if lock_type == &LocalPackageLockType::Build {
+        for project in args.workspace.members() {
+            let toml = project.toml().into_local()?;
+            if let Some(backend) = operations::resolve::luarocks_build_backend_name(&toml) {
+                extra_packages.push(backend.into());
+                if cfg!(target_family = "unix") {
+                    let luarocks = unsafe {
+                        PackageReq::new_unchecked("luarocks".into(), Some(LUAROCKS_VERSION.into()))
+                    };
+                    extra_packages.push(luarocks);
+                }
+            }
+        }
+    } else if lock_type == &LocalPackageLockType::Test {
+        for project in args.workspace.members() {
+            let toml = project.toml().into_local()?;
+            for test_dep in toml
+                .test()
+                .current_platform()
+                .test_dependencies(project)
+                .iter()
+                .filter(|test_dep| {
+                    !toml
+                        .test_dependencies()
+                        .current_platform()
+                        .iter()
+                        .any(|dep| dep.name() == test_dep.name())
+                })
+                .cloned()
+            {
+                extra_packages.push(test_dep);
+            }
+        }
+    }
+
     let packages = packages
         .into_iter()
-        .chain(args.extra_packages.into_iter().map_into())
+        .chain(extra_packages.into_iter().map_into())
         .collect_vec();
 
     let strategy = if args.fast.unwrap_or(false) {

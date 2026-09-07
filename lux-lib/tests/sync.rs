@@ -146,7 +146,7 @@ fallo = "2.2.0"
 /// Non-regression: https://github.com/lumen-oss/lux/issues/1892
 #[cfg(not(target_os = "windows"))]
 #[flaky_test(tokio, times = 5)]
-async fn sync_build_dependencies_adds_luarocks_build_backend() {
+async fn sync_dependencies_adds_luarocks_build_backend() {
     let sample_project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("resources/test/sample-projects/luarocks-build-backend/");
     let _ = tokio::fs::remove_dir_all(sample_project_dir.join(".lux")).await;
@@ -157,7 +157,7 @@ async fn sync_build_dependencies_adds_luarocks_build_backend() {
 
     Sync::new(&workspace, &config)
         .validate_integrity(cfg!(not(target_os = "windows")))
-        .sync_build_dependencies()
+        .sync_dependencies()
         .await
         .unwrap();
 
