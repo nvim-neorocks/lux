@@ -1054,6 +1054,14 @@ impl<P: LockfilePermissions> WorkspaceLockfile<P> {
         }
     }
 
+    pub(crate) fn local_pkg_locks(&self) -> Vec<LocalPackageLock> {
+        vec![
+            self.dependencies.clone(),
+            self.test_dependencies.clone(),
+            self.build_dependencies.clone(),
+        ]
+    }
+
     fn flush(&self) -> io::Result<()> {
         let content = serde_json::to_string_pretty(&self)?;
 

@@ -269,7 +269,7 @@ async fn do_sync(
         .added
         .extend(to_add.iter().map(|(_, pkg)| pkg).cloned());
 
-    let package_db = workspace_lockfile.local_pkg_lock(lock_type).clone().into();
+    let package_db = workspace_lockfile.local_pkg_locks().into();
 
     Install::new(args.config)
         .package_db(package_db)
