@@ -321,6 +321,10 @@ async fn do_sync(
         // Sync the newly added packages back to the workspace lockfile
         let dest_lockfile = tree.lockfile()?;
         workspace_lockfile.sync(dest_lockfile.local_pkg_lock(), lock_type);
+        if lock_type != &LocalPackageLockType::Build {
+            // ...including transitive build dependencies
+            workspace_lockfile.sync(dest_lockfile.local_pkg_lock(), &LocalPackageLockType::Build);
+        }
     }
 
     operations::GenLuaRc::new()

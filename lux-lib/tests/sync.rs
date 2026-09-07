@@ -169,3 +169,30 @@ async fn sync_build_dependencies_adds_luarocks_build_backend() {
         "expected the luarocks build backend to be added to the lockfile, got:\n{lockfile}"
     );
 }
+
+/// Non-regression: https://github.com/lumen-oss/lux/issues/1925
+#[cfg(target_os = "linux")]
+#[flaky_test(tokio, times = 5)]
+async fn sync_dependencies_adds_transitive_build_dependencies() {
+    let sample_project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("resources/test/sample-projects/transitive-build-dep/");
+    let _ = tokio::fs::remove_dir_all(sample_project_dir.join(".lux")).await;
+    let temp_dir = TempDir::new().unwrap();
+    temp_dir.copy_from(&sample_project_dir, &["**"]).unwrap();
+    let workspace = Workspace::from_exact(temp_dir.path()).unwrap().unwrap();
+    let config = ConfigBuilder::new().unwrap().build().unwrap();
+
+    Sync::new(&workspace, &config)
+        .validate_integrity(cfg!(not(target_os = "windows")))
+        .sync_dependencies()
+        .await
+        .unwrap();
+
+    let lockfile = tokio::fs::read_to_string(workspace.lockfile_path())
+        .await
+        .unwrap();
+    assert!(
+        lockfile.contains("luarocks-build-extended"),
+        "expected transitive build dependency to be added to the lockfile, got:\n{lockfile}"
+    );
+}
