@@ -10,7 +10,7 @@ use miette::{miette, Result};
 use crate::{
     args::OutputFormat,
     utils::path::{classify_path, PathTarget},
-    workspace::{sync_dependencies_if_locked, sync_test_dependencies_if_locked},
+    workspace::sync_dependencies_if_locked,
 };
 
 #[derive(Args)]
@@ -56,7 +56,6 @@ pub async fn check(args: Check, config: Config) -> Result<()> {
     let (workspace_dirs, rc_files) = match target {
         PathTarget::Workspace(workspace) => {
             sync_dependencies_if_locked(&workspace, &config).await?;
-            sync_test_dependencies_if_locked(&workspace, &config).await?;
 
             let dirs = workspace
                 .members()

@@ -51,9 +51,6 @@ pub enum BuildWorkspaceError {
     #[error("syncing dependencies with the project lockfile failed")]
     #[diagnostic(forward(0))]
     SyncDependencies(#[source] SyncError),
-    #[error("syncing build dependencies with the project lockfile failed")]
-    #[diagnostic(forward(0))]
-    SyncBuildDependencies(#[source] SyncError),
     #[error("error building the workspace")]
     #[diagnostic(forward(0))]
     Build(#[from] BuildError),

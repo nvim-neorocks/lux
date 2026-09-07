@@ -9,9 +9,7 @@ use lux_lib::{
 
 use miette::Result;
 
-use crate::workspace::{
-    sync_dependencies_if_locked, sync_test_dependencies_if_locked, PackageReqOrGitShorthand,
-};
+use crate::workspace::{sync_dependencies_if_locked, PackageReqOrGitShorthand};
 
 #[derive(clap::Args)]
 pub struct Add {
@@ -112,12 +110,7 @@ pub async fn add(data: Add, config: Config) -> Result<()> {
             .await?;
     }
 
-    if !data.package_req.is_empty() || !build_packages.is_empty() {
-        sync_dependencies_if_locked(&workspace, &config).await?;
-    }
-    if !test_packages.is_empty() {
-        sync_test_dependencies_if_locked(&workspace, &config).await?;
-    }
+    sync_dependencies_if_locked(&workspace, &config).await?;
 
     Ok(())
 }
