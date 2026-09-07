@@ -335,6 +335,8 @@ async fn do_sync(
         workspace_lockfile.sync(dest_lockfile.local_pkg_lock(), lock_type);
         if lock_type != &LocalPackageLockType::Build {
             // ...including transitive build dependencies
+            let tree = args.workspace.build_tree(args.config)?;
+            let dest_lockfile = tree.lockfile()?;
             workspace_lockfile.sync(dest_lockfile.local_pkg_lock(), &LocalPackageLockType::Build);
         }
     }
