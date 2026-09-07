@@ -48,7 +48,7 @@ pub enum BuildWorkspaceError {
     #[error("error installind build dependencies")]
     #[diagnostic(forward(0))]
     InstallBuildDependencies(#[source] InstallError),
-    #[error("syncing dependencies with the project lockfile failed")]
+    #[error("syncing dependencies with the workspace lockfile failed")]
     #[diagnostic(forward(0))]
     SyncDependencies(#[source] SyncError),
     #[error("error building the workspace")]
@@ -96,7 +96,7 @@ async fn do_build(args: BuildWorkspace<'_>) -> Result<Vec<LocalPackage>, BuildWo
     let lua = LuaInstallation::new_from_config(config).await?;
     if !args.no_lock {
         Sync::new(workspace, config)
-            .sync_dependencies()
+            .sync()
             .await
             .map_err(BuildWorkspaceError::SyncDependencies)?;
     } else {

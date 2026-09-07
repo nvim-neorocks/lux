@@ -36,6 +36,10 @@ pub struct Sync<'a> {
 
     /// Whether to validate the integrity of installed packages.
     validate_integrity: Option<bool>,
+
+    /// Whether to sync test dependencies
+    test: Option<bool>,
+
     /// When `true`, skip filesystem existence checks and rely on the install tree's lockfile
     /// alone.
     fast: Option<bool>,
@@ -55,17 +59,20 @@ impl<State> SyncBuilder<'_, State>
 where
     State: sync_builder::State + sync_builder::IsComplete,
 {
-    // Syncs build dependencies & regular dependencies.
-    pub async fn sync_dependencies(self) -> Result<SyncReport, SyncError> {
+    pub async fn sync(self) -> Result<SyncReport, SyncError> {
         let args = self._build();
+        let test_report = if args.test.unwrap_or(false) {
+            Some(do_sync(&args, &LocalPackageLockType::Test).await?)
+        } else {
+            None
+        };
         let build_report = do_sync(&args, &LocalPackageLockType::Build).await?;
         let mut report = do_sync(&args, &LocalPackageLockType::Regular).await?;
         report.merge(build_report);
+        if let Some(test_report) = test_report {
+            report.merge(test_report);
+        }
         Ok(report)
-    }
-
-    pub async fn sync_test_dependencies(self) -> Result<SyncReport, SyncError> {
-        do_sync(&self._build(), &LocalPackageLockType::Test).await
     }
 }
 
@@ -376,10 +383,7 @@ mod tests {
             .unwrap();
         let workspace = Workspace::from_exact(temp_dir.path()).unwrap().unwrap();
         let config = ConfigBuilder::new().unwrap().build().unwrap();
-        let report = Sync::new(&workspace, &config)
-            .sync_dependencies()
-            .await
-            .unwrap();
+        let report = Sync::new(&workspace, &config).sync().await.unwrap();
         assert!(report.removed.is_empty());
         assert!(!report.added.is_empty());
 
@@ -409,7 +413,7 @@ mod tests {
         {
             let report = Sync::new(&workspace, &config)
                 .add_package(PackageReq::new("toml-edit".into(), None).unwrap())
-                .sync_dependencies()
+                .sync()
                 .await
                 .unwrap();
             assert!(report.removed.is_empty());
@@ -446,7 +450,7 @@ mod tests {
         {
             let report = Sync::new(&workspace, &config)
                 .add_package(PackageReq::new("toml-edit".into(), None).unwrap())
-                .sync_dependencies()
+                .sync()
                 .await
                 .unwrap();
             assert!(report.removed.is_empty());
@@ -481,13 +485,10 @@ mod tests {
         // First sync to create the tree and lockfile
         Sync::new(&workspace, &config)
             .add_package(PackageReq::new("toml-edit".into(), None).unwrap())
-            .sync_dependencies()
+            .sync()
             .await
             .unwrap();
-        let report = Sync::new(&workspace, &config)
-            .sync_dependencies()
-            .await
-            .unwrap();
+        let report = Sync::new(&workspace, &config).sync().await.unwrap();
         assert!(!report.removed.is_empty());
         assert!(report.added.is_empty());
 

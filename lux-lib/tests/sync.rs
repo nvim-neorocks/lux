@@ -23,8 +23,9 @@ async fn sync_test_dependencies_empty_project() {
 
     Sync::new(&workspace, &config)
         .validate_integrity(cfg!(not(target_os = "windows")))
+        .test(true)
         .fast(true)
-        .sync_test_dependencies()
+        .sync()
         .await
         .unwrap();
 
@@ -71,8 +72,9 @@ async fn sync_multi_projects_same_dependencies() {
 
     Sync::new(&workspace, &config)
         .validate_integrity(cfg!(not(target_os = "windows")))
+        .test(true)
         .fast(true)
-        .sync_test_dependencies()
+        .sync()
         .await
         .unwrap();
 }
@@ -120,7 +122,7 @@ fallo = "2.2.0"
 
     Sync::new(&workspace, &config)
         .validate_integrity(cfg!(not(target_os = "windows")))
-        .sync_dependencies()
+        .sync()
         .await
         .unwrap();
 
@@ -132,7 +134,7 @@ fallo = "2.2.0"
 
     Sync::new(&workspace, &config)
         .validate_integrity(cfg!(not(target_os = "windows")))
-        .sync_dependencies()
+        .sync()
         .await
         .unwrap();
 
@@ -157,7 +159,7 @@ async fn sync_dependencies_adds_luarocks_build_backend() {
 
     Sync::new(&workspace, &config)
         .validate_integrity(cfg!(not(target_os = "windows")))
-        .sync_dependencies()
+        .sync()
         .await
         .unwrap();
 
@@ -184,7 +186,7 @@ async fn sync_dependencies_adds_transitive_build_dependencies() {
 
     Sync::new(&workspace, &config)
         .validate_integrity(cfg!(not(target_os = "windows")))
-        .sync_dependencies()
+        .sync()
         .await
         .unwrap();
 

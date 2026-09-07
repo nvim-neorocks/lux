@@ -145,9 +145,10 @@ async fn update_workspace(
     let mut project_lockfile = workspace.lockfile()?.write_guard();
     let tree = workspace.tree(args.config)?;
 
-    let dep_sync_report = super::Sync::new(&workspace, args.config)
+    let sync_report = super::Sync::new(&workspace, args.config)
         .validate_integrity(args.validate_integrity.unwrap_or(false))
-        .sync_dependencies()
+        .test(true)
+        .sync()
         .await?;
 
     let updated_dependencies = update_dependency_tree(
@@ -161,10 +162,6 @@ async fn update_workspace(
     .await?;
 
     let test_tree = workspace.test_tree(args.config)?;
-    let test_dep_sync_report = super::Sync::new(&workspace, args.config)
-        .validate_integrity(false)
-        .sync_test_dependencies()
-        .await?;
 
     let updated_test_dependencies = update_dependency_tree(
         test_tree,
@@ -190,12 +187,10 @@ async fn update_workspace(
 
     Ok(updated_dependencies
         .into_iter()
-        .chain(dep_sync_report.added)
-        .chain(dep_sync_report.removed)
+        .chain(sync_report.added)
+        .chain(sync_report.removed)
         .chain(updated_build_dependencies)
         .chain(updated_test_dependencies)
-        .chain(test_dep_sync_report.added)
-        .chain(test_dep_sync_report.removed)
         .collect_vec())
 }
 

@@ -165,9 +165,7 @@ async fn run_project_tests(
         let rockspec = project.toml().into_local()?;
         ensure_test_dependencies(workspace, project, rockspec, &test_config).await?;
     } else {
-        Sync::new(workspace, &test_config)
-            .sync_test_dependencies()
-            .await?;
+        Sync::new(workspace, &test_config).test(true).sync().await?;
     }
 
     BuildWorkspace::new(workspace, &test_config)
