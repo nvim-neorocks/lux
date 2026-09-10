@@ -205,6 +205,12 @@ fn lux_lib_resource_dir() -> Option<PathBuf> {
             })
     } else {
         // .deb and AppImage packages
+        if let Some(appdir) = std::env::var_os("APPDIR") {
+            let lib_dir = Path::new(&appdir).join("usr/share/lux-lua");
+            if lib_dir.is_dir() {
+                return Some(lib_dir);
+            }
+        }
         let lib_dir = PathBuf::from("/usr/share/lux-lua");
         if lib_dir.is_dir() {
             Some(lib_dir)

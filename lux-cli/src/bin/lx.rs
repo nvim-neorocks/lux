@@ -32,8 +32,10 @@ use tracing_subscriber::{
 use lux_cli::utils::error::clap_to_miette;
 
 const DEFAULT_USER_AGENT: &str = concat!("lux/", env!("CARGO_PKG_VERSION"));
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
+    restore_appimage_original_working_directory()?;
     miette::set_hook(Box::new(|_| {
         Box::new(
             MietteHandlerOpts::new()
@@ -209,6 +211,15 @@ async fn main() -> Result<()> {
         Commands::GenerateRockspec(data) => generate_rockspec::generate_rockspec(data).await?,
         Commands::Shell(data) => shell::shell(data, config).await?,
         Commands::Sync(sync_args) => sync::sync(sync_args, config).await?,
+    }
+    Ok(())
+}
+
+fn restore_appimage_original_working_directory() -> Result<()> {
+    if std::env::var_os("APPIMAGE").is_some() {
+        if let Some(owd) = std::env::var_os("OWD") {
+            std::env::set_current_dir(owd).into_diagnostic()?;
+        }
     }
     Ok(())
 }
