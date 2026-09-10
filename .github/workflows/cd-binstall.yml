@@ -75,7 +75,7 @@ jobs:
         run: brew install gpgme
 
       - name: Install Rust Toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         if: endsWith(matrix.target, 'windows-msvc')
 
       - name: Install MSVC Compiler Toolchain
