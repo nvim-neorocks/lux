@@ -36,6 +36,10 @@ pub struct Sync<'a> {
 
     /// Whether to validate the integrity of installed packages.
     validate_integrity: Option<bool>,
+
+    /// Whether to sync test dependencies
+    test: Option<bool>,
+
     /// When `true`, skip filesystem existence checks and rely on the install tree's lockfile
     /// alone.
     fast: Option<bool>,
@@ -55,47 +59,56 @@ impl<State> SyncBuilder<'_, State>
 where
     State: sync_builder::State + sync_builder::IsComplete,
 {
-    pub async fn sync_dependencies(self) -> Result<SyncReport, SyncError> {
-        do_sync(self._build(), &LocalPackageLockType::Regular).await
-    }
+    pub async fn sync(self) -> Result<SyncReport, SyncError> {
+        let mut args = self._build();
+        let test_report = if args.test.unwrap_or(false) {
+            Some(do_sync(&args, &LocalPackageLockType::Test).await?)
+        } else {
+            None
+        };
+        let mut report = do_sync(&args, &LocalPackageLockType::Regular).await?;
 
-    pub async fn sync_test_dependencies(mut self) -> Result<SyncReport, SyncError> {
-        for project in self.workspace.members() {
-            let toml = project.toml().into_local()?;
-            for test_dep in toml
-                .test()
-                .current_platform()
-                .test_dependencies(project)
-                .iter()
-                .filter(|test_dep| {
-                    !toml
-                        .test_dependencies()
-                        .current_platform()
-                        .iter()
-                        .any(|dep| dep.name() == test_dep.name())
-                })
-                .cloned()
-            {
-                self.extra_packages.push(test_dep);
-            }
-        }
-        do_sync(self._build(), &LocalPackageLockType::Test).await
-    }
+        // `do_sync` removes dependencies that aren't listed in the workspace lockfile
+        // or in `args.extra_packages`.
+        // To prevent loss of transitive build dependencies, we resolve them, and
+        // add them to `args.extra_packages` before syncing the workspace's build dependencies.
+        let lockfile = args.workspace.tree(args.config)?.lockfile()?;
+        let test_tree = args.workspace.test_tree(args.config)?;
+        let test_build_lockfile = test_tree.build_tree(args.config)?.lockfile()?;
+        let build_lockfile = args.workspace.build_tree(args.config)?.lockfile()?;
+        let transitive_build_dependencies = lockfile
+            .local_pkg_lock()
+            .rocks()
+            .values()
+            .flat_map(|rock| rock.build_dependencies())
+            .filter_map(|dep_id| build_lockfile.get(dep_id))
+            .chain(
+                test_tree
+                    .lockfile()?
+                    .local_pkg_lock()
+                    .rocks()
+                    .values()
+                    .flat_map(|rock| rock.build_dependencies())
+                    .filter_map(|dep_id| test_build_lockfile.get(dep_id)),
+            )
+            .map(|pkg| pkg.spec.as_package_req())
+            .collect_vec();
+        args.extra_packages.extend(transitive_build_dependencies);
 
-    pub async fn sync_build_dependencies(mut self) -> Result<SyncReport, SyncError> {
-        for project in self.workspace.members() {
-            let toml = project.toml().into_local()?;
-            if let Some(backend) = operations::resolve::luarocks_build_backend_name(&toml) {
-                self = self.add_package(backend.into());
-                if cfg!(target_family = "unix") {
-                    let luarocks = unsafe {
-                        PackageReq::new_unchecked("luarocks".into(), Some(LUAROCKS_VERSION.into()))
-                    };
-                    self = self.add_package(luarocks);
-                }
-            }
+        let build_report = do_sync(&args, &LocalPackageLockType::Build).await?;
+
+        operations::GenLuaRc::new()
+            .config(args.config)
+            .workspace(args.workspace)
+            .generate_luarc()
+            .await?;
+
+        report.merge(build_report);
+        if let Some(test_report) = test_report {
+            report.merge(test_report);
         }
-        do_sync(self._build(), &LocalPackageLockType::Build).await
+
+        Ok(report)
     }
 }
 
@@ -111,6 +124,11 @@ impl SyncReport {
     }
     pub fn removed(&self) -> &[LocalPackage] {
         &self.removed
+    }
+
+    fn merge(&mut self, other: SyncReport) {
+        self.added.extend(other.added);
+        self.removed.extend(other.removed);
     }
 }
 
@@ -156,7 +174,7 @@ pub enum SyncError {
 
 #[tracing::instrument(name = "Syncing dependencies", skip_all)]
 async fn do_sync(
-    args: Sync<'_>,
+    args: &Sync<'_>,
     lock_type: &LocalPackageLockType,
 ) -> Result<SyncReport, SyncError> {
     // NOTE(vhyrro): tools like cc and pkg-config leak cargo:rerun-if-env-changed
@@ -202,9 +220,46 @@ async fn do_sync(
             ),
         }
     }
+
+    let mut extra_packages = args.extra_packages.iter().cloned().collect_vec();
+    if lock_type == &LocalPackageLockType::Build {
+        for project in args.workspace.members() {
+            let toml = project.toml().into_local()?;
+            if let Some(backend) = operations::resolve::luarocks_build_backend_name(&toml) {
+                extra_packages.push(backend.into());
+                if cfg!(target_family = "unix") {
+                    let luarocks = unsafe {
+                        PackageReq::new_unchecked("luarocks".into(), Some(LUAROCKS_VERSION.into()))
+                    };
+                    extra_packages.push(luarocks);
+                }
+            }
+        }
+    } else if lock_type == &LocalPackageLockType::Test {
+        for project in args.workspace.members() {
+            let toml = project.toml().into_local()?;
+            for test_dep in toml
+                .test()
+                .current_platform()
+                .test_dependencies(project)
+                .iter()
+                .filter(|test_dep| {
+                    !toml
+                        .test_dependencies()
+                        .current_platform()
+                        .iter()
+                        .any(|dep| dep.name() == test_dep.name())
+                })
+                .cloned()
+            {
+                extra_packages.push(test_dep);
+            }
+        }
+    }
+
     let packages = packages
         .into_iter()
-        .chain(args.extra_packages.into_iter().map_into())
+        .chain(extra_packages.into_iter().unique().map_into())
         .collect_vec();
 
     let strategy = if args.fast.unwrap_or(false) {
@@ -257,7 +312,7 @@ async fn do_sync(
         .added
         .extend(to_add.iter().map(|(_, pkg)| pkg).cloned());
 
-    let package_db = workspace_lockfile.local_pkg_lock(lock_type).clone().into();
+    let package_db = workspace_lockfile.local_pkg_locks().into();
 
     Install::new(args.config)
         .package_db(package_db)
@@ -321,17 +376,7 @@ async fn do_sync(
         // Sync the newly added packages back to the workspace lockfile
         let dest_lockfile = tree.lockfile()?;
         workspace_lockfile.sync(dest_lockfile.local_pkg_lock(), lock_type);
-        if lock_type != &LocalPackageLockType::Build {
-            // ...including transitive build dependencies
-            workspace_lockfile.sync(dest_lockfile.local_pkg_lock(), &LocalPackageLockType::Build);
-        }
     }
-
-    operations::GenLuaRc::new()
-        .config(args.config)
-        .workspace(args.workspace)
-        .generate_luarc()
-        .await?;
 
     Ok(report)
 }
@@ -362,10 +407,7 @@ mod tests {
             .unwrap();
         let workspace = Workspace::from_exact(temp_dir.path()).unwrap().unwrap();
         let config = ConfigBuilder::new().unwrap().build().unwrap();
-        let report = Sync::new(&workspace, &config)
-            .sync_dependencies()
-            .await
-            .unwrap();
+        let report = Sync::new(&workspace, &config).sync().await.unwrap();
         assert!(report.removed.is_empty());
         assert!(!report.added.is_empty());
 
@@ -395,7 +437,7 @@ mod tests {
         {
             let report = Sync::new(&workspace, &config)
                 .add_package(PackageReq::new("toml-edit".into(), None).unwrap())
-                .sync_dependencies()
+                .sync()
                 .await
                 .unwrap();
             assert!(report.removed.is_empty());
@@ -432,7 +474,7 @@ mod tests {
         {
             let report = Sync::new(&workspace, &config)
                 .add_package(PackageReq::new("toml-edit".into(), None).unwrap())
-                .sync_dependencies()
+                .sync()
                 .await
                 .unwrap();
             assert!(report.removed.is_empty());
@@ -467,13 +509,10 @@ mod tests {
         // First sync to create the tree and lockfile
         Sync::new(&workspace, &config)
             .add_package(PackageReq::new("toml-edit".into(), None).unwrap())
-            .sync_dependencies()
+            .sync()
             .await
             .unwrap();
-        let report = Sync::new(&workspace, &config)
-            .sync_dependencies()
-            .await
-            .unwrap();
+        let report = Sync::new(&workspace, &config).sync().await.unwrap();
         assert!(!report.removed.is_empty());
         assert!(report.added.is_empty());
 

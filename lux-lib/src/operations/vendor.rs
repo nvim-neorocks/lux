@@ -194,7 +194,7 @@ async fn mk_resolve_args(
             // yet generated a lockfile).
             let lockfile = workspace.try_lockfile()?;
             let package_db = match lockfile {
-                Some(lockfile) if !no_lock => lockfile.local_pkg_lock(&lock_type).clone().into(),
+                Some(lockfile) if !no_lock => lockfile.local_pkg_locks().into(),
                 _ => RemotePackageDB::from_config(config).await?,
             };
             let mut install_specs = Vec::new();

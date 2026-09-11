@@ -115,9 +115,14 @@ impl<
 
         let lockfile = tree.lockfile()?;
         let mut lockfile = lockfile.write_guard();
+        let build_lockfile = tree.build_tree(config)?.lockfile()?;
+
         lockfile.add_entrypoint(&package);
         for dep in dependencies {
             lockfile.add_dependency(&package, &dep);
+        }
+        for dep in build_lockfile.rocks().values() {
+            lockfile.add_build_dependency(&package, dep);
         }
         Ok(package)
     }

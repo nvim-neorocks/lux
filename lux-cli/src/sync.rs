@@ -1,5 +1,5 @@
 use clap::Args;
-use lux_lib::{config::Config, lockfile::LocalPackage, operations::Sync, workspace::Workspace};
+use lux_lib::{config::Config, operations::Sync, workspace::Workspace};
 
 use miette::Result;
 
@@ -14,44 +14,21 @@ pub struct SyncProject {
 pub async fn sync(args: SyncProject, config: Config) -> Result<()> {
     let workspace = Workspace::current_or_err()?;
 
-    let dep_report = Sync::new(&workspace, &config)
+    let report = Sync::new(&workspace, &config)
         .validate_integrity(!args.no_integrity_check)
-        .sync_dependencies()
+        .test(true)
+        .sync()
         .await?;
 
-    let build_report = Sync::new(&workspace, &config)
-        .validate_integrity(false)
-        .sync_build_dependencies()
-        .await?;
-
-    let test_report = Sync::new(&workspace, &config)
-        .validate_integrity(false)
-        .sync_test_dependencies()
-        .await?;
-
-    let added: Vec<&LocalPackage> = dep_report
-        .added()
-        .iter()
-        .chain(build_report.added().iter())
-        .chain(test_report.added().iter())
-        .collect();
-
-    let removed: Vec<&LocalPackage> = dep_report
-        .removed()
-        .iter()
-        .chain(build_report.removed().iter())
-        .chain(test_report.removed().iter())
-        .collect();
-
-    if added.is_empty() && removed.is_empty() {
+    if report.added().is_empty() && report.removed().is_empty() {
         println!("Already in sync.");
         return Ok(());
     }
 
-    for pkg in added {
+    for pkg in report.added() {
         println!("+ {} {}", pkg.name(), pkg.version());
     }
-    for pkg in removed {
+    for pkg in report.removed() {
         println!("- {} {}", pkg.name(), pkg.version());
     }
 

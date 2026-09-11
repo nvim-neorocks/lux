@@ -218,23 +218,12 @@ impl TypedUserData for OperationsModule {
             "sync",
             |_, (workspace, config): (WorkspaceLua, ConfigLua)| async move {
                 let _runtime = lua_runtime().enter();
-                let deps = Sync::new(&workspace.0, &config.0)
-                    .sync_dependencies()
+                Sync::new(&workspace.0, &config.0)
+                    .test(true)
+                    .sync()
                     .await
-                    .into_lua_err()?;
-                let build = Sync::new(&workspace.0, &config.0)
-                    .sync_build_dependencies()
-                    .await
-                    .into_lua_err()?;
-                let test = Sync::new(&workspace.0, &config.0)
-                    .sync_test_dependencies()
-                    .await
-                    .into_lua_err()?;
-                Ok((
-                    SyncReportLua(deps),
-                    SyncReportLua(build),
-                    SyncReportLua(test),
-                ))
+                    .into_lua_err()
+                    .map(SyncReportLua)
             },
         );
 
@@ -246,22 +235,7 @@ impl TypedUserData for OperationsModule {
             |_, (workspace, config): (WorkspaceLua, ConfigLua)| async move {
                 let _runtime = lua_runtime().enter();
                 Sync::new(&workspace.0, &config.0)
-                    .sync_dependencies()
-                    .await
-                    .into_lua_err()
-                    .map(SyncReportLua)
-            },
-        );
-
-        methods.document("Sync workspace build dependencies");
-        methods.param("workspace", "Workspace to sync");
-        methods.param("config", "Lux config");
-        methods.add_async_function(
-            "sync_build_dependencies",
-            |_, (workspace, config): (WorkspaceLua, ConfigLua)| async move {
-                let _runtime = lua_runtime().enter();
-                Sync::new(&workspace.0, &config.0)
-                    .sync_build_dependencies()
+                    .sync()
                     .await
                     .into_lua_err()
                     .map(SyncReportLua)
@@ -271,17 +245,6 @@ impl TypedUserData for OperationsModule {
         methods.document("Sync workspace test dependencies");
         methods.param("workspace", "Workspace to sync");
         methods.param("config", "Lux config");
-        methods.add_async_function(
-            "sync_test_dependencies",
-            |_, (workspace, config): (WorkspaceLua, ConfigLua)| async move {
-                let _runtime = lua_runtime().enter();
-                Sync::new(&workspace.0, &config.0)
-                    .sync_test_dependencies()
-                    .await
-                    .into_lua_err()
-                    .map(SyncReportLua)
-            },
-        );
 
         methods.document("Build a workspace");
         methods.param("workspace", "Workspace to build");

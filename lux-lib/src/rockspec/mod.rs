@@ -136,6 +136,12 @@ impl<T: Rockspec> LuaVersionCompatibility for T {
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialOrd, Ord, Hash, PartialEq, Eq)]
 pub struct RockBinaries(Vec<PathBuf>);
 
+impl RockBinaries {
+    pub(crate) fn is_default(&self) -> bool {
+        &Self::default() == self
+    }
+}
+
 impl Deref for RockBinaries {
     type Target = Vec<PathBuf>;
 

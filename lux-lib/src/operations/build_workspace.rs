@@ -48,12 +48,9 @@ pub enum BuildWorkspaceError {
     #[error("error installind build dependencies")]
     #[diagnostic(forward(0))]
     InstallBuildDependencies(#[source] InstallError),
-    #[error("syncing dependencies with the project lockfile failed")]
+    #[error("syncing dependencies with the workspace lockfile failed")]
     #[diagnostic(forward(0))]
     SyncDependencies(#[source] SyncError),
-    #[error("syncing build dependencies with the project lockfile failed")]
-    #[diagnostic(forward(0))]
-    SyncBuildDependencies(#[source] SyncError),
     #[error("error building the workspace")]
     #[diagnostic(forward(0))]
     Build(#[from] BuildError),
@@ -99,14 +96,9 @@ async fn do_build(args: BuildWorkspace<'_>) -> Result<Vec<LocalPackage>, BuildWo
     let lua = LuaInstallation::new_from_config(config).await?;
     if !args.no_lock {
         Sync::new(workspace, config)
-            .sync_dependencies()
+            .sync()
             .await
             .map_err(BuildWorkspaceError::SyncDependencies)?;
-
-        Sync::new(workspace, config)
-            .sync_build_dependencies()
-            .await
-            .map_err(BuildWorkspaceError::SyncBuildDependencies)?;
     } else {
         let luarocks = LuaRocksInstallation::new(config, build_tree.clone())?;
         let mut dependencies_to_install = Vec::new();
@@ -201,10 +193,16 @@ async fn build_project(
         })
         .cloned()
         .collect_vec();
+
+    let build_lockfile = workspace.build_tree(config)?.lockfile()?;
+
     let mut lockfile = lockfile.write_guard();
     lockfile.add_entrypoint(&package);
     for dep in dependencies {
         lockfile.add_dependency(&package, &dep);
+    }
+    for dep in build_lockfile.rocks().values() {
+        lockfile.add_build_dependency(&package, dep);
     }
     Ok(package)
 }

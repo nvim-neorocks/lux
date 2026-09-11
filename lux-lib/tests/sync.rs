@@ -18,41 +18,42 @@ async fn sync_test_dependencies_empty_project() {
     let workspace = Workspace::from_exact(temp_dir.path()).unwrap().unwrap();
     let config = ConfigBuilder::new().unwrap().build().unwrap();
 
-    let lockfile_before_sync =
+    let lockfile_content_before_sync =
         String::from_utf8(tokio::fs::read(workspace.lockfile_path()).await.unwrap());
 
     Sync::new(&workspace, &config)
         .validate_integrity(cfg!(not(target_os = "windows")))
+        .test(true)
         .fast(true)
-        .sync_test_dependencies()
+        .sync()
         .await
         .unwrap();
 
-    let lockfile_after_sync =
+    let lockfile_content_after_sync =
         String::from_utf8(tokio::fs::read(workspace.lockfile_path()).await.unwrap());
 
     if cfg!(not(target_os = "windows")) {
         // Source hashes are different on Windows
-        assert_eq!(lockfile_before_sync, lockfile_after_sync);
+        assert_eq!(lockfile_content_before_sync, lockfile_content_after_sync);
     }
 
     let test_tree = workspace.tree(&config).unwrap().test_tree(&config).unwrap();
 
     assert!(matches!(
         test_tree
-            .match_rocks(&"busted@2.2.0-1".parse().unwrap())
+            .match_rocks(&"busted@2.3.0-1".parse().unwrap())
             .unwrap(),
         RockMatches::Single { .. }
     ));
     assert!(matches!(
         test_tree
-            .match_rocks(&"penlight@1.14.0-3".parse().unwrap())
+            .match_rocks(&"penlight@1.15.0-1".parse().unwrap())
             .unwrap(),
         RockMatches::Single { .. }
     ));
     assert!(matches!(
         test_tree
-            .match_rocks(&"luafilesystem@1.8.0-1".parse().unwrap())
+            .match_rocks(&"luafilesystem@1.9.0-1".parse().unwrap())
             .unwrap(),
         RockMatches::Single { .. }
     ));
@@ -71,8 +72,9 @@ async fn sync_multi_projects_same_dependencies() {
 
     Sync::new(&workspace, &config)
         .validate_integrity(cfg!(not(target_os = "windows")))
+        .test(true)
         .fast(true)
-        .sync_test_dependencies()
+        .sync()
         .await
         .unwrap();
 }
@@ -120,7 +122,7 @@ fallo = "2.2.0"
 
     Sync::new(&workspace, &config)
         .validate_integrity(cfg!(not(target_os = "windows")))
-        .sync_dependencies()
+        .sync()
         .await
         .unwrap();
 
@@ -132,7 +134,7 @@ fallo = "2.2.0"
 
     Sync::new(&workspace, &config)
         .validate_integrity(cfg!(not(target_os = "windows")))
-        .sync_dependencies()
+        .sync()
         .await
         .unwrap();
 
@@ -146,7 +148,7 @@ fallo = "2.2.0"
 /// Non-regression: https://github.com/lumen-oss/lux/issues/1892
 #[cfg(not(target_os = "windows"))]
 #[flaky_test(tokio, times = 5)]
-async fn sync_build_dependencies_adds_luarocks_build_backend() {
+async fn sync_dependencies_adds_luarocks_build_backend() {
     let sample_project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("resources/test/sample-projects/luarocks-build-backend/");
     let _ = tokio::fs::remove_dir_all(sample_project_dir.join(".lux")).await;
@@ -157,7 +159,7 @@ async fn sync_build_dependencies_adds_luarocks_build_backend() {
 
     Sync::new(&workspace, &config)
         .validate_integrity(cfg!(not(target_os = "windows")))
-        .sync_build_dependencies()
+        .sync()
         .await
         .unwrap();
 
@@ -184,7 +186,7 @@ async fn sync_dependencies_adds_transitive_build_dependencies() {
 
     Sync::new(&workspace, &config)
         .validate_integrity(cfg!(not(target_os = "windows")))
-        .sync_dependencies()
+        .sync()
         .await
         .unwrap();
 

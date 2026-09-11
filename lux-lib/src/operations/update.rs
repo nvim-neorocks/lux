@@ -145,9 +145,10 @@ async fn update_workspace(
     let mut project_lockfile = workspace.lockfile()?.write_guard();
     let tree = workspace.tree(args.config)?;
 
-    let dep_report = super::Sync::new(&workspace, args.config)
+    let sync_report = super::Sync::new(&workspace, args.config)
         .validate_integrity(args.validate_integrity.unwrap_or(false))
-        .sync_dependencies()
+        .test(true)
+        .sync()
         .await?;
 
     let updated_dependencies = update_dependency_tree(
@@ -158,16 +159,10 @@ async fn update_workspace(
         args.config,
         &args.packages,
     )
-    .await?
-    .into_iter()
-    .chain(dep_report.added)
-    .chain(dep_report.removed);
+    .await?;
 
     let test_tree = workspace.test_tree(args.config)?;
-    let dep_report = super::Sync::new(&workspace, args.config)
-        .validate_integrity(false)
-        .sync_test_dependencies()
-        .await?;
+
     let updated_test_dependencies = update_dependency_tree(
         test_tree,
         &mut project_lockfile,
@@ -176,17 +171,10 @@ async fn update_workspace(
         args.config,
         &args.test_dependencies,
     )
-    .await?
-    .into_iter()
-    .chain(dep_report.added)
-    .chain(dep_report.removed);
+    .await?;
 
     let build_tree = workspace.build_tree(args.config)?;
 
-    let dep_report = super::Sync::new(&workspace, args.config)
-        .validate_integrity(false)
-        .sync_build_dependencies()
-        .await?;
     let updated_build_dependencies = update_dependency_tree(
         build_tree,
         &mut project_lockfile,
@@ -195,15 +183,14 @@ async fn update_workspace(
         args.config,
         &args.build_dependencies,
     )
-    .await?
-    .into_iter()
-    .chain(dep_report.added)
-    .chain(dep_report.removed);
+    .await?;
 
     Ok(updated_dependencies
         .into_iter()
-        .chain(updated_test_dependencies)
+        .chain(sync_report.added)
+        .chain(sync_report.removed)
         .chain(updated_build_dependencies)
+        .chain(updated_test_dependencies)
         .collect_vec())
 }
 

@@ -82,24 +82,11 @@ pub async fn set_pinned_state(data: ChangePin, config: Config, pin: PinnedState)
                     )
                     .await?;
             }
-            if !packages.is_empty() {
-                operations::Sync::new(&workspace, &config)
-                    .sync_dependencies()
-                    .await
-                    .wrap_err("syncing dependencies with the project lockfile failed.")?;
-            }
-            if !build_packages.is_empty() {
-                operations::Sync::new(&workspace, &config)
-                    .sync_build_dependencies()
-                    .await
-                    .wrap_err("syncing build dependencies with the project lockfile failed.")?;
-            }
-            if !test_packages.is_empty() {
-                operations::Sync::new(&workspace, &config)
-                    .sync_test_dependencies()
-                    .await
-                    .wrap_err("syncing test dependencies with the project lockfile failed.")?;
-            }
+            operations::Sync::new(&workspace, &config)
+                .test(!test_packages.is_empty())
+                .sync()
+                .await
+                .wrap_err("syncing dependencies with the workspace lockfile failed.")?;
         }
         None => {
             let tree = config.user_tree(LuaVersion::from(&config)?.clone())?;

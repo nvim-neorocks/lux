@@ -276,11 +276,6 @@ mod tests {
     "{FOO_HASH}": {{
       "name": "foo",
       "version": "1.0.0-1",
-      "pinned": false,
-      "opt": false,
-      "dependencies": [],
-      "constraint": null,
-      "binaries": [],
       "source": "local",
       "hashes": {{
         "rockspec": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -301,11 +296,7 @@ mod tests {
     "{MAIN_HASH}": {{
       "name": "main",
       "version": "1.0.0-1",
-      "pinned": false,
-      "opt": false,
       "dependencies": ["{FOO_HASH}"],
-      "constraint": null,
-      "binaries": [],
       "source": "local",
       "hashes": {{
         "rockspec": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -315,11 +306,6 @@ mod tests {
     "{FOO_HASH}": {{
       "name": "foo",
       "version": "1.0.0-1",
-      "pinned": false,
-      "opt": false,
-      "dependencies": [],
-      "constraint": null,
-      "binaries": [],
       "source": "local",
       "hashes": {{
         "rockspec": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -566,11 +552,6 @@ mod tests {
     "{FOO_HASH}": {{
       "name": "foo",
       "version": "1.0.0-1",
-      "pinned": false,
-      "opt": false,
-      "dependencies": [],
-      "constraint": null,
-      "binaries": [],
       "source": "local",
       "hashes": {{
         "rockspec": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",

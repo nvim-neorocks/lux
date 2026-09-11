@@ -19,7 +19,7 @@ pub struct RemotePackageDB(Impl);
 #[derive(Clone, Debug)]
 enum Impl {
     LuarocksManifests(Vec<Manifest>),
-    Lock(LocalPackageLock),
+    LocalPackageLocks(Vec<LocalPackageLock>),
 }
 
 #[derive(Error, Debug, Diagnostic)]
@@ -90,14 +90,19 @@ impl RemotePackageDB {
                     None => Err(SearchError::RockNotFound(package_req.clone())),
                 }
             }
-            Impl::Lock(lockfile) => {
-                match lockfile.has_rock(package_req, filter).map(|local_package| {
-                    RemotePackage::new(
-                        PackageSpec::new(local_package.spec.name, local_package.spec.version),
-                        local_package.source,
-                        local_package.source_url,
-                    )
-                }) {
+            Impl::LocalPackageLocks(locks) => {
+                match locks
+                    .iter()
+                    .filter_map(|lock| lock.has_rock(package_req, filter.clone()))
+                    .map(|local_package| {
+                        RemotePackage::new(
+                            PackageSpec::new(local_package.spec.name, local_package.spec.version),
+                            local_package.source,
+                            local_package.source_url,
+                        )
+                    })
+                    .next()
+                {
                     Some(package) => Ok(package),
                     None => Err(SearchError::RockNotFoundInLockfile(package_req.clone())),
                 }
@@ -133,9 +138,9 @@ impl RemotePackageDB {
                         })
                 })
                 .collect(),
-            Impl::Lock(lockfile) => lockfile
-                .rocks()
-                .values()
+            Impl::LocalPackageLocks(locks) => locks
+                .iter()
+                .flat_map(|lock| lock.rocks().values())
                 .filter_map(|package| {
                     // NOTE: This doesn't group packages by name, but we don't care for now,
                     // as we shouldn't need to use this function with a lockfile.
@@ -175,8 +180,8 @@ impl From<Manifest> for RemotePackageDB {
     }
 }
 
-impl From<LocalPackageLock> for RemotePackageDB {
-    fn from(lock: LocalPackageLock) -> Self {
-        Self(Impl::Lock(lock))
+impl From<Vec<LocalPackageLock>> for RemotePackageDB {
+    fn from(locks: Vec<LocalPackageLock>) -> Self {
+        Self(Impl::LocalPackageLocks(locks))
     }
 }
