@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.63.0](https://github.com/lumen-oss/lux/compare/lux-lib-v0.62.0...lux-lib-v0.63.0) `lux-lib` - 2026-09-11
+
+### Fixed
+- *(sync)* [**breaking**] support transitive build dependencies ([#1929](https://github.com/lumen-oss/lux/pull/1929))
+- *(appimage)* restore working directory + lux-lua detection ([#1937](https://github.com/lumen-oss/lux/pull/1937))
+- *(sync)* include transitive build deps in workspace lockfile ([#1927](https://github.com/lumen-oss/lux/pull/1927))
+
 ## [0.62.0](https://github.com/lumen-oss/lux/compare/lux-lib-v0.61.0...lux-lib-v0.62.0) `lux-lib` - 2026-09-06
 
 ### Dependencies
