@@ -11,7 +11,6 @@ use lux_lib::{
     tree::{mk_rock_layout, RockLayout},
 };
 use mlua::prelude::*;
-use path_absolutize::Absolutize;
 
 // NOTE: The loader runs on the Lua thread.
 thread_local! {
@@ -245,7 +244,7 @@ fn load_from_installed_tree(lua: &Lua, module: &str) -> mlua::Result<Option<mlua
 
 pub fn loader(lua: &Lua, module: String) -> mlua::Result<Option<mlua::Function>> {
     if let Some(current_file) = current_file(lua) {
-        if let Ok(current_file) = PathBuf::from(current_file).absolutize() {
+        if let Ok(current_file) = std::fs::canonicalize(current_file) {
             if let Some(loader) = load_from_workspace_tree(lua, &module, &current_file)? {
                 return Ok(Some(loader));
             }

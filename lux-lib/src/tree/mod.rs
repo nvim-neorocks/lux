@@ -259,8 +259,26 @@ impl InstallTree for Tree {
     fn entrypoint(&self, package: &LocalPackage) -> io::Result<RockLayout> {
         let rock_layout = self.entrypoint_layout(package);
         fs::sync::create_dir_all(&rock_layout.rock_path).map_err(io::Error::other)?;
-        fs::sync::create_dir_all(&rock_layout.lib).map_err(io::Error::other)?;
-        fs::sync::create_dir_all(&rock_layout.src).map_err(io::Error::other)?;
+
+        if self.entrypoint_layout.root.is_some() {
+            let standard_lib = rock_layout.rock_path.join("lib");
+            let standard_src = rock_layout.rock_path.join("src");
+            let standard_etc = rock_layout.rock_path.join("etc");
+            fs::sync::create_dir_all(&standard_lib).map_err(io::Error::other)?;
+            fs::sync::create_dir_all(&standard_src).map_err(io::Error::other)?;
+            fs::sync::create_dir_all(&standard_etc).map_err(io::Error::other)?;
+
+            create_custom_layout_symlinks(
+                &self.root(),
+                &rock_layout,
+                package,
+                &self.entrypoint_layout,
+            )?;
+        } else {
+            fs::sync::create_dir_all(&rock_layout.lib).map_err(io::Error::other)?;
+            fs::sync::create_dir_all(&rock_layout.src).map_err(io::Error::other)?;
+        }
+
         Ok(rock_layout)
     }
 
@@ -389,22 +407,19 @@ pub fn mk_rock_layout(
 ) -> RockLayout {
     let (etc, lib, src) = if let Some(ref root) = layout_config.root {
         let base = tree_root.join(root);
-
         let etc = match package.spec.opt {
             OptState::Required => base.join(&layout_config.etc),
             OptState::Optional => base.join(&layout_config.opt_etc),
         }
-        .join(format!("{}", package.name()));
-
+        .join(package.name().to_string());
         let lib = etc.join(&layout_config.lib);
         let src = etc.join(&layout_config.src);
-
         (etc, lib, src)
     } else {
-        let etc = rock_path.join(&layout_config.etc);
-        let lib = rock_path.join(&layout_config.lib);
-        let src = rock_path.join(&layout_config.src);
-
+        // Always use default directory names for standard layout
+        let etc = rock_path.join("etc");
+        let lib = rock_path.join("lib");
+        let src = rock_path.join("src");
         (etc, lib, src)
     };
     let conf = etc.join(&layout_config.conf);
@@ -419,6 +434,71 @@ pub fn mk_rock_layout(
         conf,
         doc,
     }
+}
+
+/// Create symlinks from custom layout paths to standard package directories.
+/// This allows external tools (like Neovim) to find files at expected custom paths
+/// while the actual files remain in standard locations.
+pub fn create_custom_layout_symlinks(
+    tree_root: &Path,
+    rock_layout: &RockLayout,
+    package: &LocalPackage,
+    layout_config: &RockLayoutConfig,
+) -> io::Result<()> {
+    let Some(ref root) = layout_config.root else {
+        return Ok(());
+    };
+
+    // Always use default directory names for standard layout
+    let standard_etc = rock_layout.rock_path.join("etc");
+    let standard_lib = rock_layout.rock_path.join("lib");
+    let standard_src = rock_layout.rock_path.join("src");
+
+    let base = tree_root.join(root);
+    let custom_etc = match package.spec.opt {
+        OptState::Required => base.join(&layout_config.etc),
+        OptState::Optional => base.join(&layout_config.opt_etc),
+    }
+    .join(package.name().to_string());
+
+    fs::sync::create_dir_all(&custom_etc).map_err(io::Error::other)?;
+
+    // Create symlinks for src and lib (they always exist)
+    try_create_symlink(&standard_src, &custom_etc.join(&layout_config.src))?;
+    try_create_symlink(&standard_lib, &custom_etc.join(&layout_config.lib))?;
+
+    // Iterate over contents of standard etc directory and create symlinks for each item
+    if standard_etc.exists() {
+        for entry in std::fs::read_dir(&standard_etc)? {
+            let entry = entry?;
+            let file_name = entry.file_name();
+            let link_path = custom_etc.join(&file_name);
+            try_create_symlink(&entry.path(), &link_path)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn try_create_symlink(target: &Path, link: &Path) -> io::Result<()> {
+    if link.exists() || link.symlink_metadata().is_ok() {
+        return Ok(());
+    }
+
+    let relative = pathdiff::diff_paths(
+        target,
+        link.parent()
+            .ok_or_else(|| io::Error::other("invalid parent directory"))?,
+    )
+    .ok_or_else(|| io::Error::other("failed to compute relative path for symlink"))?;
+
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(relative, link)?;
+
+    #[cfg(windows)]
+    std::os::windows::fs::symlink_dir(relative, link)?;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -558,7 +638,7 @@ mod tests {
         let tree_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/sample-tree");
 
-        let temp = assert_fs::TempDir::new().unwrap();
+        let temp = assert_fs::TempDir::new().unwrap().into_persistent();
         temp.copy_from(&tree_path, &["**"]).unwrap();
 
         let tree_path = temp.to_path_buf();
@@ -582,8 +662,8 @@ mod tests {
         };
 
         let package = LocalPackage::from(
-            &PackageSpec::parse("neorg".into(), "8.0.0-1".into()).unwrap(),
-            LockConstraint::Unconstrained,
+            &PackageSpec::parse("neorg".into(), "8.8.1-1".into()).unwrap(),
+            LockConstraint::Constrained("==8.8.1".parse().unwrap()),
             RockBinaries::default(),
             RemotePackageSource::Test,
             None,
@@ -591,13 +671,14 @@ mod tests {
         );
 
         let id = package.id();
+
         let neorg = tree.entrypoint(&package).unwrap();
 
         assert_eq!(
             neorg,
             RockLayout {
                 bin: tree_path.join("5.1/bin"),
-                rock_path: tree_path.join(format!("5.1/{id}-neorg@8.0.0-1")),
+                rock_path: tree_path.join(format!("5.1/{id}-neorg@8.8.1-1")),
                 etc: tree_path.join("5.1/site/pack/lux/start/neorg"),
                 lib: tree_path.join("5.1/site/pack/lux/start/neorg/lib"),
                 src: tree_path.join("5.1/site/pack/lux/start/neorg/lua"),
@@ -605,6 +686,37 @@ mod tests {
                 doc: tree_path.join("5.1/site/pack/lux/start/neorg/doc"),
             }
         );
+
+        let custom_base = tree_path.join("5.1/site/pack/lux/start/neorg");
+
+        assert!(
+            custom_base.join("lua").symlink_metadata().is_ok(),
+            "lua symlink should exist"
+        );
+        assert!(
+            custom_base.join("lib").symlink_metadata().is_ok(),
+            "lib symlink should exist"
+        );
+        assert!(
+            custom_base.join("conf").symlink_metadata().is_err(),
+            "conf symlink should not exist"
+        );
+        assert!(
+            custom_base.join("doc").symlink_metadata().is_err(),
+            "doc symlink should not exist"
+        );
+
+        let lua_target = std::fs::canonicalize(custom_base.join("lua/foo/bar.lua")).unwrap();
+
+        assert!(lua_target
+            .to_string_lossy()
+            .contains(&format!("{id}-neorg@8.8.1-1/src")));
+
+        let plugin_target = std::fs::canonicalize(custom_base.join("plugin")).unwrap();
+
+        assert!(plugin_target
+            .to_string_lossy()
+            .contains(&format!("{id}-neorg@8.8.1-1/etc/plugin")));
     }
 
     #[test]
