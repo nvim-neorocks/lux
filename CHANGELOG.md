@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.44.0](https://github.com/lumen-oss/lux/compare/lux-lsp-v0.43.5...lux-lsp-v0.44.0) `lux-lsp` - 2026-09-11
+
+### Other
+- update Cargo.lock dependencies
+
+## [0.63.0](https://github.com/lumen-oss/lux/compare/lux-lib-v0.62.0...lux-lib-v0.63.0) `lux-lib` - 2026-09-11
+
+### Fixed
+- *(sync)* [**breaking**] support transitive build dependencies ([#1929](https://github.com/lumen-oss/lux/pull/1929))
+- *(appimage)* restore working directory + lux-lua detection ([#1937](https://github.com/lumen-oss/lux/pull/1937))
+- *(sync)* include transitive build deps in workspace lockfile ([#1927](https://github.com/lumen-oss/lux/pull/1927))
+
+## [0.44.0](https://github.com/lumen-oss/lux/compare/v0.43.5...v0.44.0) `lux-cli` - 2026-09-11
+
+### Fixed
+- *(sync)* [**breaking**] support transitive build dependencies ([#1929](https://github.com/lumen-oss/lux/pull/1929))
+- *(appimage)* restore working directory + lux-lua detection ([#1937](https://github.com/lumen-oss/lux/pull/1937))
+
 ## [0.43.5](https://github.com/lumen-oss/lux/compare/lux-lsp-v0.43.4...lux-lsp-v0.43.5) `lux-lsp` - 2026-09-06
 
 ### Other
